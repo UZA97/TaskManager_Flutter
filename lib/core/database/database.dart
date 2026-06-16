@@ -3,8 +3,10 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 part 'database.g.dart';
 
-// 테이블 정의
-class Notes extends Table {
+class NoteTable extends Table {
+  @override
+  String get tableName => 'notes';
+
   IntColumn get id => integer().autoIncrement()();
   TextColumn get title => text().withDefault(const Constant(''))();
   TextColumn get content => text().withDefault(const Constant(''))();
@@ -12,28 +14,40 @@ class Notes extends Table {
   TextColumn get updatedAt => text()();
 }
 
-class Tags extends Table {
+class TagTable extends Table {
+  @override
+  String get tableName => 'tags';
+
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().unique()();
 }
 
-class NoteTags extends Table {
-  IntColumn get noteId => integer().references(Notes, #id)();
-  IntColumn get tagId => integer().references(Tags, #id)();
+class NoteTagTable extends Table {
+  @override
+  String get tableName => 'note_tags';
+
+  IntColumn get noteId => integer().references(NoteTable, #id)();
+  IntColumn get tagId => integer().references(TagTable, #id)();
 
   @override
   Set<Column> get primaryKey => {noteId, tagId};
 }
 
-class Attachments extends Table {
+class AttachmentTable extends Table {
+  @override
+  String get tableName => 'attachments';
+
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get noteId => integer().references(Notes, #id)();
+  IntColumn get noteId => integer().references(NoteTable, #id)();
   TextColumn get fileName => text()();
   TextColumn get filePath => text()();
   TextColumn get createdAt => text()();
 }
 
-class Settings extends Table {
+class SettingTable extends Table {
+  @override
+  String get tableName => 'settings';
+
   TextColumn get key => text()();
   TextColumn get value => text()();
 
@@ -41,7 +55,9 @@ class Settings extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Notes, Tags, NoteTags, Attachments, Settings])
+@DriftDatabase(
+  tables: [NoteTable, TagTable, NoteTagTable, AttachmentTable, SettingTable],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 

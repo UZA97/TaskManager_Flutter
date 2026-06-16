@@ -3,11 +3,12 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
-class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
+class $NoteTableTable extends NoteTable
+    with TableInfo<$NoteTableTable, NoteTableData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $NotesTable(this.attachedDatabase, [this._alias]);
+  $NoteTableTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
@@ -80,7 +81,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
   static const String $name = 'notes';
   @override
   VerificationContext validateIntegrity(
-    Insertable<Note> instance, {
+    Insertable<NoteTableData> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -122,9 +123,9 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Note map(Map<String, dynamic> data, {String? tablePrefix}) {
+  NoteTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Note(
+    return NoteTableData(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}id'],
@@ -149,18 +150,18 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
   }
 
   @override
-  $NotesTable createAlias(String alias) {
-    return $NotesTable(attachedDatabase, alias);
+  $NoteTableTable createAlias(String alias) {
+    return $NoteTableTable(attachedDatabase, alias);
   }
 }
 
-class Note extends DataClass implements Insertable<Note> {
+class NoteTableData extends DataClass implements Insertable<NoteTableData> {
   final int id;
   final String title;
   final String content;
   final String createdAt;
   final String updatedAt;
-  const Note({
+  const NoteTableData({
     required this.id,
     required this.title,
     required this.content,
@@ -178,8 +179,8 @@ class Note extends DataClass implements Insertable<Note> {
     return map;
   }
 
-  NotesCompanion toCompanion(bool nullToAbsent) {
-    return NotesCompanion(
+  NoteTableCompanion toCompanion(bool nullToAbsent) {
+    return NoteTableCompanion(
       id: Value(id),
       title: Value(title),
       content: Value(content),
@@ -188,12 +189,12 @@ class Note extends DataClass implements Insertable<Note> {
     );
   }
 
-  factory Note.fromJson(
+  factory NoteTableData.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Note(
+    return NoteTableData(
       id: serializer.fromJson<int>(json['id']),
       title: serializer.fromJson<String>(json['title']),
       content: serializer.fromJson<String>(json['content']),
@@ -213,21 +214,21 @@ class Note extends DataClass implements Insertable<Note> {
     };
   }
 
-  Note copyWith({
+  NoteTableData copyWith({
     int? id,
     String? title,
     String? content,
     String? createdAt,
     String? updatedAt,
-  }) => Note(
+  }) => NoteTableData(
     id: id ?? this.id,
     title: title ?? this.title,
     content: content ?? this.content,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
-  Note copyWithCompanion(NotesCompanion data) {
-    return Note(
+  NoteTableData copyWithCompanion(NoteTableCompanion data) {
+    return NoteTableData(
       id: data.id.present ? data.id.value : this.id,
       title: data.title.present ? data.title.value : this.title,
       content: data.content.present ? data.content.value : this.content,
@@ -238,7 +239,7 @@ class Note extends DataClass implements Insertable<Note> {
 
   @override
   String toString() {
-    return (StringBuffer('Note(')
+    return (StringBuffer('NoteTableData(')
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('content: $content, ')
@@ -253,7 +254,7 @@ class Note extends DataClass implements Insertable<Note> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Note &&
+      (other is NoteTableData &&
           other.id == this.id &&
           other.title == this.title &&
           other.content == this.content &&
@@ -261,20 +262,20 @@ class Note extends DataClass implements Insertable<Note> {
           other.updatedAt == this.updatedAt);
 }
 
-class NotesCompanion extends UpdateCompanion<Note> {
+class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
   final Value<int> id;
   final Value<String> title;
   final Value<String> content;
   final Value<String> createdAt;
   final Value<String> updatedAt;
-  const NotesCompanion({
+  const NoteTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.content = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
-  NotesCompanion.insert({
+  NoteTableCompanion.insert({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.content = const Value.absent(),
@@ -282,7 +283,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
     required String updatedAt,
   }) : createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
-  static Insertable<Note> custom({
+  static Insertable<NoteTableData> custom({
     Expression<int>? id,
     Expression<String>? title,
     Expression<String>? content,
@@ -298,14 +299,14 @@ class NotesCompanion extends UpdateCompanion<Note> {
     });
   }
 
-  NotesCompanion copyWith({
+  NoteTableCompanion copyWith({
     Value<int>? id,
     Value<String>? title,
     Value<String>? content,
     Value<String>? createdAt,
     Value<String>? updatedAt,
   }) {
-    return NotesCompanion(
+    return NoteTableCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
       content: content ?? this.content,
@@ -337,7 +338,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
 
   @override
   String toString() {
-    return (StringBuffer('NotesCompanion(')
+    return (StringBuffer('NoteTableCompanion(')
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('content: $content, ')
@@ -348,11 +349,12 @@ class NotesCompanion extends UpdateCompanion<Note> {
   }
 }
 
-class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
+class $TagTableTable extends TagTable
+    with TableInfo<$TagTableTable, TagTableData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $TagsTable(this.attachedDatabase, [this._alias]);
+  $TagTableTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
@@ -385,7 +387,7 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
   static const String $name = 'tags';
   @override
   VerificationContext validateIntegrity(
-    Insertable<Tag> instance, {
+    Insertable<TagTableData> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -407,9 +409,9 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Tag map(Map<String, dynamic> data, {String? tablePrefix}) {
+  TagTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Tag(
+    return TagTableData(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}id'],
@@ -422,15 +424,15 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
   }
 
   @override
-  $TagsTable createAlias(String alias) {
-    return $TagsTable(attachedDatabase, alias);
+  $TagTableTable createAlias(String alias) {
+    return $TagTableTable(attachedDatabase, alias);
   }
 }
 
-class Tag extends DataClass implements Insertable<Tag> {
+class TagTableData extends DataClass implements Insertable<TagTableData> {
   final int id;
   final String name;
-  const Tag({required this.id, required this.name});
+  const TagTableData({required this.id, required this.name});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -439,16 +441,16 @@ class Tag extends DataClass implements Insertable<Tag> {
     return map;
   }
 
-  TagsCompanion toCompanion(bool nullToAbsent) {
-    return TagsCompanion(id: Value(id), name: Value(name));
+  TagTableCompanion toCompanion(bool nullToAbsent) {
+    return TagTableCompanion(id: Value(id), name: Value(name));
   }
 
-  factory Tag.fromJson(
+  factory TagTableData.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Tag(
+    return TagTableData(
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
     );
@@ -462,10 +464,10 @@ class Tag extends DataClass implements Insertable<Tag> {
     };
   }
 
-  Tag copyWith({int? id, String? name}) =>
-      Tag(id: id ?? this.id, name: name ?? this.name);
-  Tag copyWithCompanion(TagsCompanion data) {
-    return Tag(
+  TagTableData copyWith({int? id, String? name}) =>
+      TagTableData(id: id ?? this.id, name: name ?? this.name);
+  TagTableData copyWithCompanion(TagTableCompanion data) {
+    return TagTableData(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
     );
@@ -473,7 +475,7 @@ class Tag extends DataClass implements Insertable<Tag> {
 
   @override
   String toString() {
-    return (StringBuffer('Tag(')
+    return (StringBuffer('TagTableData(')
           ..write('id: $id, ')
           ..write('name: $name')
           ..write(')'))
@@ -485,19 +487,21 @@ class Tag extends DataClass implements Insertable<Tag> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Tag && other.id == this.id && other.name == this.name);
+      (other is TagTableData && other.id == this.id && other.name == this.name);
 }
 
-class TagsCompanion extends UpdateCompanion<Tag> {
+class TagTableCompanion extends UpdateCompanion<TagTableData> {
   final Value<int> id;
   final Value<String> name;
-  const TagsCompanion({
+  const TagTableCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
   });
-  TagsCompanion.insert({this.id = const Value.absent(), required String name})
-    : name = Value(name);
-  static Insertable<Tag> custom({
+  TagTableCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+  }) : name = Value(name);
+  static Insertable<TagTableData> custom({
     Expression<int>? id,
     Expression<String>? name,
   }) {
@@ -507,8 +511,8 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     });
   }
 
-  TagsCompanion copyWith({Value<int>? id, Value<String>? name}) {
-    return TagsCompanion(id: id ?? this.id, name: name ?? this.name);
+  TagTableCompanion copyWith({Value<int>? id, Value<String>? name}) {
+    return TagTableCompanion(id: id ?? this.id, name: name ?? this.name);
   }
 
   @override
@@ -525,7 +529,7 @@ class TagsCompanion extends UpdateCompanion<Tag> {
 
   @override
   String toString() {
-    return (StringBuffer('TagsCompanion(')
+    return (StringBuffer('TagTableCompanion(')
           ..write('id: $id, ')
           ..write('name: $name')
           ..write(')'))
@@ -533,11 +537,12 @@ class TagsCompanion extends UpdateCompanion<Tag> {
   }
 }
 
-class $NoteTagsTable extends NoteTags with TableInfo<$NoteTagsTable, NoteTag> {
+class $NoteTagTableTable extends NoteTagTable
+    with TableInfo<$NoteTagTableTable, NoteTagTableData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $NoteTagsTable(this.attachedDatabase, [this._alias]);
+  $NoteTagTableTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
   @override
   late final GeneratedColumn<int> noteId = GeneratedColumn<int>(
@@ -571,7 +576,7 @@ class $NoteTagsTable extends NoteTags with TableInfo<$NoteTagsTable, NoteTag> {
   static const String $name = 'note_tags';
   @override
   VerificationContext validateIntegrity(
-    Insertable<NoteTag> instance, {
+    Insertable<NoteTagTableData> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -598,9 +603,9 @@ class $NoteTagsTable extends NoteTags with TableInfo<$NoteTagsTable, NoteTag> {
   @override
   Set<GeneratedColumn> get $primaryKey => {noteId, tagId};
   @override
-  NoteTag map(Map<String, dynamic> data, {String? tablePrefix}) {
+  NoteTagTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return NoteTag(
+    return NoteTagTableData(
       noteId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}note_id'],
@@ -613,15 +618,16 @@ class $NoteTagsTable extends NoteTags with TableInfo<$NoteTagsTable, NoteTag> {
   }
 
   @override
-  $NoteTagsTable createAlias(String alias) {
-    return $NoteTagsTable(attachedDatabase, alias);
+  $NoteTagTableTable createAlias(String alias) {
+    return $NoteTagTableTable(attachedDatabase, alias);
   }
 }
 
-class NoteTag extends DataClass implements Insertable<NoteTag> {
+class NoteTagTableData extends DataClass
+    implements Insertable<NoteTagTableData> {
   final int noteId;
   final int tagId;
-  const NoteTag({required this.noteId, required this.tagId});
+  const NoteTagTableData({required this.noteId, required this.tagId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -630,16 +636,16 @@ class NoteTag extends DataClass implements Insertable<NoteTag> {
     return map;
   }
 
-  NoteTagsCompanion toCompanion(bool nullToAbsent) {
-    return NoteTagsCompanion(noteId: Value(noteId), tagId: Value(tagId));
+  NoteTagTableCompanion toCompanion(bool nullToAbsent) {
+    return NoteTagTableCompanion(noteId: Value(noteId), tagId: Value(tagId));
   }
 
-  factory NoteTag.fromJson(
+  factory NoteTagTableData.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return NoteTag(
+    return NoteTagTableData(
       noteId: serializer.fromJson<int>(json['noteId']),
       tagId: serializer.fromJson<int>(json['tagId']),
     );
@@ -653,10 +659,12 @@ class NoteTag extends DataClass implements Insertable<NoteTag> {
     };
   }
 
-  NoteTag copyWith({int? noteId, int? tagId}) =>
-      NoteTag(noteId: noteId ?? this.noteId, tagId: tagId ?? this.tagId);
-  NoteTag copyWithCompanion(NoteTagsCompanion data) {
-    return NoteTag(
+  NoteTagTableData copyWith({int? noteId, int? tagId}) => NoteTagTableData(
+    noteId: noteId ?? this.noteId,
+    tagId: tagId ?? this.tagId,
+  );
+  NoteTagTableData copyWithCompanion(NoteTagTableCompanion data) {
+    return NoteTagTableData(
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
       tagId: data.tagId.present ? data.tagId.value : this.tagId,
     );
@@ -664,7 +672,7 @@ class NoteTag extends DataClass implements Insertable<NoteTag> {
 
   @override
   String toString() {
-    return (StringBuffer('NoteTag(')
+    return (StringBuffer('NoteTagTableData(')
           ..write('noteId: $noteId, ')
           ..write('tagId: $tagId')
           ..write(')'))
@@ -676,27 +684,27 @@ class NoteTag extends DataClass implements Insertable<NoteTag> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is NoteTag &&
+      (other is NoteTagTableData &&
           other.noteId == this.noteId &&
           other.tagId == this.tagId);
 }
 
-class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
+class NoteTagTableCompanion extends UpdateCompanion<NoteTagTableData> {
   final Value<int> noteId;
   final Value<int> tagId;
   final Value<int> rowid;
-  const NoteTagsCompanion({
+  const NoteTagTableCompanion({
     this.noteId = const Value.absent(),
     this.tagId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  NoteTagsCompanion.insert({
+  NoteTagTableCompanion.insert({
     required int noteId,
     required int tagId,
     this.rowid = const Value.absent(),
   }) : noteId = Value(noteId),
        tagId = Value(tagId);
-  static Insertable<NoteTag> custom({
+  static Insertable<NoteTagTableData> custom({
     Expression<int>? noteId,
     Expression<int>? tagId,
     Expression<int>? rowid,
@@ -708,12 +716,12 @@ class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
     });
   }
 
-  NoteTagsCompanion copyWith({
+  NoteTagTableCompanion copyWith({
     Value<int>? noteId,
     Value<int>? tagId,
     Value<int>? rowid,
   }) {
-    return NoteTagsCompanion(
+    return NoteTagTableCompanion(
       noteId: noteId ?? this.noteId,
       tagId: tagId ?? this.tagId,
       rowid: rowid ?? this.rowid,
@@ -737,7 +745,7 @@ class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
 
   @override
   String toString() {
-    return (StringBuffer('NoteTagsCompanion(')
+    return (StringBuffer('NoteTagTableCompanion(')
           ..write('noteId: $noteId, ')
           ..write('tagId: $tagId, ')
           ..write('rowid: $rowid')
@@ -746,12 +754,12 @@ class NoteTagsCompanion extends UpdateCompanion<NoteTag> {
   }
 }
 
-class $AttachmentsTable extends Attachments
-    with TableInfo<$AttachmentsTable, Attachment> {
+class $AttachmentTableTable extends AttachmentTable
+    with TableInfo<$AttachmentTableTable, AttachmentTableData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $AttachmentsTable(this.attachedDatabase, [this._alias]);
+  $AttachmentTableTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
@@ -825,7 +833,7 @@ class $AttachmentsTable extends Attachments
   static const String $name = 'attachments';
   @override
   VerificationContext validateIntegrity(
-    Insertable<Attachment> instance, {
+    Insertable<AttachmentTableData> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -871,9 +879,9 @@ class $AttachmentsTable extends Attachments
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Attachment map(Map<String, dynamic> data, {String? tablePrefix}) {
+  AttachmentTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Attachment(
+    return AttachmentTableData(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}id'],
@@ -898,18 +906,19 @@ class $AttachmentsTable extends Attachments
   }
 
   @override
-  $AttachmentsTable createAlias(String alias) {
-    return $AttachmentsTable(attachedDatabase, alias);
+  $AttachmentTableTable createAlias(String alias) {
+    return $AttachmentTableTable(attachedDatabase, alias);
   }
 }
 
-class Attachment extends DataClass implements Insertable<Attachment> {
+class AttachmentTableData extends DataClass
+    implements Insertable<AttachmentTableData> {
   final int id;
   final int noteId;
   final String fileName;
   final String filePath;
   final String createdAt;
-  const Attachment({
+  const AttachmentTableData({
     required this.id,
     required this.noteId,
     required this.fileName,
@@ -927,8 +936,8 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     return map;
   }
 
-  AttachmentsCompanion toCompanion(bool nullToAbsent) {
-    return AttachmentsCompanion(
+  AttachmentTableCompanion toCompanion(bool nullToAbsent) {
+    return AttachmentTableCompanion(
       id: Value(id),
       noteId: Value(noteId),
       fileName: Value(fileName),
@@ -937,12 +946,12 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     );
   }
 
-  factory Attachment.fromJson(
+  factory AttachmentTableData.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Attachment(
+    return AttachmentTableData(
       id: serializer.fromJson<int>(json['id']),
       noteId: serializer.fromJson<int>(json['noteId']),
       fileName: serializer.fromJson<String>(json['fileName']),
@@ -962,21 +971,21 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     };
   }
 
-  Attachment copyWith({
+  AttachmentTableData copyWith({
     int? id,
     int? noteId,
     String? fileName,
     String? filePath,
     String? createdAt,
-  }) => Attachment(
+  }) => AttachmentTableData(
     id: id ?? this.id,
     noteId: noteId ?? this.noteId,
     fileName: fileName ?? this.fileName,
     filePath: filePath ?? this.filePath,
     createdAt: createdAt ?? this.createdAt,
   );
-  Attachment copyWithCompanion(AttachmentsCompanion data) {
-    return Attachment(
+  AttachmentTableData copyWithCompanion(AttachmentTableCompanion data) {
+    return AttachmentTableData(
       id: data.id.present ? data.id.value : this.id,
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
       fileName: data.fileName.present ? data.fileName.value : this.fileName,
@@ -987,7 +996,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
 
   @override
   String toString() {
-    return (StringBuffer('Attachment(')
+    return (StringBuffer('AttachmentTableData(')
           ..write('id: $id, ')
           ..write('noteId: $noteId, ')
           ..write('fileName: $fileName, ')
@@ -1002,7 +1011,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Attachment &&
+      (other is AttachmentTableData &&
           other.id == this.id &&
           other.noteId == this.noteId &&
           other.fileName == this.fileName &&
@@ -1010,20 +1019,20 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           other.createdAt == this.createdAt);
 }
 
-class AttachmentsCompanion extends UpdateCompanion<Attachment> {
+class AttachmentTableCompanion extends UpdateCompanion<AttachmentTableData> {
   final Value<int> id;
   final Value<int> noteId;
   final Value<String> fileName;
   final Value<String> filePath;
   final Value<String> createdAt;
-  const AttachmentsCompanion({
+  const AttachmentTableCompanion({
     this.id = const Value.absent(),
     this.noteId = const Value.absent(),
     this.fileName = const Value.absent(),
     this.filePath = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
-  AttachmentsCompanion.insert({
+  AttachmentTableCompanion.insert({
     this.id = const Value.absent(),
     required int noteId,
     required String fileName,
@@ -1033,7 +1042,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
        fileName = Value(fileName),
        filePath = Value(filePath),
        createdAt = Value(createdAt);
-  static Insertable<Attachment> custom({
+  static Insertable<AttachmentTableData> custom({
     Expression<int>? id,
     Expression<int>? noteId,
     Expression<String>? fileName,
@@ -1049,14 +1058,14 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     });
   }
 
-  AttachmentsCompanion copyWith({
+  AttachmentTableCompanion copyWith({
     Value<int>? id,
     Value<int>? noteId,
     Value<String>? fileName,
     Value<String>? filePath,
     Value<String>? createdAt,
   }) {
-    return AttachmentsCompanion(
+    return AttachmentTableCompanion(
       id: id ?? this.id,
       noteId: noteId ?? this.noteId,
       fileName: fileName ?? this.fileName,
@@ -1088,7 +1097,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
 
   @override
   String toString() {
-    return (StringBuffer('AttachmentsCompanion(')
+    return (StringBuffer('AttachmentTableCompanion(')
           ..write('id: $id, ')
           ..write('noteId: $noteId, ')
           ..write('fileName: $fileName, ')
@@ -1099,11 +1108,12 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
   }
 }
 
-class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
+class $SettingTableTable extends SettingTable
+    with TableInfo<$SettingTableTable, SettingTableData> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $SettingsTable(this.attachedDatabase, [this._alias]);
+  $SettingTableTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _keyMeta = const VerificationMeta('key');
   @override
   late final GeneratedColumn<String> key = GeneratedColumn<String>(
@@ -1131,7 +1141,7 @@ class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
   static const String $name = 'settings';
   @override
   VerificationContext validateIntegrity(
-    Insertable<Setting> instance, {
+    Insertable<SettingTableData> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -1158,9 +1168,9 @@ class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
   @override
   Set<GeneratedColumn> get $primaryKey => {key};
   @override
-  Setting map(Map<String, dynamic> data, {String? tablePrefix}) {
+  SettingTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Setting(
+    return SettingTableData(
       key: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}key'],
@@ -1173,15 +1183,16 @@ class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
   }
 
   @override
-  $SettingsTable createAlias(String alias) {
-    return $SettingsTable(attachedDatabase, alias);
+  $SettingTableTable createAlias(String alias) {
+    return $SettingTableTable(attachedDatabase, alias);
   }
 }
 
-class Setting extends DataClass implements Insertable<Setting> {
+class SettingTableData extends DataClass
+    implements Insertable<SettingTableData> {
   final String key;
   final String value;
-  const Setting({required this.key, required this.value});
+  const SettingTableData({required this.key, required this.value});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1190,16 +1201,16 @@ class Setting extends DataClass implements Insertable<Setting> {
     return map;
   }
 
-  SettingsCompanion toCompanion(bool nullToAbsent) {
-    return SettingsCompanion(key: Value(key), value: Value(value));
+  SettingTableCompanion toCompanion(bool nullToAbsent) {
+    return SettingTableCompanion(key: Value(key), value: Value(value));
   }
 
-  factory Setting.fromJson(
+  factory SettingTableData.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Setting(
+    return SettingTableData(
       key: serializer.fromJson<String>(json['key']),
       value: serializer.fromJson<String>(json['value']),
     );
@@ -1213,10 +1224,10 @@ class Setting extends DataClass implements Insertable<Setting> {
     };
   }
 
-  Setting copyWith({String? key, String? value}) =>
-      Setting(key: key ?? this.key, value: value ?? this.value);
-  Setting copyWithCompanion(SettingsCompanion data) {
-    return Setting(
+  SettingTableData copyWith({String? key, String? value}) =>
+      SettingTableData(key: key ?? this.key, value: value ?? this.value);
+  SettingTableData copyWithCompanion(SettingTableCompanion data) {
+    return SettingTableData(
       key: data.key.present ? data.key.value : this.key,
       value: data.value.present ? data.value.value : this.value,
     );
@@ -1224,7 +1235,7 @@ class Setting extends DataClass implements Insertable<Setting> {
 
   @override
   String toString() {
-    return (StringBuffer('Setting(')
+    return (StringBuffer('SettingTableData(')
           ..write('key: $key, ')
           ..write('value: $value')
           ..write(')'))
@@ -1236,25 +1247,27 @@ class Setting extends DataClass implements Insertable<Setting> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Setting && other.key == this.key && other.value == this.value);
+      (other is SettingTableData &&
+          other.key == this.key &&
+          other.value == this.value);
 }
 
-class SettingsCompanion extends UpdateCompanion<Setting> {
+class SettingTableCompanion extends UpdateCompanion<SettingTableData> {
   final Value<String> key;
   final Value<String> value;
   final Value<int> rowid;
-  const SettingsCompanion({
+  const SettingTableCompanion({
     this.key = const Value.absent(),
     this.value = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  SettingsCompanion.insert({
+  SettingTableCompanion.insert({
     required String key,
     required String value,
     this.rowid = const Value.absent(),
   }) : key = Value(key),
        value = Value(value);
-  static Insertable<Setting> custom({
+  static Insertable<SettingTableData> custom({
     Expression<String>? key,
     Expression<String>? value,
     Expression<int>? rowid,
@@ -1266,12 +1279,12 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
     });
   }
 
-  SettingsCompanion copyWith({
+  SettingTableCompanion copyWith({
     Value<String>? key,
     Value<String>? value,
     Value<int>? rowid,
   }) {
-    return SettingsCompanion(
+    return SettingTableCompanion(
       key: key ?? this.key,
       value: value ?? this.value,
       rowid: rowid ?? this.rowid,
@@ -1295,7 +1308,7 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
 
   @override
   String toString() {
-    return (StringBuffer('SettingsCompanion(')
+    return (StringBuffer('SettingTableCompanion(')
           ..write('key: $key, ')
           ..write('value: $value, ')
           ..write('rowid: $rowid')
@@ -1307,34 +1320,36 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
-  late final $NotesTable notes = $NotesTable(this);
-  late final $TagsTable tags = $TagsTable(this);
-  late final $NoteTagsTable noteTags = $NoteTagsTable(this);
-  late final $AttachmentsTable attachments = $AttachmentsTable(this);
-  late final $SettingsTable settings = $SettingsTable(this);
+  late final $NoteTableTable noteTable = $NoteTableTable(this);
+  late final $TagTableTable tagTable = $TagTableTable(this);
+  late final $NoteTagTableTable noteTagTable = $NoteTagTableTable(this);
+  late final $AttachmentTableTable attachmentTable = $AttachmentTableTable(
+    this,
+  );
+  late final $SettingTableTable settingTable = $SettingTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
-    notes,
-    tags,
-    noteTags,
-    attachments,
-    settings,
+    noteTable,
+    tagTable,
+    noteTagTable,
+    attachmentTable,
+    settingTable,
   ];
 }
 
-typedef $$NotesTableCreateCompanionBuilder =
-    NotesCompanion Function({
+typedef $$NoteTableTableCreateCompanionBuilder =
+    NoteTableCompanion Function({
       Value<int> id,
       Value<String> title,
       Value<String> content,
       required String createdAt,
       required String updatedAt,
     });
-typedef $$NotesTableUpdateCompanionBuilder =
-    NotesCompanion Function({
+typedef $$NoteTableTableUpdateCompanionBuilder =
+    NoteTableCompanion Function({
       Value<int> id,
       Value<String> title,
       Value<String> content,
@@ -1342,50 +1357,52 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<String> updatedAt,
     });
 
-final class $$NotesTableReferences
-    extends BaseReferences<_$AppDatabase, $NotesTable, Note> {
-  $$NotesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+final class $$NoteTableTableReferences
+    extends BaseReferences<_$AppDatabase, $NoteTableTable, NoteTableData> {
+  $$NoteTableTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static MultiTypedResultKey<$NoteTagsTable, List<NoteTag>> _noteTagsRefsTable(
-    _$AppDatabase db,
-  ) => MultiTypedResultKey.fromTable(
-    db.noteTags,
+  static MultiTypedResultKey<$NoteTagTableTable, List<NoteTagTableData>>
+  _noteTagTableRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.noteTagTable,
     aliasName: 'notes__id__note_tags__note_id',
   );
 
-  $$NoteTagsTableProcessedTableManager get noteTagsRefs {
-    final manager = $$NoteTagsTableTableManager(
+  $$NoteTagTableTableProcessedTableManager get noteTagTableRefs {
+    final manager = $$NoteTagTableTableTableManager(
       $_db,
-      $_db.noteTags,
+      $_db.noteTagTable,
     ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<int>('id')!));
 
-    final cache = $_typedResult.readTableOrNull(_noteTagsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(_noteTagTableRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
 
-  static MultiTypedResultKey<$AttachmentsTable, List<Attachment>>
-  _attachmentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.attachments,
+  static MultiTypedResultKey<$AttachmentTableTable, List<AttachmentTableData>>
+  _attachmentTableRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.attachmentTable,
     aliasName: 'notes__id__attachments__note_id',
   );
 
-  $$AttachmentsTableProcessedTableManager get attachmentsRefs {
-    final manager = $$AttachmentsTableTableManager(
+  $$AttachmentTableTableProcessedTableManager get attachmentTableRefs {
+    final manager = $$AttachmentTableTableTableManager(
       $_db,
-      $_db.attachments,
+      $_db.attachmentTable,
     ).filter((f) => f.noteId.id.sqlEquals($_itemColumn<int>('id')!));
 
-    final cache = $_typedResult.readTableOrNull(_attachmentsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(
+      _attachmentTableRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
 }
 
-class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
-  $$NotesTableFilterComposer({
+class $$NoteTableTableFilterComposer
+    extends Composer<_$AppDatabase, $NoteTableTable> {
+  $$NoteTableTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -1417,22 +1434,22 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  Expression<bool> noteTagsRefs(
-    Expression<bool> Function($$NoteTagsTableFilterComposer f) f,
+  Expression<bool> noteTagTableRefs(
+    Expression<bool> Function($$NoteTagTableTableFilterComposer f) f,
   ) {
-    final $$NoteTagsTableFilterComposer composer = $composerBuilder(
+    final $$NoteTagTableTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.noteTags,
+      referencedTable: $db.noteTagTable,
       getReferencedColumn: (t) => t.noteId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NoteTagsTableFilterComposer(
+          }) => $$NoteTagTableTableFilterComposer(
             $db: $db,
-            $table: $db.noteTags,
+            $table: $db.noteTagTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1442,22 +1459,22 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
     return f(composer);
   }
 
-  Expression<bool> attachmentsRefs(
-    Expression<bool> Function($$AttachmentsTableFilterComposer f) f,
+  Expression<bool> attachmentTableRefs(
+    Expression<bool> Function($$AttachmentTableTableFilterComposer f) f,
   ) {
-    final $$AttachmentsTableFilterComposer composer = $composerBuilder(
+    final $$AttachmentTableTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.attachments,
+      referencedTable: $db.attachmentTable,
       getReferencedColumn: (t) => t.noteId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$AttachmentsTableFilterComposer(
+          }) => $$AttachmentTableTableFilterComposer(
             $db: $db,
-            $table: $db.attachments,
+            $table: $db.attachmentTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1468,9 +1485,9 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
   }
 }
 
-class $$NotesTableOrderingComposer
-    extends Composer<_$AppDatabase, $NotesTable> {
-  $$NotesTableOrderingComposer({
+class $$NoteTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $NoteTableTable> {
+  $$NoteTableTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -1503,9 +1520,9 @@ class $$NotesTableOrderingComposer
   );
 }
 
-class $$NotesTableAnnotationComposer
-    extends Composer<_$AppDatabase, $NotesTable> {
-  $$NotesTableAnnotationComposer({
+class $$NoteTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NoteTableTable> {
+  $$NoteTableTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -1527,22 +1544,22 @@ class $$NotesTableAnnotationComposer
   GeneratedColumn<String> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
-  Expression<T> noteTagsRefs<T extends Object>(
-    Expression<T> Function($$NoteTagsTableAnnotationComposer a) f,
+  Expression<T> noteTagTableRefs<T extends Object>(
+    Expression<T> Function($$NoteTagTableTableAnnotationComposer a) f,
   ) {
-    final $$NoteTagsTableAnnotationComposer composer = $composerBuilder(
+    final $$NoteTagTableTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.noteTags,
+      referencedTable: $db.noteTagTable,
       getReferencedColumn: (t) => t.noteId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NoteTagsTableAnnotationComposer(
+          }) => $$NoteTagTableTableAnnotationComposer(
             $db: $db,
-            $table: $db.noteTags,
+            $table: $db.noteTagTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1552,22 +1569,22 @@ class $$NotesTableAnnotationComposer
     return f(composer);
   }
 
-  Expression<T> attachmentsRefs<T extends Object>(
-    Expression<T> Function($$AttachmentsTableAnnotationComposer a) f,
+  Expression<T> attachmentTableRefs<T extends Object>(
+    Expression<T> Function($$AttachmentTableTableAnnotationComposer a) f,
   ) {
-    final $$AttachmentsTableAnnotationComposer composer = $composerBuilder(
+    final $$AttachmentTableTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.attachments,
+      referencedTable: $db.attachmentTable,
       getReferencedColumn: (t) => t.noteId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$AttachmentsTableAnnotationComposer(
+          }) => $$AttachmentTableTableAnnotationComposer(
             $db: $db,
-            $table: $db.attachments,
+            $table: $db.attachmentTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1578,32 +1595,35 @@ class $$NotesTableAnnotationComposer
   }
 }
 
-class $$NotesTableTableManager
+class $$NoteTableTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $NotesTable,
-          Note,
-          $$NotesTableFilterComposer,
-          $$NotesTableOrderingComposer,
-          $$NotesTableAnnotationComposer,
-          $$NotesTableCreateCompanionBuilder,
-          $$NotesTableUpdateCompanionBuilder,
-          (Note, $$NotesTableReferences),
-          Note,
-          PrefetchHooks Function({bool noteTagsRefs, bool attachmentsRefs})
+          $NoteTableTable,
+          NoteTableData,
+          $$NoteTableTableFilterComposer,
+          $$NoteTableTableOrderingComposer,
+          $$NoteTableTableAnnotationComposer,
+          $$NoteTableTableCreateCompanionBuilder,
+          $$NoteTableTableUpdateCompanionBuilder,
+          (NoteTableData, $$NoteTableTableReferences),
+          NoteTableData,
+          PrefetchHooks Function({
+            bool noteTagTableRefs,
+            bool attachmentTableRefs,
+          })
         > {
-  $$NotesTableTableManager(_$AppDatabase db, $NotesTable table)
+  $$NoteTableTableTableManager(_$AppDatabase db, $NoteTableTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$NotesTableFilterComposer($db: db, $table: table),
+              $$NoteTableTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$NotesTableOrderingComposer($db: db, $table: table),
+              $$NoteTableTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$NotesTableAnnotationComposer($db: db, $table: table),
+              $$NoteTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
@@ -1611,7 +1631,7 @@ class $$NotesTableTableManager
                 Value<String> content = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
-              }) => NotesCompanion(
+              }) => NoteTableCompanion(
                 id: id,
                 title: title,
                 content: content,
@@ -1625,7 +1645,7 @@ class $$NotesTableTableManager
                 Value<String> content = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
-              }) => NotesCompanion.insert(
+              }) => NoteTableCompanion.insert(
                 id: id,
                 title: title,
                 content: content,
@@ -1634,53 +1654,59 @@ class $$NotesTableTableManager
               ),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$NotesTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable(table),
+                  $$NoteTableTableReferences(db, table, e),
+                ),
               )
               .toList(),
           prefetchHooksCallback:
-              ({noteTagsRefs = false, attachmentsRefs = false}) {
+              ({noteTagTableRefs = false, attachmentTableRefs = false}) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
-                    if (noteTagsRefs) db.noteTags,
-                    if (attachmentsRefs) db.attachments,
+                    if (noteTagTableRefs) db.noteTagTable,
+                    if (attachmentTableRefs) db.attachmentTable,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
                     return [
-                      if (noteTagsRefs)
-                        await $_getPrefetchedData<Note, $NotesTable, NoteTag>(
+                      if (noteTagTableRefs)
+                        await $_getPrefetchedData<
+                          NoteTableData,
+                          $NoteTableTable,
+                          NoteTagTableData
+                        >(
                           currentTable: table,
-                          referencedTable: $$NotesTableReferences
-                              ._noteTagsRefsTable(db),
+                          referencedTable: $$NoteTableTableReferences
+                              ._noteTagTableRefsTable(db),
                           managerFromTypedResult: (p0) =>
-                              $$NotesTableReferences(
+                              $$NoteTableTableReferences(
                                 db,
                                 table,
                                 p0,
-                              ).noteTagsRefs,
+                              ).noteTagTableRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.noteId == item.id,
                               ),
                           typedResults: items,
                         ),
-                      if (attachmentsRefs)
+                      if (attachmentTableRefs)
                         await $_getPrefetchedData<
-                          Note,
-                          $NotesTable,
-                          Attachment
+                          NoteTableData,
+                          $NoteTableTable,
+                          AttachmentTableData
                         >(
                           currentTable: table,
-                          referencedTable: $$NotesTableReferences
-                              ._attachmentsRefsTable(db),
+                          referencedTable: $$NoteTableTableReferences
+                              ._attachmentTableRefsTable(db),
                           managerFromTypedResult: (p0) =>
-                              $$NotesTableReferences(
+                              $$NoteTableTableReferences(
                                 db,
                                 table,
                                 p0,
-                              ).attachmentsRefs,
+                              ).attachmentTableRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.noteId == item.id,
@@ -1695,51 +1721,51 @@ class $$NotesTableTableManager
       );
 }
 
-typedef $$NotesTableProcessedTableManager =
+typedef $$NoteTableTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $NotesTable,
-      Note,
-      $$NotesTableFilterComposer,
-      $$NotesTableOrderingComposer,
-      $$NotesTableAnnotationComposer,
-      $$NotesTableCreateCompanionBuilder,
-      $$NotesTableUpdateCompanionBuilder,
-      (Note, $$NotesTableReferences),
-      Note,
-      PrefetchHooks Function({bool noteTagsRefs, bool attachmentsRefs})
+      $NoteTableTable,
+      NoteTableData,
+      $$NoteTableTableFilterComposer,
+      $$NoteTableTableOrderingComposer,
+      $$NoteTableTableAnnotationComposer,
+      $$NoteTableTableCreateCompanionBuilder,
+      $$NoteTableTableUpdateCompanionBuilder,
+      (NoteTableData, $$NoteTableTableReferences),
+      NoteTableData,
+      PrefetchHooks Function({bool noteTagTableRefs, bool attachmentTableRefs})
     >;
-typedef $$TagsTableCreateCompanionBuilder =
-    TagsCompanion Function({Value<int> id, required String name});
-typedef $$TagsTableUpdateCompanionBuilder =
-    TagsCompanion Function({Value<int> id, Value<String> name});
+typedef $$TagTableTableCreateCompanionBuilder =
+    TagTableCompanion Function({Value<int> id, required String name});
+typedef $$TagTableTableUpdateCompanionBuilder =
+    TagTableCompanion Function({Value<int> id, Value<String> name});
 
-final class $$TagsTableReferences
-    extends BaseReferences<_$AppDatabase, $TagsTable, Tag> {
-  $$TagsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+final class $$TagTableTableReferences
+    extends BaseReferences<_$AppDatabase, $TagTableTable, TagTableData> {
+  $$TagTableTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static MultiTypedResultKey<$NoteTagsTable, List<NoteTag>> _noteTagsRefsTable(
-    _$AppDatabase db,
-  ) => MultiTypedResultKey.fromTable(
-    db.noteTags,
+  static MultiTypedResultKey<$NoteTagTableTable, List<NoteTagTableData>>
+  _noteTagTableRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.noteTagTable,
     aliasName: 'tags__id__note_tags__tag_id',
   );
 
-  $$NoteTagsTableProcessedTableManager get noteTagsRefs {
-    final manager = $$NoteTagsTableTableManager(
+  $$NoteTagTableTableProcessedTableManager get noteTagTableRefs {
+    final manager = $$NoteTagTableTableTableManager(
       $_db,
-      $_db.noteTags,
+      $_db.noteTagTable,
     ).filter((f) => f.tagId.id.sqlEquals($_itemColumn<int>('id')!));
 
-    final cache = $_typedResult.readTableOrNull(_noteTagsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(_noteTagTableRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
 }
 
-class $$TagsTableFilterComposer extends Composer<_$AppDatabase, $TagsTable> {
-  $$TagsTableFilterComposer({
+class $$TagTableTableFilterComposer
+    extends Composer<_$AppDatabase, $TagTableTable> {
+  $$TagTableTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -1756,22 +1782,22 @@ class $$TagsTableFilterComposer extends Composer<_$AppDatabase, $TagsTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  Expression<bool> noteTagsRefs(
-    Expression<bool> Function($$NoteTagsTableFilterComposer f) f,
+  Expression<bool> noteTagTableRefs(
+    Expression<bool> Function($$NoteTagTableTableFilterComposer f) f,
   ) {
-    final $$NoteTagsTableFilterComposer composer = $composerBuilder(
+    final $$NoteTagTableTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.noteTags,
+      referencedTable: $db.noteTagTable,
       getReferencedColumn: (t) => t.tagId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NoteTagsTableFilterComposer(
+          }) => $$NoteTagTableTableFilterComposer(
             $db: $db,
-            $table: $db.noteTags,
+            $table: $db.noteTagTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1782,8 +1808,9 @@ class $$TagsTableFilterComposer extends Composer<_$AppDatabase, $TagsTable> {
   }
 }
 
-class $$TagsTableOrderingComposer extends Composer<_$AppDatabase, $TagsTable> {
-  $$TagsTableOrderingComposer({
+class $$TagTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $TagTableTable> {
+  $$TagTableTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -1801,9 +1828,9 @@ class $$TagsTableOrderingComposer extends Composer<_$AppDatabase, $TagsTable> {
   );
 }
 
-class $$TagsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $TagsTable> {
-  $$TagsTableAnnotationComposer({
+class $$TagTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TagTableTable> {
+  $$TagTableTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -1816,22 +1843,22 @@ class $$TagsTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  Expression<T> noteTagsRefs<T extends Object>(
-    Expression<T> Function($$NoteTagsTableAnnotationComposer a) f,
+  Expression<T> noteTagTableRefs<T extends Object>(
+    Expression<T> Function($$NoteTagTableTableAnnotationComposer a) f,
   ) {
-    final $$NoteTagsTableAnnotationComposer composer = $composerBuilder(
+    final $$NoteTagTableTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.noteTags,
+      referencedTable: $db.noteTagTable,
       getReferencedColumn: (t) => t.tagId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NoteTagsTableAnnotationComposer(
+          }) => $$NoteTagTableTableAnnotationComposer(
             $db: $db,
-            $table: $db.noteTags,
+            $table: $db.noteTagTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1842,61 +1869,69 @@ class $$TagsTableAnnotationComposer
   }
 }
 
-class $$TagsTableTableManager
+class $$TagTableTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $TagsTable,
-          Tag,
-          $$TagsTableFilterComposer,
-          $$TagsTableOrderingComposer,
-          $$TagsTableAnnotationComposer,
-          $$TagsTableCreateCompanionBuilder,
-          $$TagsTableUpdateCompanionBuilder,
-          (Tag, $$TagsTableReferences),
-          Tag,
-          PrefetchHooks Function({bool noteTagsRefs})
+          $TagTableTable,
+          TagTableData,
+          $$TagTableTableFilterComposer,
+          $$TagTableTableOrderingComposer,
+          $$TagTableTableAnnotationComposer,
+          $$TagTableTableCreateCompanionBuilder,
+          $$TagTableTableUpdateCompanionBuilder,
+          (TagTableData, $$TagTableTableReferences),
+          TagTableData,
+          PrefetchHooks Function({bool noteTagTableRefs})
         > {
-  $$TagsTableTableManager(_$AppDatabase db, $TagsTable table)
+  $$TagTableTableTableManager(_$AppDatabase db, $TagTableTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$TagsTableFilterComposer($db: db, $table: table),
+              $$TagTableTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$TagsTableOrderingComposer($db: db, $table: table),
+              $$TagTableTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$TagsTableAnnotationComposer($db: db, $table: table),
+              $$TagTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-              }) => TagsCompanion(id: id, name: name),
+              }) => TagTableCompanion(id: id, name: name),
           createCompanionCallback:
               ({Value<int> id = const Value.absent(), required String name}) =>
-                  TagsCompanion.insert(id: id, name: name),
+                  TagTableCompanion.insert(id: id, name: name),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $$TagsTableReferences(db, table, e)),
+                (e) => (
+                  e.readTable(table),
+                  $$TagTableTableReferences(db, table, e),
+                ),
               )
               .toList(),
-          prefetchHooksCallback: ({noteTagsRefs = false}) {
+          prefetchHooksCallback: ({noteTagTableRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (noteTagsRefs) db.noteTags],
+              explicitlyWatchedTables: [if (noteTagTableRefs) db.noteTagTable],
               addJoins: null,
               getPrefetchedDataCallback: (items) async {
                 return [
-                  if (noteTagsRefs)
-                    await $_getPrefetchedData<Tag, $TagsTable, NoteTag>(
+                  if (noteTagTableRefs)
+                    await $_getPrefetchedData<
+                      TagTableData,
+                      $TagTableTable,
+                      NoteTagTableData
+                    >(
                       currentTable: table,
-                      referencedTable: $$TagsTableReferences._noteTagsRefsTable(
+                      referencedTable: $$TagTableTableReferences
+                          ._noteTagTableRefsTable(db),
+                      managerFromTypedResult: (p0) => $$TagTableTableReferences(
                         db,
-                      ),
-                      managerFromTypedResult: (p0) =>
-                          $$TagsTableReferences(db, table, p0).noteTagsRefs,
+                        table,
+                        p0,
+                      ).noteTagTableRefs,
                       referencedItemsForCurrentItem: (item, referencedItems) =>
                           referencedItems.where((e) => e.tagId == item.id),
                       typedResults: items,
@@ -1909,46 +1944,47 @@ class $$TagsTableTableManager
       );
 }
 
-typedef $$TagsTableProcessedTableManager =
+typedef $$TagTableTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $TagsTable,
-      Tag,
-      $$TagsTableFilterComposer,
-      $$TagsTableOrderingComposer,
-      $$TagsTableAnnotationComposer,
-      $$TagsTableCreateCompanionBuilder,
-      $$TagsTableUpdateCompanionBuilder,
-      (Tag, $$TagsTableReferences),
-      Tag,
-      PrefetchHooks Function({bool noteTagsRefs})
+      $TagTableTable,
+      TagTableData,
+      $$TagTableTableFilterComposer,
+      $$TagTableTableOrderingComposer,
+      $$TagTableTableAnnotationComposer,
+      $$TagTableTableCreateCompanionBuilder,
+      $$TagTableTableUpdateCompanionBuilder,
+      (TagTableData, $$TagTableTableReferences),
+      TagTableData,
+      PrefetchHooks Function({bool noteTagTableRefs})
     >;
-typedef $$NoteTagsTableCreateCompanionBuilder =
-    NoteTagsCompanion Function({
+typedef $$NoteTagTableTableCreateCompanionBuilder =
+    NoteTagTableCompanion Function({
       required int noteId,
       required int tagId,
       Value<int> rowid,
     });
-typedef $$NoteTagsTableUpdateCompanionBuilder =
-    NoteTagsCompanion Function({
+typedef $$NoteTagTableTableUpdateCompanionBuilder =
+    NoteTagTableCompanion Function({
       Value<int> noteId,
       Value<int> tagId,
       Value<int> rowid,
     });
 
-final class $$NoteTagsTableReferences
-    extends BaseReferences<_$AppDatabase, $NoteTagsTable, NoteTag> {
-  $$NoteTagsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+final class $$NoteTagTableTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $NoteTagTableTable, NoteTagTableData> {
+  $$NoteTagTableTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $NotesTable _noteIdTable(_$AppDatabase db) =>
-      db.notes.createAlias('note_tags__note_id__notes__id');
+  static $NoteTableTable _noteIdTable(_$AppDatabase db) =>
+      db.noteTable.createAlias('note_tags__note_id__notes__id');
 
-  $$NotesTableProcessedTableManager get noteId {
+  $$NoteTableTableProcessedTableManager get noteId {
     final $_column = $_itemColumn<int>('note_id')!;
 
-    final manager = $$NotesTableTableManager(
+    final manager = $$NoteTableTableTableManager(
       $_db,
-      $_db.notes,
+      $_db.noteTable,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_noteIdTable($_db));
     if (item == null) return manager;
@@ -1957,15 +1993,15 @@ final class $$NoteTagsTableReferences
     );
   }
 
-  static $TagsTable _tagIdTable(_$AppDatabase db) =>
-      db.tags.createAlias('note_tags__tag_id__tags__id');
+  static $TagTableTable _tagIdTable(_$AppDatabase db) =>
+      db.tagTable.createAlias('note_tags__tag_id__tags__id');
 
-  $$TagsTableProcessedTableManager get tagId {
+  $$TagTableTableProcessedTableManager get tagId {
     final $_column = $_itemColumn<int>('tag_id')!;
 
-    final manager = $$TagsTableTableManager(
+    final manager = $$TagTableTableTableManager(
       $_db,
-      $_db.tags,
+      $_db.tagTable,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_tagIdTable($_db));
     if (item == null) return manager;
@@ -1975,29 +2011,29 @@ final class $$NoteTagsTableReferences
   }
 }
 
-class $$NoteTagsTableFilterComposer
-    extends Composer<_$AppDatabase, $NoteTagsTable> {
-  $$NoteTagsTableFilterComposer({
+class $$NoteTagTableTableFilterComposer
+    extends Composer<_$AppDatabase, $NoteTagTableTable> {
+  $$NoteTagTableTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  $$NotesTableFilterComposer get noteId {
-    final $$NotesTableFilterComposer composer = $composerBuilder(
+  $$NoteTableTableFilterComposer get noteId {
+    final $$NoteTableTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.noteId,
-      referencedTable: $db.notes,
+      referencedTable: $db.noteTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NotesTableFilterComposer(
+          }) => $$NoteTableTableFilterComposer(
             $db: $db,
-            $table: $db.notes,
+            $table: $db.noteTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2007,20 +2043,20 @@ class $$NoteTagsTableFilterComposer
     return composer;
   }
 
-  $$TagsTableFilterComposer get tagId {
-    final $$TagsTableFilterComposer composer = $composerBuilder(
+  $$TagTableTableFilterComposer get tagId {
+    final $$TagTableTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.tagId,
-      referencedTable: $db.tags,
+      referencedTable: $db.tagTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$TagsTableFilterComposer(
+          }) => $$TagTableTableFilterComposer(
             $db: $db,
-            $table: $db.tags,
+            $table: $db.tagTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2031,29 +2067,29 @@ class $$NoteTagsTableFilterComposer
   }
 }
 
-class $$NoteTagsTableOrderingComposer
-    extends Composer<_$AppDatabase, $NoteTagsTable> {
-  $$NoteTagsTableOrderingComposer({
+class $$NoteTagTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $NoteTagTableTable> {
+  $$NoteTagTableTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  $$NotesTableOrderingComposer get noteId {
-    final $$NotesTableOrderingComposer composer = $composerBuilder(
+  $$NoteTableTableOrderingComposer get noteId {
+    final $$NoteTableTableOrderingComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.noteId,
-      referencedTable: $db.notes,
+      referencedTable: $db.noteTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NotesTableOrderingComposer(
+          }) => $$NoteTableTableOrderingComposer(
             $db: $db,
-            $table: $db.notes,
+            $table: $db.noteTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2063,20 +2099,20 @@ class $$NoteTagsTableOrderingComposer
     return composer;
   }
 
-  $$TagsTableOrderingComposer get tagId {
-    final $$TagsTableOrderingComposer composer = $composerBuilder(
+  $$TagTableTableOrderingComposer get tagId {
+    final $$TagTableTableOrderingComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.tagId,
-      referencedTable: $db.tags,
+      referencedTable: $db.tagTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$TagsTableOrderingComposer(
+          }) => $$TagTableTableOrderingComposer(
             $db: $db,
-            $table: $db.tags,
+            $table: $db.tagTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2087,29 +2123,29 @@ class $$NoteTagsTableOrderingComposer
   }
 }
 
-class $$NoteTagsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $NoteTagsTable> {
-  $$NoteTagsTableAnnotationComposer({
+class $$NoteTagTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NoteTagTableTable> {
+  $$NoteTagTableTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  $$NotesTableAnnotationComposer get noteId {
-    final $$NotesTableAnnotationComposer composer = $composerBuilder(
+  $$NoteTableTableAnnotationComposer get noteId {
+    final $$NoteTableTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.noteId,
-      referencedTable: $db.notes,
+      referencedTable: $db.noteTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NotesTableAnnotationComposer(
+          }) => $$NoteTableTableAnnotationComposer(
             $db: $db,
-            $table: $db.notes,
+            $table: $db.noteTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2119,20 +2155,20 @@ class $$NoteTagsTableAnnotationComposer
     return composer;
   }
 
-  $$TagsTableAnnotationComposer get tagId {
-    final $$TagsTableAnnotationComposer composer = $composerBuilder(
+  $$TagTableTableAnnotationComposer get tagId {
+    final $$TagTableTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.tagId,
-      referencedTable: $db.tags,
+      referencedTable: $db.tagTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$TagsTableAnnotationComposer(
+          }) => $$TagTableTableAnnotationComposer(
             $db: $db,
-            $table: $db.tags,
+            $table: $db.tagTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2143,45 +2179,48 @@ class $$NoteTagsTableAnnotationComposer
   }
 }
 
-class $$NoteTagsTableTableManager
+class $$NoteTagTableTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $NoteTagsTable,
-          NoteTag,
-          $$NoteTagsTableFilterComposer,
-          $$NoteTagsTableOrderingComposer,
-          $$NoteTagsTableAnnotationComposer,
-          $$NoteTagsTableCreateCompanionBuilder,
-          $$NoteTagsTableUpdateCompanionBuilder,
-          (NoteTag, $$NoteTagsTableReferences),
-          NoteTag,
+          $NoteTagTableTable,
+          NoteTagTableData,
+          $$NoteTagTableTableFilterComposer,
+          $$NoteTagTableTableOrderingComposer,
+          $$NoteTagTableTableAnnotationComposer,
+          $$NoteTagTableTableCreateCompanionBuilder,
+          $$NoteTagTableTableUpdateCompanionBuilder,
+          (NoteTagTableData, $$NoteTagTableTableReferences),
+          NoteTagTableData,
           PrefetchHooks Function({bool noteId, bool tagId})
         > {
-  $$NoteTagsTableTableManager(_$AppDatabase db, $NoteTagsTable table)
+  $$NoteTagTableTableTableManager(_$AppDatabase db, $NoteTagTableTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$NoteTagsTableFilterComposer($db: db, $table: table),
+              $$NoteTagTableTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$NoteTagsTableOrderingComposer($db: db, $table: table),
+              $$NoteTagTableTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$NoteTagsTableAnnotationComposer($db: db, $table: table),
+              $$NoteTagTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> noteId = const Value.absent(),
                 Value<int> tagId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) =>
-                  NoteTagsCompanion(noteId: noteId, tagId: tagId, rowid: rowid),
+              }) => NoteTagTableCompanion(
+                noteId: noteId,
+                tagId: tagId,
+                rowid: rowid,
+              ),
           createCompanionCallback:
               ({
                 required int noteId,
                 required int tagId,
                 Value<int> rowid = const Value.absent(),
-              }) => NoteTagsCompanion.insert(
+              }) => NoteTagTableCompanion.insert(
                 noteId: noteId,
                 tagId: tagId,
                 rowid: rowid,
@@ -2190,7 +2229,7 @@ class $$NoteTagsTableTableManager
               .map(
                 (e) => (
                   e.readTable(table),
-                  $$NoteTagsTableReferences(db, table, e),
+                  $$NoteTagTableTableReferences(db, table, e),
                 ),
               )
               .toList(),
@@ -2219,9 +2258,9 @@ class $$NoteTagsTableTableManager
                           state.withJoin(
                                 currentTable: table,
                                 currentColumn: table.noteId,
-                                referencedTable: $$NoteTagsTableReferences
+                                referencedTable: $$NoteTagTableTableReferences
                                     ._noteIdTable(db),
-                                referencedColumn: $$NoteTagsTableReferences
+                                referencedColumn: $$NoteTagTableTableReferences
                                     ._noteIdTable(db)
                                     .id,
                               )
@@ -2232,9 +2271,9 @@ class $$NoteTagsTableTableManager
                           state.withJoin(
                                 currentTable: table,
                                 currentColumn: table.tagId,
-                                referencedTable: $$NoteTagsTableReferences
+                                referencedTable: $$NoteTagTableTableReferences
                                     ._tagIdTable(db),
-                                referencedColumn: $$NoteTagsTableReferences
+                                referencedColumn: $$NoteTagTableTableReferences
                                     ._tagIdTable(db)
                                     .id,
                               )
@@ -2252,30 +2291,30 @@ class $$NoteTagsTableTableManager
       );
 }
 
-typedef $$NoteTagsTableProcessedTableManager =
+typedef $$NoteTagTableTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $NoteTagsTable,
-      NoteTag,
-      $$NoteTagsTableFilterComposer,
-      $$NoteTagsTableOrderingComposer,
-      $$NoteTagsTableAnnotationComposer,
-      $$NoteTagsTableCreateCompanionBuilder,
-      $$NoteTagsTableUpdateCompanionBuilder,
-      (NoteTag, $$NoteTagsTableReferences),
-      NoteTag,
+      $NoteTagTableTable,
+      NoteTagTableData,
+      $$NoteTagTableTableFilterComposer,
+      $$NoteTagTableTableOrderingComposer,
+      $$NoteTagTableTableAnnotationComposer,
+      $$NoteTagTableTableCreateCompanionBuilder,
+      $$NoteTagTableTableUpdateCompanionBuilder,
+      (NoteTagTableData, $$NoteTagTableTableReferences),
+      NoteTagTableData,
       PrefetchHooks Function({bool noteId, bool tagId})
     >;
-typedef $$AttachmentsTableCreateCompanionBuilder =
-    AttachmentsCompanion Function({
+typedef $$AttachmentTableTableCreateCompanionBuilder =
+    AttachmentTableCompanion Function({
       Value<int> id,
       required int noteId,
       required String fileName,
       required String filePath,
       required String createdAt,
     });
-typedef $$AttachmentsTableUpdateCompanionBuilder =
-    AttachmentsCompanion Function({
+typedef $$AttachmentTableTableUpdateCompanionBuilder =
+    AttachmentTableCompanion Function({
       Value<int> id,
       Value<int> noteId,
       Value<String> fileName,
@@ -2283,19 +2322,28 @@ typedef $$AttachmentsTableUpdateCompanionBuilder =
       Value<String> createdAt,
     });
 
-final class $$AttachmentsTableReferences
-    extends BaseReferences<_$AppDatabase, $AttachmentsTable, Attachment> {
-  $$AttachmentsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+final class $$AttachmentTableTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $AttachmentTableTable,
+          AttachmentTableData
+        > {
+  $$AttachmentTableTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
 
-  static $NotesTable _noteIdTable(_$AppDatabase db) =>
-      db.notes.createAlias('attachments__note_id__notes__id');
+  static $NoteTableTable _noteIdTable(_$AppDatabase db) =>
+      db.noteTable.createAlias('attachments__note_id__notes__id');
 
-  $$NotesTableProcessedTableManager get noteId {
+  $$NoteTableTableProcessedTableManager get noteId {
     final $_column = $_itemColumn<int>('note_id')!;
 
-    final manager = $$NotesTableTableManager(
+    final manager = $$NoteTableTableTableManager(
       $_db,
-      $_db.notes,
+      $_db.noteTable,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_noteIdTable($_db));
     if (item == null) return manager;
@@ -2305,9 +2353,9 @@ final class $$AttachmentsTableReferences
   }
 }
 
-class $$AttachmentsTableFilterComposer
-    extends Composer<_$AppDatabase, $AttachmentsTable> {
-  $$AttachmentsTableFilterComposer({
+class $$AttachmentTableTableFilterComposer
+    extends Composer<_$AppDatabase, $AttachmentTableTable> {
+  $$AttachmentTableTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2334,20 +2382,20 @@ class $$AttachmentsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  $$NotesTableFilterComposer get noteId {
-    final $$NotesTableFilterComposer composer = $composerBuilder(
+  $$NoteTableTableFilterComposer get noteId {
+    final $$NoteTableTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.noteId,
-      referencedTable: $db.notes,
+      referencedTable: $db.noteTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NotesTableFilterComposer(
+          }) => $$NoteTableTableFilterComposer(
             $db: $db,
-            $table: $db.notes,
+            $table: $db.noteTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2358,9 +2406,9 @@ class $$AttachmentsTableFilterComposer
   }
 }
 
-class $$AttachmentsTableOrderingComposer
-    extends Composer<_$AppDatabase, $AttachmentsTable> {
-  $$AttachmentsTableOrderingComposer({
+class $$AttachmentTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $AttachmentTableTable> {
+  $$AttachmentTableTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2387,20 +2435,20 @@ class $$AttachmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  $$NotesTableOrderingComposer get noteId {
-    final $$NotesTableOrderingComposer composer = $composerBuilder(
+  $$NoteTableTableOrderingComposer get noteId {
+    final $$NoteTableTableOrderingComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.noteId,
-      referencedTable: $db.notes,
+      referencedTable: $db.noteTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NotesTableOrderingComposer(
+          }) => $$NoteTableTableOrderingComposer(
             $db: $db,
-            $table: $db.notes,
+            $table: $db.noteTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2411,9 +2459,9 @@ class $$AttachmentsTableOrderingComposer
   }
 }
 
-class $$AttachmentsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $AttachmentsTable> {
-  $$AttachmentsTableAnnotationComposer({
+class $$AttachmentTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AttachmentTableTable> {
+  $$AttachmentTableTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2432,20 +2480,20 @@ class $$AttachmentsTableAnnotationComposer
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
-  $$NotesTableAnnotationComposer get noteId {
-    final $$NotesTableAnnotationComposer composer = $composerBuilder(
+  $$NoteTableTableAnnotationComposer get noteId {
+    final $$NoteTableTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.noteId,
-      referencedTable: $db.notes,
+      referencedTable: $db.noteTable,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$NotesTableAnnotationComposer(
+          }) => $$NoteTableTableAnnotationComposer(
             $db: $db,
-            $table: $db.notes,
+            $table: $db.noteTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2456,32 +2504,34 @@ class $$AttachmentsTableAnnotationComposer
   }
 }
 
-class $$AttachmentsTableTableManager
+class $$AttachmentTableTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $AttachmentsTable,
-          Attachment,
-          $$AttachmentsTableFilterComposer,
-          $$AttachmentsTableOrderingComposer,
-          $$AttachmentsTableAnnotationComposer,
-          $$AttachmentsTableCreateCompanionBuilder,
-          $$AttachmentsTableUpdateCompanionBuilder,
-          (Attachment, $$AttachmentsTableReferences),
-          Attachment,
+          $AttachmentTableTable,
+          AttachmentTableData,
+          $$AttachmentTableTableFilterComposer,
+          $$AttachmentTableTableOrderingComposer,
+          $$AttachmentTableTableAnnotationComposer,
+          $$AttachmentTableTableCreateCompanionBuilder,
+          $$AttachmentTableTableUpdateCompanionBuilder,
+          (AttachmentTableData, $$AttachmentTableTableReferences),
+          AttachmentTableData,
           PrefetchHooks Function({bool noteId})
         > {
-  $$AttachmentsTableTableManager(_$AppDatabase db, $AttachmentsTable table)
-    : super(
+  $$AttachmentTableTableTableManager(
+    _$AppDatabase db,
+    $AttachmentTableTable table,
+  ) : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$AttachmentsTableFilterComposer($db: db, $table: table),
+              $$AttachmentTableTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$AttachmentsTableOrderingComposer($db: db, $table: table),
+              $$AttachmentTableTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$AttachmentsTableAnnotationComposer($db: db, $table: table),
+              $$AttachmentTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
@@ -2489,7 +2539,7 @@ class $$AttachmentsTableTableManager
                 Value<String> fileName = const Value.absent(),
                 Value<String> filePath = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
-              }) => AttachmentsCompanion(
+              }) => AttachmentTableCompanion(
                 id: id,
                 noteId: noteId,
                 fileName: fileName,
@@ -2503,7 +2553,7 @@ class $$AttachmentsTableTableManager
                 required String fileName,
                 required String filePath,
                 required String createdAt,
-              }) => AttachmentsCompanion.insert(
+              }) => AttachmentTableCompanion.insert(
                 id: id,
                 noteId: noteId,
                 fileName: fileName,
@@ -2514,7 +2564,7 @@ class $$AttachmentsTableTableManager
               .map(
                 (e) => (
                   e.readTable(table),
-                  $$AttachmentsTableReferences(db, table, e),
+                  $$AttachmentTableTableReferences(db, table, e),
                 ),
               )
               .toList(),
@@ -2543,11 +2593,13 @@ class $$AttachmentsTableTableManager
                           state.withJoin(
                                 currentTable: table,
                                 currentColumn: table.noteId,
-                                referencedTable: $$AttachmentsTableReferences
-                                    ._noteIdTable(db),
-                                referencedColumn: $$AttachmentsTableReferences
-                                    ._noteIdTable(db)
-                                    .id,
+                                referencedTable:
+                                    $$AttachmentTableTableReferences
+                                        ._noteIdTable(db),
+                                referencedColumn:
+                                    $$AttachmentTableTableReferences
+                                        ._noteIdTable(db)
+                                        .id,
                               )
                               as T;
                     }
@@ -2563,36 +2615,36 @@ class $$AttachmentsTableTableManager
       );
 }
 
-typedef $$AttachmentsTableProcessedTableManager =
+typedef $$AttachmentTableTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $AttachmentsTable,
-      Attachment,
-      $$AttachmentsTableFilterComposer,
-      $$AttachmentsTableOrderingComposer,
-      $$AttachmentsTableAnnotationComposer,
-      $$AttachmentsTableCreateCompanionBuilder,
-      $$AttachmentsTableUpdateCompanionBuilder,
-      (Attachment, $$AttachmentsTableReferences),
-      Attachment,
+      $AttachmentTableTable,
+      AttachmentTableData,
+      $$AttachmentTableTableFilterComposer,
+      $$AttachmentTableTableOrderingComposer,
+      $$AttachmentTableTableAnnotationComposer,
+      $$AttachmentTableTableCreateCompanionBuilder,
+      $$AttachmentTableTableUpdateCompanionBuilder,
+      (AttachmentTableData, $$AttachmentTableTableReferences),
+      AttachmentTableData,
       PrefetchHooks Function({bool noteId})
     >;
-typedef $$SettingsTableCreateCompanionBuilder =
-    SettingsCompanion Function({
+typedef $$SettingTableTableCreateCompanionBuilder =
+    SettingTableCompanion Function({
       required String key,
       required String value,
       Value<int> rowid,
     });
-typedef $$SettingsTableUpdateCompanionBuilder =
-    SettingsCompanion Function({
+typedef $$SettingTableTableUpdateCompanionBuilder =
+    SettingTableCompanion Function({
       Value<String> key,
       Value<String> value,
       Value<int> rowid,
     });
 
-class $$SettingsTableFilterComposer
-    extends Composer<_$AppDatabase, $SettingsTable> {
-  $$SettingsTableFilterComposer({
+class $$SettingTableTableFilterComposer
+    extends Composer<_$AppDatabase, $SettingTableTable> {
+  $$SettingTableTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2610,9 +2662,9 @@ class $$SettingsTableFilterComposer
   );
 }
 
-class $$SettingsTableOrderingComposer
-    extends Composer<_$AppDatabase, $SettingsTable> {
-  $$SettingsTableOrderingComposer({
+class $$SettingTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $SettingTableTable> {
+  $$SettingTableTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2630,9 +2682,9 @@ class $$SettingsTableOrderingComposer
   );
 }
 
-class $$SettingsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $SettingsTable> {
-  $$SettingsTableAnnotationComposer({
+class $$SettingTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SettingTableTable> {
+  $$SettingTableTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -2646,44 +2698,47 @@ class $$SettingsTableAnnotationComposer
       $composableBuilder(column: $table.value, builder: (column) => column);
 }
 
-class $$SettingsTableTableManager
+class $$SettingTableTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $SettingsTable,
-          Setting,
-          $$SettingsTableFilterComposer,
-          $$SettingsTableOrderingComposer,
-          $$SettingsTableAnnotationComposer,
-          $$SettingsTableCreateCompanionBuilder,
-          $$SettingsTableUpdateCompanionBuilder,
-          (Setting, BaseReferences<_$AppDatabase, $SettingsTable, Setting>),
-          Setting,
+          $SettingTableTable,
+          SettingTableData,
+          $$SettingTableTableFilterComposer,
+          $$SettingTableTableOrderingComposer,
+          $$SettingTableTableAnnotationComposer,
+          $$SettingTableTableCreateCompanionBuilder,
+          $$SettingTableTableUpdateCompanionBuilder,
+          (
+            SettingTableData,
+            BaseReferences<_$AppDatabase, $SettingTableTable, SettingTableData>,
+          ),
+          SettingTableData,
           PrefetchHooks Function()
         > {
-  $$SettingsTableTableManager(_$AppDatabase db, $SettingsTable table)
+  $$SettingTableTableTableManager(_$AppDatabase db, $SettingTableTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$SettingsTableFilterComposer($db: db, $table: table),
+              $$SettingTableTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$SettingsTableOrderingComposer($db: db, $table: table),
+              $$SettingTableTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$SettingsTableAnnotationComposer($db: db, $table: table),
+              $$SettingTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<String> key = const Value.absent(),
                 Value<String> value = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => SettingsCompanion(key: key, value: value, rowid: rowid),
+              }) => SettingTableCompanion(key: key, value: value, rowid: rowid),
           createCompanionCallback:
               ({
                 required String key,
                 required String value,
                 Value<int> rowid = const Value.absent(),
-              }) => SettingsCompanion.insert(
+              }) => SettingTableCompanion.insert(
                 key: key,
                 value: value,
                 rowid: rowid,
@@ -2696,31 +2751,35 @@ class $$SettingsTableTableManager
       );
 }
 
-typedef $$SettingsTableProcessedTableManager =
+typedef $$SettingTableTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $SettingsTable,
-      Setting,
-      $$SettingsTableFilterComposer,
-      $$SettingsTableOrderingComposer,
-      $$SettingsTableAnnotationComposer,
-      $$SettingsTableCreateCompanionBuilder,
-      $$SettingsTableUpdateCompanionBuilder,
-      (Setting, BaseReferences<_$AppDatabase, $SettingsTable, Setting>),
-      Setting,
+      $SettingTableTable,
+      SettingTableData,
+      $$SettingTableTableFilterComposer,
+      $$SettingTableTableOrderingComposer,
+      $$SettingTableTableAnnotationComposer,
+      $$SettingTableTableCreateCompanionBuilder,
+      $$SettingTableTableUpdateCompanionBuilder,
+      (
+        SettingTableData,
+        BaseReferences<_$AppDatabase, $SettingTableTable, SettingTableData>,
+      ),
+      SettingTableData,
       PrefetchHooks Function()
     >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
-  $$NotesTableTableManager get notes =>
-      $$NotesTableTableManager(_db, _db.notes);
-  $$TagsTableTableManager get tags => $$TagsTableTableManager(_db, _db.tags);
-  $$NoteTagsTableTableManager get noteTags =>
-      $$NoteTagsTableTableManager(_db, _db.noteTags);
-  $$AttachmentsTableTableManager get attachments =>
-      $$AttachmentsTableTableManager(_db, _db.attachments);
-  $$SettingsTableTableManager get settings =>
-      $$SettingsTableTableManager(_db, _db.settings);
+  $$NoteTableTableTableManager get noteTable =>
+      $$NoteTableTableTableManager(_db, _db.noteTable);
+  $$TagTableTableTableManager get tagTable =>
+      $$TagTableTableTableManager(_db, _db.tagTable);
+  $$NoteTagTableTableTableManager get noteTagTable =>
+      $$NoteTagTableTableTableManager(_db, _db.noteTagTable);
+  $$AttachmentTableTableTableManager get attachmentTable =>
+      $$AttachmentTableTableTableManager(_db, _db.attachmentTable);
+  $$SettingTableTableTableManager get settingTable =>
+      $$SettingTableTableTableManager(_db, _db.settingTable);
 }
