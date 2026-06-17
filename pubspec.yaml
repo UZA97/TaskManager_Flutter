@@ -9,6 +9,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  flutter_launcher_icons: ^0.14.1 # 최신 버전 확인해서 추가
+
   # 상태관리
   flutter_riverpod: ^2.6.1
 
@@ -37,6 +39,15 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   build_runner: ^2.4.13
   drift_dev: ^2.20.0
-
+  
+# flutter_launcher_icons:
+#   android: true
+#   ios: true
+#   window: true
+#   image_path: "assets/icon_1.ico" # 여기서 경로 지정
+#   min_sdk_android: 21
+  
 flutter:
   uses-material-design: true
+  # assets:
+  #   - assets/icon_1.ico

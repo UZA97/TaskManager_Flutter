@@ -27,31 +27,47 @@ class NoteRepository {
   }
 
   Future<List<Note>> searchNotes(String keyword) async {
-    final rows =
-        await (_db.select(_db.noteTable)..where(
-              (t) => t.title.contains(keyword) | t.content.contains(keyword),
-            ))
-            .get();
-    return Future.wait(
-      rows.map((row) async {
-        final tags = await getNoteTags(row.id);
-        return Note(
-          id: row.id,
-          title: row.title,
-          content: row.content,
-          tags: tags,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-        );
-      }),
-    );
+    // 태그로 검색
+    final tagQuery = _db.select(_db.noteTagTable).join([
+      innerJoin(
+          _db.tagTable, _db.tagTable.id.equalsExp(_db.noteTagTable.tagId)),
+    ])
+      ..where(_db.tagTable.name.contains(keyword));
+    final tagRows = await tagQuery.get();
+    final tagNoteIds =
+        tagRows.map((r) => r.readTable(_db.noteTagTable).noteId).toSet();
+
+    // 제목/내용으로 검색
+    final rows = await (_db.select(_db.noteTable)
+          ..where(
+              (t) => t.title.contains(keyword) | t.content.contains(keyword)))
+        .get();
+
+    // 합치기 (중복 제거)
+    final allIds = {...rows.map((r) => r.id), ...tagNoteIds};
+
+    // 전체 노트 중 해당 id만 필터
+    final allRows = await (_db.select(_db.noteTable)
+          ..where((t) => t.id.isIn(allIds))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+
+    return Future.wait(allRows.map((row) async {
+      final tags = await getNoteTags(row.id);
+      return Note(
+        id: row.id,
+        title: row.title,
+        content: row.content,
+        tags: tags,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      );
+    }));
   }
 
   Future<Note> createNote() async {
     final now = DateTime.now().toIso8601String();
-    final id = await _db
-        .into(_db.noteTable)
-        .insert(
+    final id = await _db.into(_db.noteTable).insert(
           NoteTableCompanion.insert(
             title: const Value(''),
             content: const Value(''),
@@ -65,7 +81,8 @@ class NoteRepository {
   Future<void> saveNote(Note note) async {
     await (_db.update(
       _db.noteTable,
-    )..where((t) => t.id.equals(note.id!))).write(
+    )..where((t) => t.id.equals(note.id!)))
+        .write(
       NoteTableCompanion(
         title: Value(note.title),
         content: Value(note.content),
@@ -84,7 +101,8 @@ class NoteRepository {
         _db.tagTable,
         _db.tagTable.id.equalsExp(_db.noteTagTable.tagId),
       ),
-    ])..where(_db.noteTagTable.noteId.equals(noteId));
+    ])
+      ..where(_db.noteTagTable.noteId.equals(noteId));
     final rows = await query.get();
     return rows.map((r) => r.readTable(_db.tagTable).name).toList();
   }
@@ -92,7 +110,8 @@ class NoteRepository {
   Future<void> saveNoteTags(int noteId, List<String> tags) async {
     await (_db.delete(
       _db.noteTagTable,
-    )..where((t) => t.noteId.equals(noteId))).go();
+    )..where((t) => t.noteId.equals(noteId)))
+        .go();
 
     for (final tag in tags) {
       await _db
@@ -100,10 +119,9 @@ class NoteRepository {
           .insertOnConflictUpdate(TagTableCompanion.insert(name: tag));
       final tagRow = await (_db.select(
         _db.tagTable,
-      )..where((t) => t.name.equals(tag))).getSingle();
-      await _db
-          .into(_db.noteTagTable)
-          .insertOnConflictUpdate(
+      )..where((t) => t.name.equals(tag)))
+          .getSingle();
+      await _db.into(_db.noteTagTable).insertOnConflictUpdate(
             NoteTagTableCompanion.insert(noteId: noteId, tagId: tagRow.id),
           );
     }

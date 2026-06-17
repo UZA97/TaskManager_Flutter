@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
+import '../data/note_repository.dart';
 
 class MemoListView extends ConsumerWidget {
   const MemoListView({super.key});
@@ -128,10 +129,7 @@ class _NoteListItem extends ConsumerWidget {
   }
 
   void _showContextMenu(
-    BuildContext context,
-    WidgetRef ref,
-    Offset position,
-  ) async {
+      BuildContext context, WidgetRef ref, Offset position) async {
     final result = await showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -150,9 +148,46 @@ class _NoteListItem extends ConsumerWidget {
     if (result == 'delete') {
       ref.read(noteListProvider.notifier).deleteNote(note.id!);
     } else if (result == 'duplicate') {
-      // 나중에 구현
+      final repo = ref.read(noteRepositoryProvider);
+      final newNote = await repo.createNote();
+      await repo.saveNote(newNote.copyWith(
+        title: '${note.title} (복사)',
+        content: note.content,
+      ));
+      ref.read(noteListProvider.notifier).refresh();
     } else if (result == 'tag') {
-      // 나중에 구현
+      if (!context.mounted) return;
+      final tagController = TextEditingController();
+      final tag = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('태그 추가'),
+          content: TextField(
+            controller: tagController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: '태그 이름 입력',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, tagController.text),
+              child: const Text('추가'),
+            ),
+          ],
+        ),
+      );
+
+      if (tag != null && tag.isNotEmpty) {
+        final updatedTags = [...note.tags, tag];
+        final repo = ref.read(noteRepositoryProvider);
+        await repo.saveNoteTags(note.id!, updatedTags);
+        ref.read(noteListProvider.notifier).refresh();
+      }
     }
   }
 }

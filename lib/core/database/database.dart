@@ -55,14 +55,43 @@ class SettingTable extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(
-  tables: [NoteTable, TagTable, NoteTagTable, AttachmentTable, SettingTable],
-)
+class EventTable extends Table {
+  @override
+  String get tableName => 'events';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text().withDefault(const Constant(''))();
+  TextColumn get eventDate => text()();
+  TextColumn get createdAt => text()();
+  BoolColumn get alarmEnabled => boolean().withDefault(const Constant(false))();
+  TextColumn get alarmTime => text().withDefault(const Constant('09:00'))();
+  IntColumn get alarmDaysBefore => integer().withDefault(const Constant(0))();
+  BoolColumn get isCompleted => boolean().withDefault(const Constant(false))();
+  IntColumn get priority => integer().withDefault(const Constant(1))();
+}
+
+@DriftDatabase(tables: [
+  NoteTable,
+  TagTable,
+  NoteTagTable,
+  AttachmentTable,
+  SettingTable,
+  EventTable,
+])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(eventTable);
+          }
+        },
+      );
 
   static QueryExecutor _openConnection() {
     return driftDatabase(name: 'taskmanager');

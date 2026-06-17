@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/memo/views/memo_list_view.dart';
 import 'features/memo/views/memo_editor_view.dart';
+import 'features/calendar/views/calendar_view.dart';
+import 'features/calendar/views/calendar_editor_view.dart';
+import 'core/notification/notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
   runApp(const ProviderScope(child: TaskManagerApp()));
 }
 
@@ -81,7 +86,7 @@ class _MainShellState extends State<MainShell> {
               index: _selectedIndex,
               children: const [
                 MemoListView(),
-                Center(child: Text('캘린더')),
+                CalendarView(), // 여기
                 Center(child: Text('메일')),
                 Center(child: Text('설정')),
               ],
@@ -90,7 +95,17 @@ class _MainShellState extends State<MainShell> {
           // 구분선
           const VerticalDivider(width: 1, color: Color(0xFFDDDDDD)),
           // 오른쪽 메인 영역
-          const Expanded(child: MemoEditorView()),
+          Expanded(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: const [
+                MemoEditorView(),
+                CalendarEditorView(),
+                Center(child: Text('메일')),
+                Center(child: Text('설정')),
+              ],
+            ),
+          ),
         ],
       ),
     );
