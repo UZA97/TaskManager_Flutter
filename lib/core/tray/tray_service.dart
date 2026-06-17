@@ -20,6 +20,10 @@ class TrayService with TrayListener {
 
     await trayManager.setIcon('assets/tray_icon.ico');
     await trayManager.setToolTip('TaskManager');
+    await _setContextMenu();
+  }
+
+  Future<void> _setContextMenu() async {
     await trayManager.setContextMenu(Menu(
       items: [
         MenuItem(
@@ -42,6 +46,11 @@ class TrayService with TrayListener {
   @override
   void onTrayIconMouseDown() {
     onShow?.call();
+  }
+
+  @override
+  void onTrayIconRightMouseDown() {
+    trayManager.popUpContextMenu();
   }
 
   @override

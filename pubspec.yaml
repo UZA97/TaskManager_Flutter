@@ -18,12 +18,17 @@ dependencies:
   drift: ^2.20.0
   drift_flutter: ^0.2.4
 
+  window_manager: ^0.4.3
+
   # 에디터
   appflowy_editor: ^4.0.0
 
   # 시스템 트레이
   tray_manager: ^0.2.3
-
+  
+  # 드래그앤드롭
+  desktop_drop: ^0.4.4
+  
   # 알림
   local_notifier: ^0.1.6
 
@@ -32,6 +37,10 @@ dependencies:
 
   # IMAP
   enough_mail: ^2.1.0
+  
+  # 경로 처리
+  path: ^1.9.0
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -49,5 +58,5 @@ dev_dependencies:
   
 flutter:
   uses-material-design: true
-  # assets:
-  #   - assets/icon_1.ico
+  assets:
+    - assets/
