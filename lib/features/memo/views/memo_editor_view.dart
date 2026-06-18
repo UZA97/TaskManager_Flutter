@@ -1,11 +1,18 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
-import '../providers/attachment_provider.dart';
-import '../data/attachment_repository.dart';
+import '../widgets/local_image_block.dart';
+import '../widgets/local_file_block.dart';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -20,6 +27,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   final _titleController = TextEditingController();
   bool _isDragging = false;
 
+  static const _imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+
+  bool _isImage(String filePath) =>
+      _imageExts.contains(path.extension(filePath).toLowerCase());
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -33,27 +45,29 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     if (note.content.isNotEmpty) {
       try {
         editorState = EditorState(
-          document: markdownToDocument(note.content),
+          document: Document.fromJson(jsonDecode(note.content)),
         );
       } catch (_) {
-        editorState = EditorState.blank();
+        try {
+          editorState = EditorState(
+            document: markdownToDocument(note.content),
+          );
+        } catch (_) {
+          editorState = EditorState.blank();
+        }
       }
     } else {
       editorState = EditorState.blank();
     }
 
-    editorState.transactionStream.listen((_) {
-      _onContentChanged();
-    });
+    editorState.transactionStream.listen((_) => _onContentChanged());
 
-    setState(() {
-      _editorState = editorState;
-    });
+    setState(() => _editorState = editorState);
   }
 
   void _onContentChanged() {
     if (_currentNote == null || _editorState == null) return;
-    final content = documentToMarkdown(_editorState!.document);
+    final content = jsonEncode(_editorState!.document.toJson());
     final updated = _currentNote!.copyWith(
       title: _titleController.text,
       content: content,
@@ -61,17 +75,124 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     ref.read(noteListProvider.notifier).saveNote(updated);
   }
 
+  Future<String> _copyToAppDir(String srcPath) async {
+    final appDir = await getApplicationSupportDirectory();
+    final attachDir = Directory(
+      '${appDir.path}\\Attachments\\${_currentNote!.id}',
+    );
+    await attachDir.create(recursive: true);
+
+    final fileName = path.basename(srcPath);
+    String destPath = '${attachDir.path}\\$fileName';
+
+    if (File(destPath).existsSync()) {
+      final ext = path.extension(fileName);
+      final name = path.basenameWithoutExtension(fileName);
+      destPath =
+          '${attachDir.path}\\${name}_${DateTime.now().millisecondsSinceEpoch}$ext';
+    }
+
+    await File(srcPath).copy(destPath);
+    return destPath;
+  }
+
+  void _insertAtCursor(Node node) {
+    final editorState = _editorState;
+    if (editorState == null) return;
+
+    final selection = editorState.selection;
+    final insertPath = selection != null
+        ? selection.end.path.next
+        : [editorState.document.root.children.length];
+
+    final transaction = editorState.transaction;
+    transaction.insertNode(insertPath, node);
+    editorState.apply(transaction);
+  }
+
+  Future<void> _processFile(String srcPath) async {
+    if (_currentNote == null) return;
+    final destPath = await _copyToAppDir(srcPath);
+    final fileName = path.basename(destPath);
+
+    if (_isImage(destPath)) {
+      _insertAtCursor(localImageNode(src: destPath));
+    } else {
+      _insertAtCursor(localFileNode(src: destPath, fileName: fileName));
+    }
+  }
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
+    if (result == null) return;
+    for (final file in result.files) {
+      if (file.path != null) await _processFile(file.path!);
+    }
+  }
+
   Future<void> _handleDrop(DropDoneDetails details) async {
-    final filePaths = details.files.map((f) => f.path).toList();
-    await ref
-        .read(attachmentProvider.notifier)
-        .addAttachmentFromDrop(filePaths);
+    for (final file in details.files) {
+      await _processFile(file.path);
+    }
+  }
+
+  // Backspace 핸들러 — local_image / local_file 블록일 때 삭제 다이얼로그
+  late final _backspaceHandler = CommandShortcutEvent(
+    key: 'delete local block',
+    getDescription: () => 'Delete local block with confirmation',
+    command: 'backspace',
+    handler: (editorState) {
+      final selection = editorState.selection;
+      if (selection == null) return KeyEventResult.ignored;
+
+      final node = editorState.getNodeAtPath(selection.end.path);
+      if (node == null) return KeyEventResult.ignored;
+
+      if (node.type != localImageType && node.type != localFileType) {
+        return KeyEventResult.ignored;
+      }
+
+      // 다이얼로그는 BuildContext 필요 — 위젯 내부에서 처리
+      // 해당 블록 위젯의 GlobalKey를 통해 호출하는 대신
+      // 여기서 직접 다이얼로그 띄움
+      _showDeleteDialog(editorState, node);
+      return KeyEventResult.handled;
+    },
+  );
+
+  Future<void> _showDeleteDialog(EditorState editorState, Node node) async {
+    final isImage = node.type == localImageType;
+    final label =
+        isImage ? '이미지' : (node.attributes['fileName'] as String? ?? '파일');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('$label 삭제'),
+        content: Text('$label 를 삭제할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final transaction = editorState.transaction;
+      transaction.deleteNode(node);
+      editorState.apply(transaction);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
-    final attachmentsAsync = ref.watch(attachmentProvider);
 
     if (selectedNote != null && selectedNote.id != _currentNote?.id) {
       _currentNote = selectedNote;
@@ -82,16 +203,25 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
     if (selectedNote == null) {
       return const Center(
-        child: Text(
-          '메모를 선택하세요',
-          style: TextStyle(color: Colors.grey, fontSize: 16),
-        ),
+        child: Text('메모를 선택하세요',
+            style: TextStyle(color: Colors.grey, fontSize: 16)),
       );
     }
 
     if (_editorState == null) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    final blockBuilders = {
+      ...standardBlockComponentBuilderMap,
+      localImageType: LocalImageBlockComponentBuilder(),
+      localFileType: LocalFileBlockComponentBuilder(),
+    };
+
+    final shortcutEvents = [
+      _backspaceHandler,
+      ...standardCommandShortcutEvents,
+    ];
 
     return DropTarget(
       onDragEntered: (_) => setState(() => _isDragging = true),
@@ -104,15 +234,12 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         children: [
           Column(
             children: [
-              // 제목 입력
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
                 child: TextField(
                   controller: _titleController,
                   style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      fontSize: 24, fontWeight: FontWeight.bold),
                   decoration: const InputDecoration(
                     hintText: '제목 없음',
                     border: InputBorder.none,
@@ -121,173 +248,60 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                   onChanged: (_) => _onContentChanged(),
                 ),
               ),
-
               const Divider(height: 1, color: Color(0xFFDDDDDD)),
-
-              // 에디터
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: AppFlowyEditor(
                     editorState: _editorState!,
                     editorStyle: const EditorStyle.desktop(),
-                    blockComponentBuilders: standardBlockComponentBuilderMap,
-                    commandShortcutEvents: standardCommandShortcutEvents,
+                    blockComponentBuilders: blockBuilders,
+                    commandShortcutEvents: shortcutEvents,
                   ),
                 ),
               ),
-
-              // 첨부파일 목록
-              if (attachmentsAsync.value?.isNotEmpty ?? false) ...[
-                const Divider(height: 1, color: Color(0xFFDDDDDD)),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '첨부파일',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: attachmentsAsync.value!
-                            .map((att) => _AttachmentChip(attachment: att))
-                            .toList(),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              // 하단 툴바
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                 decoration: const BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: Color(0xFFDDDDDD)),
-                  ),
+                  border: Border(top: BorderSide(color: Color(0xFFDDDDDD))),
                 ),
                 child: Row(
                   children: [
                     IconButton(
                       icon: const Icon(Icons.attach_file, size: 18),
                       tooltip: '파일 첨부',
-                      onPressed: () {
-                        ref.read(attachmentProvider.notifier).addAttachment();
-                      },
+                      onPressed: _pickFile,
                     ),
                     const Spacer(),
-                    const Text(
-                      '저장됨',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
+                    const Text('저장됨',
+                        style: TextStyle(fontSize: 11, color: Colors.grey)),
                   ],
                 ),
               ),
             ],
           ),
-
-          // 드래그 오버레이
           if (_isDragging)
             Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF4A90E2).withOpacity(0.1),
-                border: Border.all(
-                  color: const Color(0xFF4A90E2),
-                  width: 2,
-                ),
+                border: Border.all(color: const Color(0xFF4A90E2), width: 2),
               ),
               child: const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.upload_file,
-                      size: 48,
-                      color: Color(0xFF4A90E2),
-                    ),
+                    Icon(Icons.upload_file, size: 48, color: Color(0xFF4A90E2)),
                     SizedBox(height: 8),
-                    Text(
-                      '파일을 여기에 놓으세요',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF4A90E2),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text('파일을 여기에 놓으세요',
+                        style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF4A90E2),
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AttachmentChip extends ConsumerWidget {
-  final Attachment attachment;
-
-  const _AttachmentChip({required this.attachment});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isImage =
-        ref.read(attachmentProvider.notifier).isImage(attachment.fileName);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F5FF),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFFD0E0FF)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(width: 8),
-          Icon(
-            isImage ? Icons.image : Icons.attach_file,
-            size: 12,
-            color: const Color(0xFF4A90E2),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: () {
-              ref
-                  .read(attachmentProvider.notifier)
-                  .openAttachment(attachment.filePath);
-            },
-            child: Text(
-              attachment.fileName,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF4A90E2),
-                decoration: TextDecoration.underline,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.close, size: 12),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            onPressed: () {
-              ref.read(attachmentProvider.notifier).deleteAttachment(
-                    attachment.id!,
-                    attachment.filePath,
-                  );
-            },
-          ),
-          const SizedBox(width: 4),
         ],
       ),
     );
