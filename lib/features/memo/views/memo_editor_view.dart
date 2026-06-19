@@ -4,15 +4,13 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
-import '../widgets/local_image_block.dart';
-import '../widgets/local_file_block.dart';
+import 'dart:async';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -26,43 +24,58 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   Note? _currentNote;
   final _titleController = TextEditingController();
   bool _isDragging = false;
+  StreamSubscription? _transactionSubscription;
 
   static const _imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+
+// 클래스 레벨에 선언
+  late final Map<String, BlockComponentBuilder> _blockBuilders;
+
+  @override
+  void initState() {
+    super.initState();
+    _blockBuilders = {
+      ...standardBlockComponentBuilderMap,
+    };
+  }
 
   bool _isImage(String filePath) =>
       _imageExts.contains(path.extension(filePath).toLowerCase());
 
   @override
   void dispose() {
+    _transactionSubscription?.cancel();
+    _editorState?.dispose(); // 추가
     _titleController.dispose();
     super.dispose();
   }
 
   void _initEditor(Note note) {
     _titleController.text = note.title;
+    _transactionSubscription?.cancel();
+    _editorState?.dispose(); // 추가 — 이전 editorState 정리
 
-    EditorState editorState;
-    if (note.content.isNotEmpty) {
-      try {
-        editorState = EditorState(
-          document: Document.fromJson(jsonDecode(note.content)),
-        );
-      } catch (_) {
-        try {
-          editorState = EditorState(
-            document: markdownToDocument(note.content),
-          );
-        } catch (_) {
-          editorState = EditorState.blank();
-        }
-      }
-    } else {
-      editorState = EditorState.blank();
-    }
-
-    editorState.transactionStream.listen((_) => _onContentChanged());
+    final editorState = _createEditorState(note.content);
+    _transactionSubscription = editorState.transactionStream.listen((_) {
+      _onContentChanged();
+    });
 
     setState(() => _editorState = editorState);
+  }
+
+  EditorState _createEditorState(String content) {
+    if (content.trim().isNotEmpty) {
+      // JSON 먼저 시도
+      try {
+        final json = jsonDecode(content);
+        return EditorState(document: Document.fromJson(json));
+      } catch (_) {}
+      // 구버전 마크다운 호환
+      try {
+        return EditorState(document: markdownToDocument(content));
+      } catch (_) {}
+    }
+    return EditorState.blank(withInitialText: true);
   }
 
   void _onContentChanged() {
@@ -101,13 +114,26 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     if (editorState == null) return;
 
     final selection = editorState.selection;
-    final insertPath = selection != null
-        ? selection.end.path.next
-        : [editorState.document.root.children.length];
+    final insertIndex = selection != null
+        ? selection.end.path.last
+        : editorState.document.root.children.length;
+
+    final insertPath = [insertIndex + 1];
+    final nextPath = [insertIndex + 2];
 
     final transaction = editorState.transaction;
     transaction.insertNode(insertPath, node);
+    transaction.insertNode(nextPath, paragraphNode());
     editorState.apply(transaction);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        editorState.updateSelectionWithReason(
+          Selection.collapsed(Position(path: nextPath, offset: 0)),
+          reason: SelectionUpdateReason.uiEvent,
+        );
+      });
+    });
   }
 
   Future<void> _processFile(String srcPath) async {
@@ -116,9 +142,19 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final fileName = path.basename(destPath);
 
     if (_isImage(destPath)) {
-      _insertAtCursor(localImageNode(src: destPath));
+      _insertAtCursor(imageNode(url: destPath));
     } else {
-      _insertAtCursor(localFileNode(src: destPath, fileName: fileName));
+      // file:/// 프로토콜 붙이면 url_launcher가 파일 탐색기로 열어줌
+      final fileUri = Uri.file(destPath).toString(); // file:///C:/Users/...
+      _insertAtCursor(
+        paragraphNode(
+          delta: Delta()
+            ..insert(
+              '📎 $fileName',
+              attributes: {'href': fileUri},
+            ),
+        ),
+      );
     }
   }
 
@@ -133,60 +169,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   Future<void> _handleDrop(DropDoneDetails details) async {
     for (final file in details.files) {
       await _processFile(file.path);
-    }
-  }
-
-  // Backspace 핸들러 — local_image / local_file 블록일 때 삭제 다이얼로그
-  late final _backspaceHandler = CommandShortcutEvent(
-    key: 'delete local block',
-    getDescription: () => 'Delete local block with confirmation',
-    command: 'backspace',
-    handler: (editorState) {
-      final selection = editorState.selection;
-      if (selection == null) return KeyEventResult.ignored;
-
-      final node = editorState.getNodeAtPath(selection.end.path);
-      if (node == null) return KeyEventResult.ignored;
-
-      if (node.type != localImageType && node.type != localFileType) {
-        return KeyEventResult.ignored;
-      }
-
-      // 다이얼로그는 BuildContext 필요 — 위젯 내부에서 처리
-      // 해당 블록 위젯의 GlobalKey를 통해 호출하는 대신
-      // 여기서 직접 다이얼로그 띄움
-      _showDeleteDialog(editorState, node);
-      return KeyEventResult.handled;
-    },
-  );
-
-  Future<void> _showDeleteDialog(EditorState editorState, Node node) async {
-    final isImage = node.type == localImageType;
-    final label =
-        isImage ? '이미지' : (node.attributes['fileName'] as String? ?? '파일');
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('$label 삭제'),
-        content: Text('$label 를 삭제할까요?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('삭제', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      final transaction = editorState.transaction;
-      transaction.deleteNode(node);
-      editorState.apply(transaction);
     }
   }
 
@@ -211,17 +193,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     if (_editorState == null) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    final blockBuilders = {
-      ...standardBlockComponentBuilderMap,
-      localImageType: LocalImageBlockComponentBuilder(),
-      localFileType: LocalFileBlockComponentBuilder(),
-    };
-
-    final shortcutEvents = [
-      _backspaceHandler,
-      ...standardCommandShortcutEvents,
-    ];
 
     return DropTarget(
       onDragEntered: (_) => setState(() => _isDragging = true),
@@ -255,8 +226,8 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                   child: AppFlowyEditor(
                     editorState: _editorState!,
                     editorStyle: const EditorStyle.desktop(),
-                    blockComponentBuilders: blockBuilders,
-                    commandShortcutEvents: shortcutEvents,
+                    blockComponentBuilders: standardBlockComponentBuilderMap,
+                    commandShortcutEvents: standardCommandShortcutEvents,
                   ),
                 ),
               ),
