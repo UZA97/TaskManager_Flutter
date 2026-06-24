@@ -81,6 +81,7 @@ class _LocalFileBlockWidgetState extends State<LocalFileBlockWidget> {
     return GestureDetector(
       onTap: _openFile,
       onSecondaryTap: _showDeleteDialog,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Container(

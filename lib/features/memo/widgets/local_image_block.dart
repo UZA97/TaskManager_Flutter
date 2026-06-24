@@ -113,120 +113,114 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
   Widget build(BuildContext context) {
     final src = widget.node.attributes['src'] as String;
 
-    return TapRegion(
-      onTapOutside: (_) {
-        if (!_isDragging) setState(() => _isSelected = false);
-      },
+    return GestureDetector(
+      onTap: () => setState(() => _isSelected = !_isSelected),
+      onSecondaryTap: _showDeleteDialog,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Align(
           alignment: Alignment.centerLeft,
-          child: GestureDetector(
-            onTap: () => setState(() => _isSelected = true),
-            child: SizedBox(
-              width: _width,
-              height: _aspectRatio != null ? _width / _aspectRatio! : null,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.file(
-                      File(src),
+          child: SizedBox(
+            width: _width,
+            height: _aspectRatio != null
+                ? _width / _aspectRatio!
+                : 200, // null 대신 200
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.file(
+                    File(src),
+                    width: _width,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Container(
                       width: _width,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: _width,
-                        height: 100,
-                        color: Colors.grey[200],
-                        child: const Center(child: Icon(Icons.broken_image)),
+                      height: 100,
+                      color: Colors.grey[200],
+                      child: const Center(child: Icon(Icons.broken_image)),
+                    ),
+                  ),
+                ),
+                if (_isSelected)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: const Color(0xFF4A90E2),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
                     ),
                   ),
-
-                  // 선택 테두리
-                  if (_isSelected)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: const Color(0xFF4A90E2),
-                              width: 2,
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                if (_isSelected)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: _showDeleteDialog,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 16,
                         ),
                       ),
                     ),
+                  ),
+                if (_isSelected)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: GestureDetector(
+                      onPanStart: (d) {
+                        _isDragging = true;
+                        _dragStartX = d.globalPosition.dx;
+                        _dragStartY = d.globalPosition.dy;
+                        _dragStartWidth = _width;
+                      },
+                      onPanUpdate: (d) {
+                        print('pan update: ${d.globalPosition}'); // 추가
 
-                  // 우측 상단 삭제 버튼
-                  if (_isSelected)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: _showDeleteDialog,
+                        final deltaX = d.globalPosition.dx - _dragStartX;
+                        final deltaY = d.globalPosition.dy - _dragStartY;
+                        final delta = (deltaX + deltaY) / 2;
+                        setState(() {
+                          _width =
+                              (_dragStartWidth + delta).clamp(100.0, 800.0);
+                        });
+                      },
+                      onPanEnd: (_) {
+                        _isDragging = false;
+                        _saveWidth(_width);
+                      },
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.resizeUpLeftDownRight,
                         child: Container(
-                          padding: const EdgeInsets.all(4),
+                          width: 20,
+                          height: 20,
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            borderRadius: BorderRadius.circular(4),
+                            color: const Color(0xFF4A90E2),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                           child: const Icon(
-                            Icons.close,
+                            Icons.open_in_full,
                             color: Colors.white,
-                            size: 16,
+                            size: 12,
                           ),
                         ),
                       ),
                     ),
-
-                  // 우측 하단 리사이즈 핸들
-                  if (_isSelected)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: GestureDetector(
-                        onPanStart: (d) {
-                          _isDragging = true;
-                          _dragStartX = d.globalPosition.dx;
-                          _dragStartY = d.globalPosition.dy;
-                          _dragStartWidth = _width;
-                        },
-                        onPanUpdate: (d) {
-                          final deltaX = d.globalPosition.dx - _dragStartX;
-                          final deltaY = d.globalPosition.dy - _dragStartY;
-                          final delta = (deltaX + deltaY) / 2;
-                          setState(() {
-                            _width =
-                                (_dragStartWidth + delta).clamp(100.0, 800.0);
-                          });
-                        },
-                        onPanEnd: (_) {
-                          _isDragging = false;
-                          _saveWidth(_width);
-                        },
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.resizeUpLeftDownRight,
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF4A90E2),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                            child: const Icon(
-                              Icons.open_in_full,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ),

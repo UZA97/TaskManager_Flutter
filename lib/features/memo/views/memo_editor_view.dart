@@ -332,6 +332,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                     editorStyle: const EditorStyle.desktop(),
                     blockComponentBuilders: _blockBuilders,
                     commandShortcutEvents: shortcutEvents,
+                    characterShortcutEvents: standardCharacterShortcutEvents,
                   ),
                 ),
               ),
