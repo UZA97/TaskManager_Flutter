@@ -14,10 +14,12 @@ Node localFileNode({required String src, required String fileName}) {
 
 class LocalFileBlockComponentBuilder extends BlockComponentBuilder {
   LocalFileBlockComponentBuilder()
-      : super(configuration: const BlockComponentConfiguration()) {
-    validate = (node) =>
-        node.attributes['src'] is String &&
-        node.attributes['fileName'] is String;
+      : super(
+        configuration: BlockComponentConfiguration(
+          padding: (_) => EdgeInsets.zero,
+        ),
+      ) {
+    validate = (node) => node.type == localFileType;
   }
 
   @override
@@ -97,11 +99,14 @@ class _LocalFileBlockWidgetState extends State<LocalFileBlockWidget> {
               const Icon(Icons.insert_drive_file,
                   size: 16, color: Color(0xFF4A90E2)),
               const SizedBox(width: 8),
-              Text(
-                fileName,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF4A90E2),
+              Flexible(
+                child: Text(
+                  fileName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF4A90E2),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

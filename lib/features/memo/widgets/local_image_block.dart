@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 const localImageType = 'local_image';
@@ -14,8 +15,12 @@ Node localImageNode({required String src, double width = 300}) {
 
 class LocalImageBlockComponentBuilder extends BlockComponentBuilder {
   LocalImageBlockComponentBuilder()
-      : super(configuration: const BlockComponentConfiguration()) {
-    validate = (node) => node.attributes['src'] is String;
+      : super(
+        configuration: BlockComponentConfiguration(
+          padding: (_) => EdgeInsets.zero,
+        ),
+      ) {
+    validate = (node) => node.type == localImageType;
   }
 
   @override
@@ -24,6 +29,90 @@ class LocalImageBlockComponentBuilder extends BlockComponentBuilder {
       key: blockComponentContext.node.key,
       node: blockComponentContext.node,
       configuration: configuration,
+    );
+  }
+}
+
+class _ImageMenuButton extends StatefulWidget {
+  const _ImageMenuButton({
+    required this.onCopy,
+    required this.onCut,
+    required this.onDelete,
+  });
+
+  final VoidCallback onCopy;
+  final VoidCallback onCut;
+  final VoidCallback onDelete;
+
+  @override
+  State<_ImageMenuButton> createState() => _ImageMenuButtonState();
+}
+
+class _ImageMenuButtonState extends State<_ImageMenuButton> {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showMenu(context),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: const Icon(
+          Icons.menu,
+          color: Colors.white,
+          size: 16,
+        ),
+      ),
+    );
+  }
+
+  void _showMenu(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox;
+    final offset = box.localToGlobal(Offset.zero);
+
+    await showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        offset.dx,
+        offset.dy + box.size.height,
+        offset.dx + box.size.width,
+        offset.dy,
+      ),
+      items: <PopupMenuEntry<dynamic>>[
+        PopupMenuItem(
+          onTap: widget.onCopy,
+          child: const Row(
+            children: [
+              Icon(Icons.copy, size: 16),
+              SizedBox(width: 8),
+              Text('복사'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          onTap: widget.onCut,
+          child: const Row(
+            children: [
+              Icon(Icons.content_cut, size: 16),
+              SizedBox(width: 8),
+              Text('잘라내기'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          onTap: widget.onDelete,
+          child: const Row(
+            children: [
+              Icon(Icons.delete, size: 16, color: Colors.red),
+              SizedBox(width: 8),
+              Text('삭제', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -57,8 +146,12 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
     _loadImageSize();
   }
 
+  String get _imageSrc =>
+      (widget.node.attributes['src'] ?? widget.node.attributes['url'])
+          as String;
+
   void _loadImageSize() {
-    final src = widget.node.attributes['src'] as String;
+    final src = _imageSrc;
     final file = File(src);
     if (!file.existsSync()) return;
 
@@ -109,39 +202,81 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
     }
   }
 
+  void _copyImage() async {
+    await Clipboard.setData(ClipboardData(text: _imageSrc));
+  }
+
+  void _cutImage() async {
+    await Clipboard.setData(ClipboardData(text: _imageSrc));
+    final editorState = Provider.of<EditorState>(context, listen: false);
+    final transaction = editorState.transaction;
+    transaction.deleteNode(widget.node);
+    editorState.apply(transaction);
+  }
+
+  void _pasteImage() async {
+    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+    if (clipboardData?.text == null) return;
+
+    final imagePath = clipboardData!.text!;
+    final file = File(imagePath);
+    if (!file.existsSync()) return;
+
+    final editorState = Provider.of<EditorState>(context, listen: false);
+    final selection = editorState.selection;
+    if (selection == null) return;
+
+    final insertPath = selection.end.path.next;
+    final newNode = Node(
+      type: localImageType,
+      attributes: {'src': imagePath, 'width': 300},
+    );
+
+    final transaction = editorState.transaction;
+    transaction.insertNode(insertPath, newNode);
+    editorState.apply(transaction);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final src = widget.node.attributes['src'] as String;
+    final src = _imageSrc;
 
-    return GestureDetector(
-      onTap: () => setState(() => _isSelected = !_isSelected),
-      onSecondaryTap: _showDeleteDialog,
+    return TapRegion(
+      onTapOutside: (_) {
+        if (!_isDragging && _isSelected) {
+          setState(() => _isSelected = false);
+        }
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Align(
           alignment: Alignment.centerLeft,
           child: SizedBox(
             width: _width,
-            height: _aspectRatio != null
-                ? _width / _aspectRatio!
-                : 200, // null 대신 200
+            height: _aspectRatio != null ? _width / _aspectRatio! : 200,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.file(
-                    File(src),
-                    width: _width,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: _width,
-                      height: 100,
-                      color: Colors.grey[200],
-                      child: const Center(child: Icon(Icons.broken_image)),
+                // 이미지 + 탭 감지
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _isSelected = true),
+                    onSecondaryTap: _showDeleteDialog,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.file(
+                        File(src),
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey[200],
+                          child: const Center(child: Icon(Icons.broken_image)),
+                        ),
+                      ),
                     ),
                   ),
                 ),
+
+                // 선택 테두리
                 if (_isSelected)
                   Positioned.fill(
                     child: IgnorePointer(
@@ -156,57 +291,50 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                       ),
                     ),
                   ),
+
+                // 우측 상단 햄버거 메뉴
                 if (_isSelected)
                   Positioned(
                     top: 8,
                     right: 8,
-                    child: GestureDetector(
-                      onTap: _showDeleteDialog,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
+                    child: _ImageMenuButton(
+                      onCopy: _copyImage,
+                      onCut: _cutImage,
+                      onDelete: _showDeleteDialog,
                     ),
                   ),
+
+                // 우측 하단 리사이즈 핸들 — 별도 GestureDetector
                 if (_isSelected)
                   Positioned(
                     right: 0,
                     bottom: 0,
-                    child: GestureDetector(
-                      onPanStart: (d) {
-                        _isDragging = true;
-                        _dragStartX = d.globalPosition.dx;
-                        _dragStartY = d.globalPosition.dy;
-                        _dragStartWidth = _width;
-                      },
-                      onPanUpdate: (d) {
-                        print('pan update: ${d.globalPosition}'); // 추가
-
-                        final deltaX = d.globalPosition.dx - _dragStartX;
-                        final deltaY = d.globalPosition.dy - _dragStartY;
-                        final delta = (deltaX + deltaY) / 2;
-                        setState(() {
-                          _width =
-                              (_dragStartWidth + delta).clamp(100.0, 800.0);
-                        });
-                      },
-                      onPanEnd: (_) {
-                        _isDragging = false;
-                        _saveWidth(_width);
-                      },
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeUpLeftDownRight,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.resizeUpLeftDownRight,
+                      child: Listener(
+                        behavior: HitTestBehavior.opaque,
+                        onPointerDown: (e) {
+                          _isDragging = true;
+                          _dragStartX = e.position.dx;
+                          _dragStartY = e.position.dy;
+                          _dragStartWidth = _width;
+                        },
+                        onPointerMove: (e) {
+                          final deltaX = e.position.dx - _dragStartX;
+                          final deltaY = e.position.dy - _dragStartY;
+                          final delta = (deltaX + deltaY) / 2;
+                          setState(() {
+                            _width =
+                                (_dragStartWidth + delta).clamp(100.0, 800.0);
+                          });
+                        },
+                        onPointerUp: (_) {
+                          _isDragging = false;
+                          _saveWidth(_width);
+                        },
                         child: Container(
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           decoration: BoxDecoration(
                             color: const Color(0xFF4A90E2),
                             borderRadius: BorderRadius.circular(2),
@@ -214,7 +342,7 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                           child: const Icon(
                             Icons.open_in_full,
                             color: Colors.white,
-                            size: 12,
+                            size: 14,
                           ),
                         ),
                       ),

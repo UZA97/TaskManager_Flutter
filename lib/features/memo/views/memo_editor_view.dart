@@ -8,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'package:provider/provider.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
 import '../widgets/local_image_block.dart';
@@ -67,6 +66,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
   void _onContentChanged() {
     if (_currentNote == null || _editorState == null) return;
+
     final content = jsonEncode(_editorState!.document.toJson());
     final updated = _currentNote!.copyWith(
       title: _titleController.text,
@@ -94,6 +94,24 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
     await File(srcPath).copy(destPath);
     return destPath;
+  }
+
+  void _setTextAlign(String align) {
+    final editorState = _editorState;
+    if (editorState == null) return;
+
+    final selection = editorState.selection;
+    if (selection == null) return;
+
+    final node = editorState.getNodeAtPath(selection.end.path);
+    if (node == null) return;
+
+    final transaction = editorState.transaction;
+    transaction.updateNode(node, {
+      ...node.attributes,
+      'text_align': align,
+    });
+    editorState.apply(transaction);
   }
 
   void _insertAtCursor(Node node) {
@@ -139,21 +157,31 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   late final _moveUpHandler = CommandShortcutEvent(
     key: 'move block up',
     getDescription: () => 'Move block up',
-    command: 'alt+up',
+    command: 'alt+arrow up',
     handler: (editorState) {
       final selection = editorState.selection;
       if (selection == null) return KeyEventResult.ignored;
 
-      final node = editorState.getNodeAtPath(selection.end.path);
+      final path = selection.end.path;
+      if (path.isEmpty || path.last <= 0) return KeyEventResult.ignored;
+
+      final node = editorState.getNodeAtPath(path);
       if (node == null) return KeyEventResult.ignored;
 
-      final prevPath = selection.end.path.previous;
+      final prevPath = [...path.sublist(0, path.length - 1), path.last - 1];
       final prevNode = editorState.getNodeAtPath(prevPath);
       if (prevNode == null) return KeyEventResult.ignored;
 
       final transaction = editorState.transaction;
       transaction.moveNode(prevPath, node);
       editorState.apply(transaction);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        editorState.selection = Selection.collapsed(
+          Position(path: prevPath, offset: 0),
+        );
+      });
+
       return KeyEventResult.handled;
     },
   );
@@ -161,21 +189,31 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   late final _moveDownHandler = CommandShortcutEvent(
     key: 'move block down',
     getDescription: () => 'Move block down',
-    command: 'alt+down',
+    command: 'alt+arrow down',
     handler: (editorState) {
       final selection = editorState.selection;
       if (selection == null) return KeyEventResult.ignored;
 
-      final node = editorState.getNodeAtPath(selection.end.path);
+      final path = selection.end.path;
+      final node = editorState.getNodeAtPath(path);
       if (node == null) return KeyEventResult.ignored;
 
-      final nextPath = selection.end.path.next;
-      final nextNode = editorState.getNodeAtPath(nextPath);
-      if (nextNode == null) return KeyEventResult.ignored;
+      final childCount = editorState.document.root.children.length;
+      if (path.last >= childCount - 1) return KeyEventResult.ignored;
+
+      final nextNextPath = [...path.sublist(0, path.length - 1), path.last + 2];
+      final newPath = [...path.sublist(0, path.length - 1), path.last + 1];
 
       final transaction = editorState.transaction;
-      transaction.moveNode(nextPath.next, node);
+      transaction.moveNode(nextNextPath, node);
       editorState.apply(transaction);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        editorState.selection = Selection.collapsed(
+          Position(path: newPath, offset: 0),
+        );
+      });
+
       return KeyEventResult.handled;
     },
   );
@@ -203,6 +241,81 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     },
   );
   // Backspace 핸들러 — local_image / local_file 블록일 때 삭제 다이얼로그
+  void _handlePasteImage(EditorState editorState) async {
+    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+    if (clipboardData?.text == null) return;
+
+    final imagePath = clipboardData!.text!.trim();
+
+    if (!_isImage(imagePath)) return;
+
+    final file = File(imagePath);
+    if (!file.existsSync()) return;
+
+    final selection = editorState.selection;
+    if (selection == null) return;
+
+    final path = selection.end.path;
+    final node = editorState.getNodeAtPath(path);
+
+    if (node != null && node.type == 'paragraph') {
+      final transaction = editorState.transaction;
+      transaction.deleteNode(node);
+      transaction.insertNode(path, localImageNode(src: imagePath));
+      transaction.insertNode(
+        [...path.sublist(0, path.length - 1), path.last + 1],
+        Node(type: 'paragraph'),
+      );
+      editorState.apply(transaction);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        editorState.selection = Selection.collapsed(
+          Position(path: [...path.sublist(0, path.length - 1), path.last + 1]),
+        );
+      });
+    }
+  }
+
+  late final _pasteHandler = CommandShortcutEvent(
+    key: 'paste local image',
+    getDescription: () => 'Paste local image from clipboard',
+    command: 'ctrl+v',
+    handler: (editorState) {
+      _handlePasteImage(editorState);
+      return KeyEventResult.handled;
+    },
+  );
+
+  late final _alignLeftHandler = CommandShortcutEvent(
+    key: 'align left',
+    getDescription: () => 'Align left',
+    command: 'ctrl+shift+l',
+    handler: (editorState) {
+      _setTextAlign('left');
+      return KeyEventResult.handled;
+    },
+  );
+
+  late final _alignCenterHandler = CommandShortcutEvent(
+    key: 'align center',
+    getDescription: () => 'Align center',
+    command: 'ctrl+shift+c',
+    handler: (editorState) {
+      _setTextAlign('center');
+      return KeyEventResult.handled;
+    },
+  );
+
+  late final _alignRightHandler = CommandShortcutEvent(
+    key: 'align right',
+    getDescription: () => 'Align right',
+    command: 'ctrl+shift+r',
+    handler: (editorState) {
+      _setTextAlign('right');
+      return KeyEventResult.handled;
+    },
+  );
+
   late final _backspaceHandler = CommandShortcutEvent(
     key: 'delete local block',
     getDescription: () => 'Delete local block with confirmation',
@@ -263,6 +376,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     super.initState();
     _blockBuilders = {
       ...standardBlockComponentBuilderMap,
+      'image': LocalImageBlockComponentBuilder(),
       localImageType: LocalImageBlockComponentBuilder(),
       localFileType: LocalFileBlockComponentBuilder(),
     };
@@ -290,12 +404,17 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final standardPaste = standardCommandShortcutEvents
+        .where((e) => e.key != 'paste' && e.command != 'ctrl+v')
+        .toList();
+
     final shortcutEvents = [
+      _pasteHandler,
       _backspaceHandler,
       _deleteHandler,
       _moveUpHandler,
       _moveDownHandler,
-      ...standardCommandShortcutEvents,
+      ...standardPaste,
     ];
 
     return DropTarget(
@@ -348,6 +467,22 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       icon: const Icon(Icons.attach_file, size: 18),
                       tooltip: '파일 첨부',
                       onPressed: _pickFile,
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton(
+                      icon: const Icon(Icons.format_align_left, size: 18),
+                      tooltip: '왼쪽 정렬',
+                      onPressed: () => _setTextAlign('left'),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.format_align_center, size: 18),
+                      tooltip: '가운데 정렬',
+                      onPressed: () => _setTextAlign('center'),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.format_align_right, size: 18),
+                      tooltip: '우측 정렬',
+                      onPressed: () => _setTextAlign('right'),
                     ),
                     const Spacer(),
                     const Text('저장됨',
