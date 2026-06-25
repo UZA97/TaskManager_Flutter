@@ -21,6 +21,7 @@ class MemoEditorView extends ConsumerStatefulWidget {
 }
 
 class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
+  Selection? _lastSelection;
   EditorState? _editorState;
   Note? _currentNote;
   final _titleController = TextEditingController();
@@ -48,9 +49,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         );
       } catch (_) {
         try {
-          editorState = EditorState(
-            document: markdownToDocument(note.content),
-          );
+          editorState = EditorState(document: markdownToDocument(note.content));
         } catch (_) {
           editorState = EditorState.blank();
         }
@@ -58,7 +57,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     } else {
       editorState = EditorState.blank();
     }
-
+    editorState.selectionNotifier.addListener(() {
+      final sel = editorState.selection;
+      if (sel != null) _lastSelection = sel;
+    });
     editorState.transactionStream.listen((_) => _onContentChanged());
 
     setState(() => _editorState = editorState);
@@ -100,17 +102,20 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final editorState = _editorState;
     if (editorState == null) return;
 
-    final selection = editorState.selection;
+    final selection = editorState.selection ?? _lastSelection;
     if (selection == null) return;
 
-    final node = editorState.getNodeAtPath(selection.end.path);
-    if (node == null) return;
+    final nodes = editorState.getNodesInSelection(selection);
+    if (nodes.isEmpty) return;
 
     final transaction = editorState.transaction;
-    transaction.updateNode(node, {
-      ...node.attributes,
-      'text_align': align,
-    });
+    for (final node in nodes) {
+      transaction.updateNode(node, {
+        ...node.attributes,
+        'align': align, // text_align → align
+      });
+    }
+    transaction.afterSelection = selection;
     editorState.apply(transaction);
   }
 
@@ -228,7 +233,8 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
       // del키는 커서 오른쪽 블록을 삭제하므로 next path 확인
       final nextPath = selection.end.path.next;
-      final node = editorState.getNodeAtPath(nextPath) ??
+      final node =
+          editorState.getNodeAtPath(nextPath) ??
           editorState.getNodeAtPath(selection.end.path);
       if (node == null) return KeyEventResult.ignored;
 
@@ -240,13 +246,12 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       return KeyEventResult.handled;
     },
   );
-  // Backspace 핸들러 — local_image / local_file 블록일 때 삭제 다이얼로그
+
   void _handlePasteImage(EditorState editorState) async {
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     if (clipboardData?.text == null) return;
 
     final imagePath = clipboardData!.text!.trim();
-
     if (!_isImage(imagePath)) return;
 
     final file = File(imagePath);
@@ -257,23 +262,30 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
     final path = selection.end.path;
     final node = editorState.getNodeAtPath(path);
+    if (node == null) return;
 
-    if (node != null && node.type == 'paragraph') {
-      final transaction = editorState.transaction;
+    final nextPath = [...path.sublist(0, path.length - 1), path.last + 1];
+    final nextNode = editorState.getNodeAtPath(nextPath);
+
+    final transaction = editorState.transaction;
+
+    if (node.type == 'paragraph') {
       transaction.deleteNode(node);
       transaction.insertNode(path, localImageNode(src: imagePath));
-      transaction.insertNode(
-        [...path.sublist(0, path.length - 1), path.last + 1],
-        Node(type: 'paragraph'),
-      );
-      editorState.apply(transaction);
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        editorState.selection = Selection.collapsed(
-          Position(path: [...path.sublist(0, path.length - 1), path.last + 1]),
-        );
-      });
+    } else {
+      transaction.insertNode(nextPath, localImageNode(src: imagePath));
     }
+
+    // 다음 노드가 없을 때만 빈 paragraph 추가
+    if (nextNode == null) {
+      transaction.insertNode(nextPath, Node(type: 'paragraph'));
+    }
+
+    editorState.apply(transaction);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      editorState.selection = Selection.collapsed(Position(path: nextPath));
+    });
   }
 
   late final _pasteHandler = CommandShortcutEvent(
@@ -341,8 +353,9 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
   Future<void> _showDeleteDialog(EditorState editorState, Node node) async {
     final isImage = node.type == localImageType;
-    final label =
-        isImage ? '이미지' : (node.attributes['fileName'] as String? ?? '파일');
+    final label = isImage
+        ? '이미지'
+        : (node.attributes['fileName'] as String? ?? '파일');
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -395,8 +408,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
     if (selectedNote == null) {
       return const Center(
-        child: Text('메모를 선택하세요',
-            style: TextStyle(color: Colors.grey, fontSize: 16)),
+        child: Text(
+          '메모를 선택하세요',
+          style: TextStyle(color: Colors.grey, fontSize: 16),
+        ),
       );
     }
 
@@ -414,6 +429,9 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _deleteHandler,
       _moveUpHandler,
       _moveDownHandler,
+      _alignLeftHandler,
+      _alignCenterHandler,
+      _alignRightHandler,
       ...standardPaste,
     ];
 
@@ -433,7 +451,9 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                 child: TextField(
                   controller: _titleController,
                   style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.bold),
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                   decoration: const InputDecoration(
                     hintText: '제목 없음',
                     border: InputBorder.none,
@@ -456,8 +476,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 8,
+                ),
                 decoration: const BoxDecoration(
                   border: Border(top: BorderSide(color: Color(0xFFDDDDDD))),
                 ),
@@ -485,8 +507,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       onPressed: () => _setTextAlign('right'),
                     ),
                     const Spacer(),
-                    const Text('저장됨',
-                        style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    const Text(
+                      '저장됨',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
                   ],
                 ),
               ),
@@ -504,11 +528,14 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                   children: [
                     Icon(Icons.upload_file, size: 48, color: Color(0xFF4A90E2)),
                     SizedBox(height: 8),
-                    Text('파일을 여기에 놓으세요',
-                        style: TextStyle(
-                            fontSize: 16,
-                            color: Color(0xFF4A90E2),
-                            fontWeight: FontWeight.bold)),
+                    Text(
+                      '파일을 여기에 놓으세요',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF4A90E2),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),

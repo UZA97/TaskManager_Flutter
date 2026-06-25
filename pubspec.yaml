@@ -3,25 +3,25 @@ description: "Task Manager - 메모, 캘린더, 메일 통합 앱"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.6.0 <4.0.0'
+  sdk: '>=3.8.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
 
-  flutter_launcher_icons: ^0.14.1
+  flutter_launcher_icons: ^0.14.4
 
   # 상태관리
   flutter_riverpod: ^2.6.1
 
   # DB
   drift: ^2.20.0
-  drift_flutter: ^0.2.4
+  drift_flutter: ^0.2.8
 
   window_manager: ^0.5.1
 
   # 에디터
-  appflowy_editor: ^6.0.0
+  appflowy_editor: ^6.2.0
 
   # 시스템 트레이
   tray_manager: ^0.5.3
@@ -33,14 +33,14 @@ dependencies:
   local_notifier: ^0.1.6
 
   # 파일 선택
-  file_picker: ^8.3.7
+  file_picker: ^10.0.2
 
   # IMAP
   enough_mail: ^2.1.0
 
   # 경로 처리
   path: ^1.9.0
-  path_provider: ^2.1.0
+  path_provider: ^2.1.5
 
   # provider (appflowy_editor 내부 사용)
   provider: ^6.1.2
@@ -48,9 +48,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
-  build_runner: ^2.4.13
-  drift_dev: ^2.20.0
+  flutter_lints: ^6.0.0
+  build_runner: ^2.15.0
+  drift_dev: ^2.31.0
 
 flutter:
   uses-material-design: true

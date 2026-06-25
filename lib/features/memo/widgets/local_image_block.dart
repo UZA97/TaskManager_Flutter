@@ -7,15 +7,12 @@ import 'package:provider/provider.dart';
 const localImageType = 'local_image';
 
 Node localImageNode({required String src, double width = 300}) {
-  return Node(
-    type: localImageType,
-    attributes: {'src': src, 'width': width},
-  );
+  return Node(type: localImageType, attributes: {'src': src, 'width': width});
 }
 
 class LocalImageBlockComponentBuilder extends BlockComponentBuilder {
   LocalImageBlockComponentBuilder()
-      : super(
+    : super(
         configuration: BlockComponentConfiguration(
           padding: (_) => EdgeInsets.zero,
         ),
@@ -59,11 +56,7 @@ class _ImageMenuButtonState extends State<_ImageMenuButton> {
           color: Colors.black.withOpacity(0.6),
           borderRadius: BorderRadius.circular(4),
         ),
-        child: const Icon(
-          Icons.menu,
-          color: Colors.white,
-          size: 16,
-        ),
+        child: const Icon(Icons.menu, color: Colors.white, size: 16),
       ),
     );
   }
@@ -150,19 +143,78 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
       (widget.node.attributes['src'] ?? widget.node.attributes['url'])
           as String;
 
+  Alignment _getAlignment() {
+    final align = widget.node.attributes['align'] as String?;
+    switch (align) {
+      case 'center':
+        return Alignment.center;
+      case 'right':
+        return Alignment.centerRight;
+      default:
+        return Alignment.centerLeft;
+    }
+  }
+
   void _loadImageSize() {
     final src = _imageSrc;
     final file = File(src);
     if (!file.existsSync()) return;
 
     final image = Image.file(file);
-    image.image.resolve(const ImageConfiguration()).addListener(
-      ImageStreamListener((info, _) {
-        if (!mounted) return;
-        final w = info.image.width.toDouble();
-        final h = info.image.height.toDouble();
-        if (h > 0) setState(() => _aspectRatio = w / h);
-      }),
+    image.image
+        .resolve(const ImageConfiguration())
+        .addListener(
+          ImageStreamListener((info, _) {
+            if (!mounted) return;
+            final w = info.image.width.toDouble();
+            final h = info.image.height.toDouble();
+            if (h > 0) setState(() => _aspectRatio = w / h);
+          }),
+        );
+  }
+
+  void _showContextMenu(BuildContext context, Offset globalPosition) async {
+    await showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        globalPosition.dx,
+        globalPosition.dy,
+      ),
+      items: <PopupMenuEntry<dynamic>>[
+        PopupMenuItem(
+          onTap: _copyImage,
+          child: const Row(
+            children: [
+              Icon(Icons.copy, size: 16),
+              SizedBox(width: 8),
+              Text('복사'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          onTap: _cutImage,
+          child: const Row(
+            children: [
+              Icon(Icons.content_cut, size: 16),
+              SizedBox(width: 8),
+              Text('잘라내기'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          onTap: _showDeleteDialog,
+          child: const Row(
+            children: [
+              Icon(Icons.delete, size: 16, color: Colors.red),
+              SizedBox(width: 8),
+              Text('삭제', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -250,7 +302,7 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Align(
-          alignment: Alignment.centerLeft,
+          alignment: _getAlignment(),
           child: SizedBox(
             width: _width,
             height: _aspectRatio != null ? _width / _aspectRatio! : 200,
@@ -261,7 +313,9 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                 Positioned.fill(
                   child: GestureDetector(
                     onTap: () => setState(() => _isSelected = true),
-                    onSecondaryTap: _showDeleteDialog,
+                    onSecondaryTapUp: (details) {
+                      _showContextMenu(context, details.globalPosition);
+                    },
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: Image.file(
@@ -324,8 +378,10 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                           final deltaY = e.position.dy - _dragStartY;
                           final delta = (deltaX + deltaY) / 2;
                           setState(() {
-                            _width =
-                                (_dragStartWidth + delta).clamp(100.0, 800.0);
+                            _width = (_dragStartWidth + delta).clamp(
+                              100.0,
+                              800.0,
+                            );
                           });
                         },
                         onPointerUp: (_) {

@@ -14,7 +14,7 @@ Node localFileNode({required String src, required String fileName}) {
 
 class LocalFileBlockComponentBuilder extends BlockComponentBuilder {
   LocalFileBlockComponentBuilder()
-      : super(
+    : super(
         configuration: BlockComponentConfiguration(
           padding: (_) => EdgeInsets.zero,
         ),
@@ -96,8 +96,11 @@ class _LocalFileBlockWidgetState extends State<LocalFileBlockWidget> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.insert_drive_file,
-                  size: 16, color: Color(0xFF4A90E2)),
+              const Icon(
+                Icons.insert_drive_file,
+                size: 16,
+                color: Color(0xFF4A90E2),
+              ),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
