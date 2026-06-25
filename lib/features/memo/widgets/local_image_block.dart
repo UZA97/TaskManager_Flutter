@@ -258,15 +258,13 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
   void _copyImage() async {
     final file = File(_imageSrc);
     if (!file.existsSync()) return;
-    final bytes = await file.readAsBytes();
-    await Pasteboard.writeImage(bytes);
+    await Pasteboard.writeFiles([_imageSrc]); // 파일 경로를 클립보드에 저장
   }
 
   void _cutImage() async {
     final file = File(_imageSrc);
     if (!file.existsSync()) return;
-    final bytes = await file.readAsBytes();
-    await Pasteboard.writeImage(bytes);
+    await Pasteboard.writeFiles([_imageSrc]);
 
     final editorState = Provider.of<EditorState>(context, listen: false);
     final transaction = editorState.transaction;

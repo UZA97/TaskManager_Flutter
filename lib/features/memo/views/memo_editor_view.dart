@@ -290,9 +290,38 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       Pasteboard.image.then((imageBytes) {
         if (imageBytes != null) {
           _handlePasteImage(editorState, imageBytes);
+        } else {
+          // 파일로 복사된 이미지 확인
+          Pasteboard.files().then((files) {
+            if (files.isNotEmpty) {
+              final imagePath = files.first;
+              final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+                  .contains(
+                    imagePath.split('.').last.toLowerCase().contains('.')
+                        ? imagePath.split('.').last.toLowerCase()
+                        : '.${imagePath.split('.').last.toLowerCase()}',
+                  );
+              if (isImage) {
+                final file = File(imagePath);
+                file.readAsBytes().then(
+                  (bytes) => _handlePasteImage(editorState, bytes),
+                );
+              } else {
+                final pasteCommand = standardCommandShortcutEvents.firstWhere(
+                  (e) => e.command == 'ctrl+v',
+                );
+                pasteCommand.handler(editorState);
+              }
+            } else {
+              final pasteCommand = standardCommandShortcutEvents.firstWhere(
+                (e) => e.command == 'ctrl+v',
+              );
+              pasteCommand.handler(editorState);
+            }
+          });
         }
       });
-      return KeyEventResult.ignored;
+      return KeyEventResult.handled;
     },
   );
 
