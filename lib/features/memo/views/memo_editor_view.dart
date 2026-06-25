@@ -12,6 +12,7 @@ import '../models/note.dart';
 import '../providers/note_provider.dart';
 import '../widgets/local_image_block.dart';
 import '../widgets/local_file_block.dart';
+import 'package:pasteboard/pasteboard.dart';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -131,6 +132,13 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final transaction = editorState.transaction;
     transaction.insertNode(insertPath, node);
     editorState.apply(transaction);
+
+    // 삽입한 노드 바로 이전 path로 selection 복원
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      editorState.selection = Selection.collapsed(
+        Position(path: selection?.end.path ?? insertPath, offset: 0),
+      );
+    });
   }
 
   Future<void> _processFile(String srcPath) async {
@@ -247,54 +255,44 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     },
   );
 
-  void _handlePasteImage(EditorState editorState) async {
-    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    if (clipboardData?.text == null) return;
+  void _handlePasteImage(EditorState editorState, Uint8List imageBytes) async {
+    if (_currentNote == null) return;
 
-    final imagePath = clipboardData!.text!.trim();
-    if (!_isImage(imagePath)) return;
+    final appDir = await getApplicationSupportDirectory();
+    final tempPath =
+        '${appDir.path}\\temp_${DateTime.now().millisecondsSinceEpoch}.png';
+    final tempFile = File(tempPath);
+    await tempFile.writeAsBytes(imageBytes);
 
-    final file = File(imagePath);
-    if (!file.existsSync()) return;
+    final destPath = await _copyToAppDir(tempPath);
+    await tempFile.delete();
 
     final selection = editorState.selection;
     if (selection == null) return;
 
     final path = selection.end.path;
-    final node = editorState.getNodeAtPath(path);
-    if (node == null) return;
-
-    final nextPath = [...path.sublist(0, path.length - 1), path.last + 1];
-    final nextNode = editorState.getNodeAtPath(nextPath);
-
     final transaction = editorState.transaction;
-
-    if (node.type == 'paragraph') {
-      transaction.deleteNode(node);
-      transaction.insertNode(path, localImageNode(src: imagePath));
-    } else {
-      transaction.insertNode(nextPath, localImageNode(src: imagePath));
-    }
-
-    // 다음 노드가 없을 때만 빈 paragraph 추가
-    if (nextNode == null) {
-      transaction.insertNode(nextPath, Node(type: 'paragraph'));
-    }
-
+    transaction.insertNode(path.next, localImageNode(src: destPath));
     editorState.apply(transaction);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      editorState.selection = Selection.collapsed(Position(path: nextPath));
+      editorState.selection = Selection.collapsed(
+        Position(path: path, offset: 0),
+      );
     });
   }
 
   late final _pasteHandler = CommandShortcutEvent(
     key: 'paste local image',
-    getDescription: () => 'Paste local image from clipboard',
+    getDescription: () => 'Paste image or text',
     command: 'ctrl+v',
     handler: (editorState) {
-      _handlePasteImage(editorState);
-      return KeyEventResult.handled;
+      Pasteboard.image.then((imageBytes) {
+        if (imageBytes != null) {
+          _handlePasteImage(editorState, imageBytes);
+        }
+      });
+      return KeyEventResult.ignored;
     },
   );
 
@@ -420,7 +418,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
 
     final standardPaste = standardCommandShortcutEvents
-        .where((e) => e.key != 'paste' && e.command != 'ctrl+v')
+        .where((e) => e.command != 'ctrl+v')
         .toList();
 
     final shortcutEvents = [

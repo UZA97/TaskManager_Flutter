@@ -3,6 +3,7 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:pasteboard/pasteboard.dart';
 
 const localImageType = 'local_image';
 
@@ -255,37 +256,21 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
   }
 
   void _copyImage() async {
-    await Clipboard.setData(ClipboardData(text: _imageSrc));
+    final file = File(_imageSrc);
+    if (!file.existsSync()) return;
+    final bytes = await file.readAsBytes();
+    await Pasteboard.writeImage(bytes);
   }
 
   void _cutImage() async {
-    await Clipboard.setData(ClipboardData(text: _imageSrc));
+    final file = File(_imageSrc);
+    if (!file.existsSync()) return;
+    final bytes = await file.readAsBytes();
+    await Pasteboard.writeImage(bytes);
+
     final editorState = Provider.of<EditorState>(context, listen: false);
     final transaction = editorState.transaction;
     transaction.deleteNode(widget.node);
-    editorState.apply(transaction);
-  }
-
-  void _pasteImage() async {
-    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    if (clipboardData?.text == null) return;
-
-    final imagePath = clipboardData!.text!;
-    final file = File(imagePath);
-    if (!file.existsSync()) return;
-
-    final editorState = Provider.of<EditorState>(context, listen: false);
-    final selection = editorState.selection;
-    if (selection == null) return;
-
-    final insertPath = selection.end.path.next;
-    final newNode = Node(
-      type: localImageType,
-      attributes: {'src': imagePath, 'width': 300},
-    );
-
-    final transaction = editorState.transaction;
-    transaction.insertNode(insertPath, newNode);
     editorState.apply(transaction);
   }
 
@@ -312,7 +297,17 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                 // 이미지 + 탭 감지
                 Positioned.fill(
                   child: GestureDetector(
-                    onTap: () => setState(() => _isSelected = true),
+                    onTap: () {
+                      setState(() => _isSelected = true);
+                      final editorState = Provider.of<EditorState>(
+                        context,
+                        listen: false,
+                      );
+                      editorState.selection = Selection(
+                        start: Position(path: widget.node.path, offset: 0),
+                        end: Position(path: widget.node.path, offset: 1),
+                      );
+                    },
                     onSecondaryTapUp: (details) {
                       _showContextMenu(context, details.globalPosition);
                     },
