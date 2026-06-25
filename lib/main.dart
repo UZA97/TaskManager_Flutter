@@ -7,6 +7,9 @@ import 'features/memo/views/memo_list_view.dart';
 import 'features/memo/views/memo_editor_view.dart';
 import 'features/calendar/views/calendar_view.dart';
 import 'features/calendar/views/calendar_editor_view.dart';
+import 'features/mail/views/mail_settings_view.dart';
+import 'features/mail/providers/mail_provider.dart';
+import 'features/mail/services/mail_check_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,12 +65,27 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> with WindowListener {
   int _selectedIndex = 0;
   final _trayService = TrayService();
+  bool _mailServiceInitialized = false;
 
   @override
   void initState() {
     super.initState();
     windowManager.addListener(this);
     _initTray();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initMailService();
+  }
+
+  Future<void> _initMailService() async {
+    final container = ProviderScope.containerOf(context);
+    final account = await container.read(mailAccountProvider.future);
+    if (account != null) {
+      container.read(mailCheckServiceProvider).start(account);
+    }
   }
 
   @override
@@ -115,8 +133,10 @@ class _MainShellState extends State<MainShell> with WindowListener {
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.calendar_month, color: Colors.white),
-                selectedIcon:
-                    Icon(Icons.calendar_month, color: Color(0xFF4A90E2)),
+                selectedIcon: Icon(
+                  Icons.calendar_month,
+                  color: Color(0xFF4A90E2),
+                ),
                 label: Text('캘린더'),
               ),
               NavigationRailDestination(
@@ -139,7 +159,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
               children: const [
                 MemoListView(),
                 CalendarView(),
-                Center(child: Text('메일')),
+                MailSettingsView(),
                 Center(child: Text('설정')),
               ],
             ),
