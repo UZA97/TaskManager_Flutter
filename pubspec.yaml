@@ -36,13 +36,20 @@ dependencies:
   file_picker: ^10.0.2
 
   # IMAP
-  enough_mail: ^2.1.1
-  
+  enough_mail: ^2.1.7
+
+  # Google OAuth
+  google_sign_in_all_platforms: ^2.0.0
+  crypto: ^3.0.3
+  http: ^1.5.0
+
+  # 클립보드
   pasteboard: ^0.5.0
 
   # 경로 처리
   path: ^1.9.0
   path_provider: ^2.1.5
+  url_launcher: ^6.3.0
 
   # provider (appflowy_editor 내부 사용)
   provider: ^6.1.2

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/mail_repository.dart';
 import '../models/mail_account.dart';
+import '../models/mail_message.dart';
 import '../services/mail_check_service.dart';
 
 class MailAccountNotifier extends AsyncNotifier<TaskMailAccount?> {
@@ -36,3 +37,8 @@ final mailAccountProvider =
     AsyncNotifierProvider<MailAccountNotifier, TaskMailAccount?>(
       MailAccountNotifier.new,
     );
+
+final mailMessagesProvider = FutureProvider<List<MailMessage>>((ref) async {
+  final service = ref.watch(mailCheckServiceProvider);
+  return service.fetchMessages();
+});

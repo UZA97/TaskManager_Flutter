@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/mail_account.dart';
 import '../providers/mail_provider.dart';
 import '../services/mail_check_service.dart';
+import '../services/google_auth_service.dart';
 
 enum MailPlatform { gmail, outlook }
 
@@ -51,7 +52,6 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
 
     final account = TaskMailAccount(
       email: _emailController.text.trim(),
-      password: _passwordController.text,
       imapServer: _imapServer,
       imapPort: 993,
       pollIntervalMinutes: _pollInterval,
@@ -69,25 +69,35 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
     }
   }
 
-  Future<void> _save() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showSnackBar('모든 항목을 입력하세요', isError: true);
-      return;
-    }
-
+  final _authService = GoogleAuthService();
+  Future<void> _signInWithGoogle() async {
     setState(() => _isSaving = true);
 
-    final account = TaskMailAccount(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      imapServer: _imapServer,
-      imapPort: 993,
-      pollIntervalMinutes: _pollInterval,
-    );
+    try {
+      final result = await _authService.signIn();
+      print('result: $result'); // 추가
 
-    await ref.read(mailAccountProvider.notifier).saveAccount(account);
-    setState(() => _isSaving = false);
-    _showSnackBar('저장되었습니다');
+      if (result == null) {
+        setState(() => _isSaving = false);
+        _showSnackBar('로그인 실패', isError: true);
+        return;
+      }
+
+      final account = TaskMailAccount(
+        email: result.email,
+        imapServer: 'imap.gmail.com',
+        imapPort: 993,
+        pollIntervalMinutes: _pollInterval,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
+
+      await ref.read(mailAccountProvider.notifier).saveAccount(account);
+      setState(() => _isSaving = false);
+    } catch (e) {
+      print('_signInWithGoogle error: $e'); // 추가
+      setState(() => _isSaving = false);
+    }
   }
 
   Future<void> _logout() async {
@@ -144,6 +154,7 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
   }
 
   // 로그인 후 화면
+  // Client ID : 435117565109-c9n6m213r1l3u6fkpd2hario4fds9sfe.apps.googleusercontent.com
   Widget _buildLoggedInView(TaskMailAccount account) {
     final isGmail = account.imapServer == 'imap.gmail.com';
 
@@ -290,11 +301,10 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
               ),
               const SizedBox(height: 8),
               _PlatformButton(
-                label: 'Outlook',
+                label: 'Outlook (준비중)',
                 color: const Color(0xFF0078D4),
-                isSelected: _selectedPlatform == MailPlatform.outlook,
-                onTap: () =>
-                    setState(() => _selectedPlatform = MailPlatform.outlook),
+                isSelected: false,
+                onTap: () {}, // 비활성
               ),
             ],
           ),
@@ -396,31 +406,10 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
           // 버튼 — 세로로
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton(
-              onPressed: _isTesting ? null : _testConnection,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF4A90E2)),
-                foregroundColor: const Color(0xFF4A90E2),
-              ),
-              child: _isTesting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('연결 테스트'),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4A90E2),
-                foregroundColor: Colors.white,
-              ),
-              child: _isSaving
+            child: ElevatedButton.icon(
+              onPressed: _isSaving ? null : _signInWithGoogle,
+              icon: const Icon(Icons.login, size: 18),
+              label: _isSaving
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -429,7 +418,11 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text('저장'),
+                  : const Text('Google로 로그인'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEA4335),
+                foregroundColor: Colors.white,
+              ),
             ),
           ),
         ],

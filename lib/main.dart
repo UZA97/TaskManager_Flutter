@@ -10,14 +10,14 @@ import 'features/calendar/views/calendar_editor_view.dart';
 import 'features/mail/views/mail_settings_view.dart';
 import 'features/mail/providers/mail_provider.dart';
 import 'features/mail/services/mail_check_service.dart';
+import 'features/mail/views/mail_view.dart';
+import 'features/settings/views/settings_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 순서 중요: window_manager 먼저
   await windowManager.ensureInitialized();
   await windowManager.setPreventClose(true);
-
   await windowManager.waitUntilReadyToShow(
     const WindowOptions(
       size: Size(950, 600),
@@ -31,8 +31,6 @@ void main() async {
       await windowManager.focus();
     },
   );
-
-  // 알림은 window 다음
   await NotificationService.init();
 
   runApp(const ProviderScope(child: TaskManagerApp()));
@@ -65,11 +63,11 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> with WindowListener {
   int _selectedIndex = 0;
   final _trayService = TrayService();
-  bool _mailServiceInitialized = false;
 
   @override
   void initState() {
     super.initState();
+
     windowManager.addListener(this);
     _initTray();
   }
@@ -159,6 +157,9 @@ class _MainShellState extends State<MainShell> with WindowListener {
               children: const [
                 MemoListView(),
                 CalendarView(),
+                MailView(),
+                SizedBox(),
+                SettingsView(),
                 MailSettingsView(),
                 Center(child: Text('설정')),
               ],
@@ -171,6 +172,8 @@ class _MainShellState extends State<MainShell> with WindowListener {
               children: const [
                 MemoEditorView(),
                 CalendarEditorView(),
+                MailView(),
+                SizedBox(),
                 Center(child: Text('메일')),
                 Center(child: Text('설정')),
               ],
