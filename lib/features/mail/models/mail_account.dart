@@ -10,7 +10,7 @@ class TaskMailAccount {
     required this.email,
     required this.imapServer,
     required this.imapPort,
-    this.pollIntervalMinutes = 5,
+    this.pollIntervalMinutes = 1,
     this.accessToken,
     this.refreshToken,
   });
@@ -28,24 +28,25 @@ class TaskMailAccount {
   }
 
   Map<String, dynamic> toJson() => {
-    'email': email,
-    'imapServer': imapServer,
-    'imapPort': imapPort,
-    'pollIntervalMinutes': pollIntervalMinutes,
-    'accessToken': accessToken,
-    'refreshToken': refreshToken,
-  };
+        'email': email,
+        'imapServer': imapServer,
+        'imapPort': imapPort,
+        'pollIntervalMinutes': pollIntervalMinutes,
+        'accessToken': accessToken,
+        'refreshToken': refreshToken,
+      };
 
   TaskMailAccount copyWith({
     String? accessToken,
     String? refreshToken,
     int? pollIntervalMinutes,
-  }) => TaskMailAccount(
-    email: email,
-    imapServer: imapServer,
-    imapPort: imapPort,
-    pollIntervalMinutes: pollIntervalMinutes ?? this.pollIntervalMinutes,
-    accessToken: accessToken ?? this.accessToken,
-    refreshToken: refreshToken ?? this.refreshToken,
-  );
+  }) =>
+      TaskMailAccount(
+        email: email,
+        imapServer: imapServer,
+        imapPort: imapPort,
+        pollIntervalMinutes: pollIntervalMinutes ?? this.pollIntervalMinutes,
+        accessToken: accessToken ?? this.accessToken,
+        refreshToken: refreshToken ?? this.refreshToken,
+      );
 }

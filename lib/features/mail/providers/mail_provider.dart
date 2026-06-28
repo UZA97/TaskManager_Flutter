@@ -33,12 +33,49 @@ class MailAccountNotifier extends AsyncNotifier<TaskMailAccount?> {
   }
 }
 
+class MailMessagesNotifier extends AsyncNotifier<List<MailMessage>> {
+  @override
+  Future<List<MailMessage>> build() async {
+    final service = ref.watch(mailCheckServiceProvider);
+    return service.fetchMessages();
+  }
+
+  Future<void> loadMore() async {
+    final service = ref.read(mailCheckServiceProvider);
+    final token = service.nextPageToken;
+    if (token == null) return;
+
+    final current = state.value ?? [];
+    final more = await service.fetchMessages(pageToken: token);
+    state = AsyncData([...current, ...more]);
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() {
+      final service = ref.read(mailCheckServiceProvider);
+      return service.fetchMessages();
+    });
+  }
+}
+
+class SelectedMailNotifier extends Notifier<MailMessage?> {
+  @override
+  MailMessage? build() => null;
+
+  void select(MailMessage? message) => state = message;
+}
+
+final selectedMailProvider =
+    NotifierProvider<SelectedMailNotifier, MailMessage?>(
+  SelectedMailNotifier.new,
+);
+final mailMessagesProvider =
+    AsyncNotifierProvider<MailMessagesNotifier, List<MailMessage>>(
+  MailMessagesNotifier.new,
+);
+
 final mailAccountProvider =
     AsyncNotifierProvider<MailAccountNotifier, TaskMailAccount?>(
-      MailAccountNotifier.new,
-    );
-
-final mailMessagesProvider = FutureProvider<List<MailMessage>>((ref) async {
-  final service = ref.watch(mailCheckServiceProvider);
-  return service.fetchMessages();
-});
+  MailAccountNotifier.new,
+);

@@ -12,6 +12,8 @@ import 'features/mail/providers/mail_provider.dart';
 import 'features/mail/services/mail_check_service.dart';
 import 'features/mail/views/mail_view.dart';
 import 'features/settings/views/settings_view.dart';
+import 'features/mail/views/mail_list_view.dart';
+import 'features/mail/views/mail_detail_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -131,10 +133,8 @@ class _MainShellState extends State<MainShell> with WindowListener {
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.calendar_month, color: Colors.white),
-                selectedIcon: Icon(
-                  Icons.calendar_month,
-                  color: Color(0xFF4A90E2),
-                ),
+                selectedIcon:
+                    Icon(Icons.calendar_month, color: Color(0xFF4A90E2)),
                 label: Text('캘린더'),
               ),
               NavigationRailDestination(
@@ -155,13 +155,10 @@ class _MainShellState extends State<MainShell> with WindowListener {
             child: IndexedStack(
               index: _selectedIndex,
               children: const [
-                MemoListView(),
-                CalendarView(),
-                MailView(),
-                SizedBox(),
-                SettingsView(),
-                MailSettingsView(),
-                Center(child: Text('설정')),
+                MemoListView(), // 0: 메모
+                CalendarView(), // 1: 캘린더
+                MailListView(), // 2: 메일 (좌측 빈칸)
+                SettingsView(), // 3: 설정
               ],
             ),
           ),
@@ -170,12 +167,10 @@ class _MainShellState extends State<MainShell> with WindowListener {
             child: IndexedStack(
               index: _selectedIndex,
               children: const [
-                MemoEditorView(),
-                CalendarEditorView(),
-                MailView(),
-                SizedBox(),
-                Center(child: Text('메일')),
-                Center(child: Text('설정')),
+                MemoEditorView(), // 0: 메모
+                CalendarEditorView(), // 1: 캘린더
+                MailDetailView(), // 2: 메일
+                SizedBox(), // 3: 설정 우측 빈칸
               ],
             ),
           ),

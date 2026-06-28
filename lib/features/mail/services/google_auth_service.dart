@@ -14,7 +14,11 @@ class GoogleAuthService {
     params: GoogleSignInParams(
       clientId: _clientId,
       clientSecret: _clientSecret,
-      scopes: ['email', 'profile', 'https://mail.google.com/'],
+      scopes: [
+        'email',
+        'profile',
+        'https://www.googleapis.com/auth/gmail.readonly'
+      ],
     ),
   );
 
@@ -67,10 +71,10 @@ class GoogleAuthResult {
   });
 
   Map<String, dynamic> toJson() => {
-    'accessToken': accessToken,
-    'refreshToken': refreshToken,
-    'email': email,
-  };
+        'accessToken': accessToken,
+        'refreshToken': refreshToken,
+        'email': email,
+      };
 
   factory GoogleAuthResult.fromJson(Map<String, dynamic> json) =>
       GoogleAuthResult(

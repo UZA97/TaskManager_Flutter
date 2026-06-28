@@ -1,136 +1,79 @@
+import 'dart:async';
 import 'dart:convert';
-import 'package:enough_mail/enough_mail.dart' as enough_mail;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/notification/notification_service.dart';
 import '../data/mail_repository.dart';
 import '../models/mail_account.dart';
-import 'google_auth_service.dart';
 import '../models/mail_message.dart';
+import 'google_auth_service.dart';
 
 class MailCheckService {
-  enough_mail.MailClient? _mailClient;
+  Timer? _timer;
   final MailRepository _repo;
   final GoogleAuthService _authService = GoogleAuthService();
+  String? _lastMessageId; // 마지막으로 확인한 메일 ID
 
   MailCheckService(this._repo);
 
   Future<void> start(TaskMailAccount account) async {
-    await stop();
+    stop();
+    await _checkNewMail(account); // 시작하자마자 한 번
+    _timer = Timer.periodic(
+      Duration(minutes: account.pollIntervalMinutes),
+      (_) async {
+        final latest = await _repo.getAccount();
+        if (latest != null) await _checkNewMail(latest);
+      },
+    );
+  }
 
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  Future<void> _checkNewMail(TaskMailAccount account) async {
     try {
       final accessToken = await _getValidAccessToken(account);
       if (accessToken == null) return;
 
-      final auth = enough_mail.OauthAuthentication(
-        account.email,
-        enough_mail.OauthToken(
-          accessToken: accessToken,
-          expiresIn: 3600,
-          refreshToken: account.refreshToken ?? '',
-          scope: 'https://mail.google.com/',
-          tokenType: 'Bearer',
-          created: DateTime.now().toUtc(),
+      // 안읽은 메일 목록 조회
+      final response = await http.get(
+        Uri.parse(
+          'https://gmail.googleapis.com/gmail/v1/users/me/messages'
+          '?q=is:unread&maxResults=10',
         ),
+        headers: {'Authorization': 'Bearer $accessToken'},
       );
 
-      final mailAccount = enough_mail.MailAccount.fromManualSettingsWithAuth(
-        name: account.email,
-        email: account.email,
-        userName: account.email,
-        incomingHost: account.imapServer,
-        outgoingHost: 'smtp.gmail.com',
-        auth: auth,
-        incomingType: enough_mail.ServerType.imap,
-        outgoingType: enough_mail.ServerType.smtp,
-        incomingPort: account.imapPort,
-        outgoingPort: 465,
-        incomingSocketType: enough_mail.SocketType.ssl,
-        outgoingSocketType: enough_mail.SocketType.ssl,
-      );
+      if (response.statusCode != 200) return;
 
-      _mailClient = enough_mail.MailClient(mailAccount, isLogEnabled: false);
-      await _mailClient!.connect();
-      await _mailClient!.selectInbox();
+      final json = jsonDecode(response.body);
+      final messages = json['messages'] as List<dynamic>? ?? [];
 
-      _mailClient!.eventBus.on<enough_mail.MailLoadEvent>().listen((event) {
-        final subject = event.message.decodeSubject() ?? '(제목 없음)';
-        final from = event.message.fromEmail ?? account.email;
-        NotificationService.show(title: '📧 새 메일 - $from', body: subject);
-      });
+      if (messages.isEmpty) return;
 
-      await _mailClient!.startPolling(
-        Duration(minutes: account.pollIntervalMinutes),
-      );
+      final latestId = messages.first['id'] as String;
+      if (latestId == _lastMessageId) return; // 새 메일 없음
+
+      // 새 메일들만 알림
+      for (final msg in messages) {
+        final id = msg['id'] as String;
+        if (id == _lastMessageId) break;
+
+        final detail = await _fetchMessageDetail(accessToken, id);
+        if (detail != null) {
+          await NotificationService.show(
+            title: '📧 새 메일 - ${detail.from}',
+            body: detail.subject,
+          );
+        }
+      }
+
+      _lastMessageId = latestId;
     } catch (e) {
-      print('MailCheckService error: $e');
-    }
-  }
-
-  Future<List<MailMessage>> fetchMessages({int count = 20}) async {
-    final account = await _repo.getAccount();
-    if (account == null) return [];
-
-    try {
-      final accessToken = await _getValidAccessToken(account);
-      if (accessToken == null) return [];
-
-      final auth = enough_mail.OauthAuthentication(
-        account.email,
-        enough_mail.OauthToken(
-          accessToken: accessToken,
-          expiresIn: 3600,
-          refreshToken: account.refreshToken ?? '',
-          scope: 'https://mail.google.com/',
-          tokenType: 'Bearer',
-          created: DateTime.now().toUtc(),
-        ),
-      );
-
-      final mailAccount = enough_mail.MailAccount.fromManualSettingsWithAuth(
-        name: account.email,
-        email: account.email,
-        userName: account.email,
-        incomingHost: account.imapServer,
-        outgoingHost: 'smtp.gmail.com',
-        auth: auth,
-        incomingType: enough_mail.ServerType.imap,
-        outgoingType: enough_mail.ServerType.smtp,
-        incomingPort: account.imapPort,
-        outgoingPort: 465,
-        incomingSocketType: enough_mail.SocketType.ssl,
-        outgoingSocketType: enough_mail.SocketType.ssl,
-      );
-
-      final client = enough_mail.MailClient(mailAccount, isLogEnabled: false);
-      await client.connect();
-      await client.selectInbox();
-
-      final messages = await client.fetchMessages(
-        count: count,
-        fetchPreference: enough_mail.FetchPreference.envelope,
-      );
-
-      await client.disconnect();
-
-      return messages.map((msg) {
-        return MailMessage(
-          subject: msg.decodeSubject() ?? '(제목 없음)',
-          from: msg.fromEmail ?? '',
-          preview:
-              msg.decodeTextPlainPart()?.substring(
-                0,
-                msg.decodeTextPlainPart()!.length > 100
-                    ? 100
-                    : msg.decodeTextPlainPart()!.length,
-              ) ??
-              '',
-          date: msg.decodeDate() ?? DateTime.now(),
-          isRead: msg.isSeen ?? false,
-        );
-      }).toList();
-    } catch (e) {
-      print('fetchMessages error: $e');
-      return [];
+      print('_checkNewMail error: $e');
     }
   }
 
@@ -138,9 +81,8 @@ class MailCheckService {
     if (account.accessToken != null) return account.accessToken;
     if (account.refreshToken == null) return null;
 
-    final newToken = await _authService.refreshAccessToken(
-      account.refreshToken!,
-    );
+    final newToken =
+        await _authService.refreshAccessToken(account.refreshToken!);
     if (newToken != null) {
       final updated = account.copyWith(accessToken: newToken);
       await _repo.saveAccount(updated);
@@ -148,48 +90,108 @@ class MailCheckService {
     return newToken;
   }
 
-  Future<void> stop() async {
-    await _mailClient?.stopPolling();
-    await _mailClient?.disconnect();
-    _mailClient = null;
+  Future<MailMessage?> _fetchMessageDetail(
+      String accessToken, String messageId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://gmail.googleapis.com/gmail/v1/users/me/messages/$messageId'
+          '?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date',
+        ),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+
+      if (response.statusCode != 200) return null;
+
+      final json = jsonDecode(response.body);
+      final headers = json['payload']['headers'] as List<dynamic>;
+
+      String subject = '(제목 없음)';
+      String from = '';
+      DateTime date = DateTime.now();
+
+      for (final header in headers) {
+        final name = header['name'] as String;
+        final value = header['value'] as String;
+        if (name == 'Subject') subject = value;
+        if (name == 'From') from = value;
+        if (name == 'Date') {
+          try {
+            date = DateTime.parse(value);
+          } catch (_) {}
+        }
+      }
+
+      final snippet = json['snippet'] as String? ?? '';
+      final isUnread = (json['labelIds'] as List<dynamic>).contains('UNREAD');
+
+      return MailMessage(
+        id: messageId,
+        subject: subject,
+        from: from,
+        preview: snippet,
+        date: date,
+        isRead: !isUnread,
+      );
+    } catch (e) {
+      return null;
+    }
   }
+
+  Future<List<MailMessage>> fetchMessages({
+    int count = 20,
+    String? pageToken,
+  }) async {
+    final account = await _repo.getAccount();
+    if (account == null) return [];
+
+    try {
+      final accessToken = await _getValidAccessToken(account);
+      if (accessToken == null) return [];
+
+      String url = 'https://gmail.googleapis.com/gmail/v1/users/me/messages'
+          '?maxResults=$count&labelIds=INBOX';
+      if (pageToken != null) url += '&pageToken=$pageToken';
+
+      final listResponse = await http.get(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+
+      if (listResponse.statusCode != 200) return [];
+
+      final listJson = jsonDecode(listResponse.body);
+      final messageIds = listJson['messages'] as List<dynamic>? ?? [];
+      _nextPageToken = listJson['nextPageToken'] as String?; // 저장
+
+      final messages = <MailMessage>[];
+      for (final msg in messageIds) {
+        final detail =
+            await _fetchMessageDetail(accessToken, msg['id'] as String);
+        if (detail != null) messages.add(detail);
+      }
+
+      return messages;
+    } catch (e) {
+      print('fetchMessages error: $e');
+      return [];
+    }
+  }
+
+  String? _nextPageToken;
+  String? get nextPageToken => _nextPageToken;
 
   Future<bool> testConnection(TaskMailAccount account) async {
     try {
       final accessToken = await _getValidAccessToken(account);
       if (accessToken == null) return false;
 
-      final auth = enough_mail.OauthAuthentication(
-        account.email,
-        enough_mail.OauthToken(
-          accessToken: accessToken,
-          expiresIn: 3600,
-          refreshToken: account.refreshToken ?? '',
-          scope: 'https://mail.google.com/',
-          tokenType: 'Bearer',
-          created: DateTime.now().toUtc(),
-        ),
+      final response = await http.get(
+        Uri.parse('https://gmail.googleapis.com/gmail/v1/users/me/profile'),
+        headers: {'Authorization': 'Bearer $accessToken'},
       );
 
-      final mailAccount = enough_mail.MailAccount.fromManualSettingsWithAuth(
-        name: account.email,
-        email: account.email,
-        userName: account.email,
-        incomingHost: account.imapServer,
-        outgoingHost: 'smtp.gmail.com',
-        auth: auth,
-        incomingType: enough_mail.ServerType.imap,
-        outgoingType: enough_mail.ServerType.smtp,
-        incomingPort: account.imapPort,
-        outgoingPort: 465,
-        incomingSocketType: enough_mail.SocketType.ssl,
-        outgoingSocketType: enough_mail.SocketType.ssl,
-      );
-
-      final client = enough_mail.MailClient(mailAccount, isLogEnabled: false);
-      await client.connect();
-      await client.disconnect();
-      return true;
+      return response.statusCode == 200;
     } catch (e) {
       return false;
     }
