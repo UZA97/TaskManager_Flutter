@@ -68,30 +68,39 @@ class EventTable extends Table {
   IntColumn get alarmDaysBefore => integer().withDefault(const Constant(0))();
   BoolColumn get isCompleted => boolean().withDefault(const Constant(false))();
   IntColumn get priority => integer().withDefault(const Constant(1))();
+  TextColumn get googleEventId => text().withDefault(const Constant(''))();
 }
 
-@DriftDatabase(tables: [
-  NoteTable,
-  TagTable,
-  NoteTagTable,
-  AttachmentTable,
-  SettingTable,
-  EventTable,
-])
+@DriftDatabase(
+  tables: [
+    NoteTable,
+    TagTable,
+    NoteTagTable,
+    AttachmentTable,
+    SettingTable,
+    EventTable,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3; // 2 → 3
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await m.createTable(eventTable);
-          }
-        },
-      );
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(eventTable);
+      }
+      if (from < 3) {
+        await m.addColumn(
+          eventTable,
+          eventTable.googleEventId as GeneratedColumn,
+        ); // 추가
+      }
+    },
+  );
 
   static QueryExecutor _openConnection() {
     return driftDatabase(name: 'taskmanager');

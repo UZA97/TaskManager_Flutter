@@ -8,6 +8,7 @@ class Event {
   final int alarmDaysBefore;
   final bool isCompleted;
   final int priority;
+  final String? googleEventId;
 
   const Event({
     this.id,
@@ -19,6 +20,7 @@ class Event {
     this.alarmDaysBefore = 0,
     this.isCompleted = false,
     this.priority = 1,
+    this.googleEventId,
   });
 
   Event copyWith({

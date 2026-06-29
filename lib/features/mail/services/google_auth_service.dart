@@ -15,9 +15,11 @@ class GoogleAuthService {
       clientId: _clientId,
       clientSecret: _clientSecret,
       scopes: [
+        'openid',
         'email',
         'profile',
-        'https://www.googleapis.com/auth/gmail.readonly'
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/calendar',
       ],
     ),
   );
@@ -26,9 +28,18 @@ class GoogleAuthService {
     try {
       final credentials = await _googleSignIn.signIn();
       if (credentials == null) return null;
-      final email = await _getEmail(credentials.accessToken);
+
+      // refresh token으로 새 access token 발급
+      String accessToken = credentials.accessToken;
+      if (credentials.refreshToken != null) {
+        final newToken = await refreshAccessToken(credentials.refreshToken!);
+        if (newToken != null) accessToken = newToken;
+      }
+
+      final email = await _getEmail(accessToken);
+
       return GoogleAuthResult(
-        accessToken: credentials.accessToken,
+        accessToken: accessToken,
         refreshToken: credentials.refreshToken,
         email: email,
       );
@@ -39,12 +50,19 @@ class GoogleAuthService {
   }
 
   Future<String?> refreshAccessToken(String refreshToken) async {
-    try {
-      final credentials = await _googleSignIn.silentSignIn();
-      return credentials?.accessToken;
-    } catch (e) {
-      return null;
-    }
+    final response = await http.post(
+      Uri.parse('https://oauth2.googleapis.com/token'),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {
+        'client_id': _clientId,
+        'client_secret': _clientSecret,
+        'refresh_token': refreshToken,
+        'grant_type': 'refresh_token',
+      },
+    );
+    if (response.statusCode != 200) return null;
+    final data = jsonDecode(response.body);
+    return data['access_token'] as String?;
   }
 
   Future<String> _getEmail(String accessToken) async {
@@ -52,6 +70,7 @@ class GoogleAuthService {
       Uri.parse('https://www.googleapis.com/oauth2/v2/userinfo'),
       headers: {'Authorization': 'Bearer $accessToken'},
     );
+    print(response.body);
     if (response.statusCode != 200) return '';
     final json = jsonDecode(response.body);
     return json['email'] as String? ?? '';
@@ -71,10 +90,10 @@ class GoogleAuthResult {
   });
 
   Map<String, dynamic> toJson() => {
-        'accessToken': accessToken,
-        'refreshToken': refreshToken,
-        'email': email,
-      };
+    'accessToken': accessToken,
+    'refreshToken': refreshToken,
+    'email': email,
+  };
 
   factory GoogleAuthResult.fromJson(Map<String, dynamic> json) =>
       GoogleAuthResult(

@@ -15,6 +15,8 @@ class TaskMailAccount {
     this.refreshToken,
   });
 
+  bool get isOutlook => imapServer == 'outlook';
+
   // password 제거, token 기반으로 변경
   factory TaskMailAccount.fromJson(Map<String, dynamic> json) {
     return TaskMailAccount(
@@ -28,25 +30,24 @@ class TaskMailAccount {
   }
 
   Map<String, dynamic> toJson() => {
-        'email': email,
-        'imapServer': imapServer,
-        'imapPort': imapPort,
-        'pollIntervalMinutes': pollIntervalMinutes,
-        'accessToken': accessToken,
-        'refreshToken': refreshToken,
-      };
+    'email': email,
+    'imapServer': imapServer,
+    'imapPort': imapPort,
+    'pollIntervalMinutes': pollIntervalMinutes,
+    'accessToken': accessToken,
+    'refreshToken': refreshToken,
+  };
 
   TaskMailAccount copyWith({
     String? accessToken,
     String? refreshToken,
     int? pollIntervalMinutes,
-  }) =>
-      TaskMailAccount(
-        email: email,
-        imapServer: imapServer,
-        imapPort: imapPort,
-        pollIntervalMinutes: pollIntervalMinutes ?? this.pollIntervalMinutes,
-        accessToken: accessToken ?? this.accessToken,
-        refreshToken: refreshToken ?? this.refreshToken,
-      );
+  }) => TaskMailAccount(
+    email: email,
+    imapServer: imapServer,
+    imapPort: imapPort,
+    pollIntervalMinutes: pollIntervalMinutes ?? this.pollIntervalMinutes,
+    accessToken: accessToken ?? this.accessToken,
+    refreshToken: refreshToken ?? this.refreshToken,
+  );
 }

@@ -301,10 +301,11 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
               ),
               const SizedBox(height: 8),
               _PlatformButton(
-                label: 'Outlook (준비중)',
+                label: 'Outlook',
                 color: const Color(0xFF0078D4),
-                isSelected: false,
-                onTap: () {}, // 비활성
+                isSelected: _selectedPlatform == MailPlatform.outlook,
+                onTap: () =>
+                    setState(() => _selectedPlatform = MailPlatform.outlook),
               ),
             ],
           ),

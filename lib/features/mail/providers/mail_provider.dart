@@ -68,14 +68,14 @@ class SelectedMailNotifier extends Notifier<MailMessage?> {
 
 final selectedMailProvider =
     NotifierProvider<SelectedMailNotifier, MailMessage?>(
-  SelectedMailNotifier.new,
-);
+      SelectedMailNotifier.new,
+    );
 final mailMessagesProvider =
     AsyncNotifierProvider<MailMessagesNotifier, List<MailMessage>>(
-  MailMessagesNotifier.new,
-);
+      MailMessagesNotifier.new,
+    );
 
 final mailAccountProvider =
     AsyncNotifierProvider<MailAccountNotifier, TaskMailAccount?>(
-  MailAccountNotifier.new,
-);
+      MailAccountNotifier.new,
+    );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
 import '../services/google_auth_service.dart';
 import '../models/mail_account.dart';
+import '../services/outlook_auth_service.dart';
 
 class MailLoginDialog extends ConsumerStatefulWidget {
   const MailLoginDialog({super.key});
@@ -13,6 +14,7 @@ class MailLoginDialog extends ConsumerStatefulWidget {
 
 class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
   bool _isGoogleLoading = false;
+  bool _isOutlookLoading = false;
 
   Future<void> _signInWithGoogle() async {
     setState(() => _isGoogleLoading = true);
@@ -40,6 +42,33 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
       if (mounted) _showSnackBar('로그인 실패: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
+    }
+  }
+
+  Future<void> _signInWithOutlook() async {
+    setState(() => _isOutlookLoading = true);
+
+    try {
+      final result = await OutlookAuthService().signIn();
+      if (result == null) {
+        if (mounted) _showSnackBar('로그인 실패', isError: true);
+        return;
+      }
+
+      final account = TaskMailAccount(
+        email: result.email,
+        imapServer: 'outlook',
+        imapPort: 0,
+        pollIntervalMinutes: 5,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
+
+      await ref.read(mailAccountProvider.notifier).saveAccount(account);
+    } catch (e) {
+      if (mounted) _showSnackBar('로그인 실패: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isOutlookLoading = false);
     }
   }
 
@@ -121,15 +150,22 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: null, // 준비중
-            icon: const Icon(Icons.mail_outline, size: 18),
-            label: const Text('Outlook (준비중)'),
+            onPressed: _isOutlookLoading ? null : _signInWithOutlook,
+            icon: _isOutlookLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.mail_outline, size: 18),
+            label: const Text('Outlook으로 로그인'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0078D4),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12),
-              disabledBackgroundColor: const Color(0xFF0078D4).withOpacity(0.4),
-              disabledForegroundColor: Colors.white54,
             ),
           ),
         ),
