@@ -50,6 +50,29 @@ class EventRepository {
         );
   }
 
+  Future<void> upsertGoogleEvent(Event event) async {
+    // googleEventId로 기존 이벤트 확인
+    final existing =
+        await (_db.select(_db.eventTable)
+              ..where((t) => t.googleEventId.equals(event.googleEventId ?? '')))
+            .getSingleOrNull();
+
+    if (existing != null) {
+      // 이미 있으면 업데이트
+      await (_db.update(
+        _db.eventTable,
+      )..where((t) => t.id.equals(existing.id))).write(
+        EventTableCompanion(
+          title: Value(event.title),
+          eventDate: Value(event.eventDate),
+        ),
+      );
+    } else {
+      // 없으면 새로 추가
+      await addEvent(event);
+    }
+  }
+
   Future<void> deleteEvent(int id) async {
     await (_db.delete(_db.eventTable)..where((t) => t.id.equals(id))).go();
   }

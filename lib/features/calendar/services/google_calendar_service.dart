@@ -52,7 +52,7 @@ class GoogleCalendarService {
   }
 
   // 일정 추가
-  Future<bool> addEvent(String accessToken, Event event) async {
+  Future<String?> addEvent(String accessToken, Event event) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/calendars/primary/events'),
       headers: {
@@ -66,7 +66,9 @@ class GoogleCalendarService {
       }),
     );
 
-    return response.statusCode == 200 || response.statusCode == 201;
+    if (response.statusCode != 200 && response.statusCode != 201) return null;
+    final data = jsonDecode(response.body);
+    return data['id'] as String?;
   }
 
   // 일정 삭제

@@ -1,6 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/event_repository.dart';
 import '../models/event.dart';
+import '../services/google_calendar_service.dart';
+import '../../mail/data/mail_repository.dart';
+import '../../mail/services/google_auth_service.dart';
+import '../../mail/services/mail_check_service.dart';
 
 // 현재 월
 class CurrentMonthNotifier extends Notifier<DateTime> {
@@ -29,21 +33,89 @@ final selectedDateProvider = NotifierProvider<SelectedDateNotifier, DateTime>(
 
 // 이벤트 목록
 class EventListNotifier extends AsyncNotifier<List<Event>> {
+  final _calendarService = GoogleCalendarService();
+  // final _authService = GoogleAuthService();
+
   @override
   Future<List<Event>> build() async {
     final month = ref.watch(currentMonthProvider);
     final repo = ref.watch(eventRepositoryProvider);
+
+    // Google Calendar 동기화
+    await _syncGoogleCalendar(month.year, month.month);
+
     return repo.getEventsByMonth(month.year, month.month);
+  }
+
+  Future<String?> _getAccessToken() async {
+    final mailRepo = ref.read(mailRepositoryProvider);
+    final account = await mailRepo.getAccount();
+    print('account: ${account?.email}');
+    print('isOutlook: ${account?.isOutlook}');
+    if (account == null || account.isOutlook) return null;
+
+    final token = await ref
+        .read(mailCheckServiceProvider)
+        .getGoogleAccessToken();
+    print('token: $token');
+    return token;
+  }
+
+  Future<void> _syncGoogleCalendar(int year, int month) async {
+    try {
+      print('_syncGoogleCalendar 시작: $year-$month');
+      final accessToken = await _getAccessToken();
+      print('accessToken null?: ${accessToken == null}');
+      if (accessToken == null) return;
+
+      final repo = ref.read(eventRepositoryProvider);
+      final googleEvents = await _calendarService.getEvents(
+        accessToken,
+        year,
+        month,
+      );
+      print('googleEvents count: ${googleEvents.length}');
+
+      for (final event in googleEvents) {
+        print('event: ${event.title} - ${event.eventDate}');
+        await repo.upsertGoogleEvent(event);
+      }
+    } catch (e) {
+      print('_syncGoogleCalendar error: $e');
+    }
   }
 
   Future<void> addEvent(Event event) async {
     final repo = ref.read(eventRepositoryProvider);
+
+    // Google Calendar에도 추가
+    final accessToken = await _getAccessToken();
+    if (accessToken != null) {
+      final googleEventId = await _calendarService.addEvent(accessToken, event);
+      if (googleEventId != null) {
+        await repo.addEvent(event.copyWith(googleEventId: googleEventId));
+        ref.invalidateSelf();
+        return;
+      }
+    }
+
     await repo.addEvent(event);
     ref.invalidateSelf();
   }
 
   Future<void> deleteEvent(int id) async {
     final repo = ref.read(eventRepositoryProvider);
+    final events = state.value ?? [];
+    final event = events.firstWhere((e) => e.id == id);
+
+    // Google Calendar에서도 삭제
+    if (event.googleEventId != null && event.googleEventId!.isNotEmpty) {
+      final accessToken = await _getAccessToken();
+      if (accessToken != null) {
+        await _calendarService.deleteEvent(accessToken, event.googleEventId!);
+      }
+    }
+
     await repo.deleteEvent(id);
     ref.invalidateSelf();
   }
@@ -63,7 +135,8 @@ final eventListProvider = AsyncNotifierProvider<EventListNotifier, List<Event>>(
 final selectedDateEventsProvider = Provider<List<Event>>((ref) {
   final events = ref.watch(eventListProvider).value ?? [];
   final selectedDate = ref.watch(selectedDateProvider);
-  final dateStr = '${selectedDate.year}-'
+  final dateStr =
+      '${selectedDate.year}-'
       '${selectedDate.month.toString().padLeft(2, '0')}-'
       '${selectedDate.day.toString().padLeft(2, '0')}';
   return events.where((e) => e.eventDate == dateStr).toList();

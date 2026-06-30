@@ -294,6 +294,12 @@ class MailCheckService {
       return [];
     }
   }
+
+  Future<String?> getGoogleAccessToken() async {
+    final account = await _repo.getAccount();
+    if (account == null || account.isOutlook) return null;
+    return _getValidAccessToken(account);
+  }
 }
 
 final mailCheckServiceProvider = Provider<MailCheckService>((ref) {

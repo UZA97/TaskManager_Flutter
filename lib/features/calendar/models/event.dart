@@ -33,6 +33,7 @@ class Event {
     int? alarmDaysBefore,
     bool? isCompleted,
     int? priority,
+    String? googleEventId,
   }) {
     return Event(
       id: id ?? this.id,
@@ -44,6 +45,7 @@ class Event {
       alarmDaysBefore: alarmDaysBefore ?? this.alarmDaysBefore,
       isCompleted: isCompleted ?? this.isCompleted,
       priority: priority ?? this.priority,
+      googleEventId: googleEventId ?? this.googleEventId,
     );
   }
 }
