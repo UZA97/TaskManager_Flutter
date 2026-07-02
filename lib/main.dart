@@ -7,10 +7,8 @@ import 'features/memo/views/memo_list_view.dart';
 import 'features/memo/views/memo_editor_view.dart';
 import 'features/calendar/views/calendar_view.dart';
 import 'features/calendar/views/calendar_editor_view.dart';
-import 'features/mail/views/mail_settings_view.dart';
 import 'features/mail/providers/mail_provider.dart';
 import 'features/mail/services/mail_check_service.dart';
-import 'features/mail/views/mail_view.dart';
 import 'features/settings/views/settings_view.dart';
 import 'features/mail/views/mail_list_view.dart';
 import 'features/mail/views/mail_detail_view.dart';
@@ -133,8 +131,10 @@ class _MainShellState extends State<MainShell> with WindowListener {
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.calendar_month, color: Colors.white),
-                selectedIcon:
-                    Icon(Icons.calendar_month, color: Color(0xFF4A90E2)),
+                selectedIcon: Icon(
+                  Icons.calendar_month,
+                  color: Color(0xFF4A90E2),
+                ),
                 label: Text('캘린더'),
               ),
               NavigationRailDestination(

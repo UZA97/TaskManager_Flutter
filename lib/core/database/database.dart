@@ -1,5 +1,8 @@
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'dart:io';
 
 part 'database.g.dart';
 
@@ -10,7 +13,7 @@ class FolderTable extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
   IntColumn get parentId => integer().nullable().references(FolderTable, #id)();
-  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  RealColumn get sortOrder => real().withDefault(const Constant(0.0))();
   TextColumn get createdAt => text()();
 }
 
@@ -24,6 +27,7 @@ class NoteTable extends Table {
   TextColumn get createdAt => text()();
   TextColumn get updatedAt => text()();
   IntColumn get folderId => integer().nullable().references(FolderTable, #id)();
+  RealColumn get sortOrder => real().withDefault(const Constant(0.0))();
 }
 
 class TagTable extends Table {
@@ -102,6 +106,18 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async {
+      await m.createAllTables();
+
+      // 기본 폴더 생성
+      final now = DateTime.now().toIso8601String();
+      final defaultFolderId = await into(
+        folderTable,
+      ).insert(FolderTableCompanion.insert(name: '기본 폴더', createdAt: now));
+      await (update(noteTable)..where((t) => t.folderId.isNull())).write(
+        NoteTableCompanion(folderId: Value(defaultFolderId)),
+      );
+    },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
         await m.createTable(eventTable);
@@ -109,7 +125,6 @@ class AppDatabase extends _$AppDatabase {
       if (from < 3) {
         await m.createTable(folderTable);
         await m.addColumn(noteTable, noteTable.folderId as GeneratedColumn);
-
         final now = DateTime.now().toIso8601String();
         final defaultFolderId = await into(
           folderTable,
@@ -121,6 +136,10 @@ class AppDatabase extends _$AppDatabase {
     },
   );
   static QueryExecutor _openConnection() {
-    return driftDatabase(name: 'taskmanager');
+    return LazyDatabase(() async {
+      final dir = await getApplicationSupportDirectory();
+      final file = File(p.join(dir.path, 'taskmanager.sqlite'));
+      return NativeDatabase(file);
+    });
   }
 }

@@ -5,6 +5,7 @@ class Note {
   final List<String> tags;
   final String createdAt;
   final String updatedAt;
+  final int? folderId;
 
   const Note({
     this.id,
@@ -13,6 +14,7 @@ class Note {
     this.tags = const [],
     required this.createdAt,
     required this.updatedAt,
+    this.folderId,
   });
 
   Note copyWith({
@@ -22,6 +24,7 @@ class Note {
     List<String>? tags,
     String? createdAt,
     String? updatedAt,
+    int? folderId,
   }) {
     return Note(
       id: id ?? this.id,
@@ -30,6 +33,7 @@ class Note {
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      folderId: folderId ?? this.folderId,
     );
   }
 }

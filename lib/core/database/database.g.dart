@@ -49,13 +49,13 @@ class $FolderTableTable extends FolderTable
     'sortOrder',
   );
   @override
-  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+  late final GeneratedColumn<double> sortOrder = GeneratedColumn<double>(
     'sort_order',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.double,
     requiredDuringInsert: false,
-    defaultValue: const Constant(0),
+    defaultValue: const Constant(0.0),
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -141,7 +141,7 @@ class $FolderTableTable extends FolderTable
         data['${effectivePrefix}parent_id'],
       ),
       sortOrder: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}sort_order'],
       )!,
       createdAt: attachedDatabase.typeMapping.read(
@@ -161,7 +161,7 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
   final int id;
   final String name;
   final int? parentId;
-  final int sortOrder;
+  final double sortOrder;
   final String createdAt;
   const FolderTableData({
     required this.id,
@@ -178,7 +178,7 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
     if (!nullToAbsent || parentId != null) {
       map['parent_id'] = Variable<int>(parentId);
     }
-    map['sort_order'] = Variable<int>(sortOrder);
+    map['sort_order'] = Variable<double>(sortOrder);
     map['created_at'] = Variable<String>(createdAt);
     return map;
   }
@@ -204,7 +204,7 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       parentId: serializer.fromJson<int?>(json['parentId']),
-      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      sortOrder: serializer.fromJson<double>(json['sortOrder']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
     );
   }
@@ -215,7 +215,7 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
       'parentId': serializer.toJson<int?>(parentId),
-      'sortOrder': serializer.toJson<int>(sortOrder),
+      'sortOrder': serializer.toJson<double>(sortOrder),
       'createdAt': serializer.toJson<String>(createdAt),
     };
   }
@@ -224,7 +224,7 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
     int? id,
     String? name,
     Value<int?> parentId = const Value.absent(),
-    int? sortOrder,
+    double? sortOrder,
     String? createdAt,
   }) => FolderTableData(
     id: id ?? this.id,
@@ -272,7 +272,7 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
   final Value<int> id;
   final Value<String> name;
   final Value<int?> parentId;
-  final Value<int> sortOrder;
+  final Value<double> sortOrder;
   final Value<String> createdAt;
   const FolderTableCompanion({
     this.id = const Value.absent(),
@@ -293,7 +293,7 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
     Expression<int>? id,
     Expression<String>? name,
     Expression<int>? parentId,
-    Expression<int>? sortOrder,
+    Expression<double>? sortOrder,
     Expression<String>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -309,7 +309,7 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
     Value<int>? id,
     Value<String>? name,
     Value<int?>? parentId,
-    Value<int>? sortOrder,
+    Value<double>? sortOrder,
     Value<String>? createdAt,
   }) {
     return FolderTableCompanion(
@@ -334,7 +334,7 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
       map['parent_id'] = Variable<int>(parentId.value);
     }
     if (sortOrder.present) {
-      map['sort_order'] = Variable<int>(sortOrder.value);
+      map['sort_order'] = Variable<double>(sortOrder.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
@@ -432,6 +432,18 @@ class $NoteTableTable extends NoteTable
       'REFERENCES folders (id)',
     ),
   );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<double> sortOrder = GeneratedColumn<double>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -440,6 +452,7 @@ class $NoteTableTable extends NoteTable
     createdAt,
     updatedAt,
     folderId,
+    sortOrder,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -490,6 +503,12 @@ class $NoteTableTable extends NoteTable
         folderId.isAcceptableOrUnknown(data['folder_id']!, _folderIdMeta),
       );
     }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
     return context;
   }
 
@@ -523,6 +542,10 @@ class $NoteTableTable extends NoteTable
         DriftSqlType.int,
         data['${effectivePrefix}folder_id'],
       ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}sort_order'],
+      )!,
     );
   }
 
@@ -539,6 +562,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
   final String createdAt;
   final String updatedAt;
   final int? folderId;
+  final double sortOrder;
   const NoteTableData({
     required this.id,
     required this.title,
@@ -546,6 +570,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     required this.createdAt,
     required this.updatedAt,
     this.folderId,
+    required this.sortOrder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -558,6 +583,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     if (!nullToAbsent || folderId != null) {
       map['folder_id'] = Variable<int>(folderId);
     }
+    map['sort_order'] = Variable<double>(sortOrder);
     return map;
   }
 
@@ -571,6 +597,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       folderId: folderId == null && nullToAbsent
           ? const Value.absent()
           : Value(folderId),
+      sortOrder: Value(sortOrder),
     );
   }
 
@@ -586,6 +613,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
       folderId: serializer.fromJson<int?>(json['folderId']),
+      sortOrder: serializer.fromJson<double>(json['sortOrder']),
     );
   }
   @override
@@ -598,6 +626,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
       'folderId': serializer.toJson<int?>(folderId),
+      'sortOrder': serializer.toJson<double>(sortOrder),
     };
   }
 
@@ -608,6 +637,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     String? createdAt,
     String? updatedAt,
     Value<int?> folderId = const Value.absent(),
+    double? sortOrder,
   }) => NoteTableData(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -615,6 +645,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     folderId: folderId.present ? folderId.value : this.folderId,
+    sortOrder: sortOrder ?? this.sortOrder,
   );
   NoteTableData copyWithCompanion(NoteTableCompanion data) {
     return NoteTableData(
@@ -624,6 +655,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       folderId: data.folderId.present ? data.folderId.value : this.folderId,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
     );
   }
 
@@ -635,14 +667,22 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('folderId: $folderId')
+          ..write('folderId: $folderId, ')
+          ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, content, createdAt, updatedAt, folderId);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    content,
+    createdAt,
+    updatedAt,
+    folderId,
+    sortOrder,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -652,7 +692,8 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
           other.content == this.content &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
-          other.folderId == this.folderId);
+          other.folderId == this.folderId &&
+          other.sortOrder == this.sortOrder);
 }
 
 class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
@@ -662,6 +703,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int?> folderId;
+  final Value<double> sortOrder;
   const NoteTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -669,6 +711,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.folderId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
   });
   NoteTableCompanion.insert({
     this.id = const Value.absent(),
@@ -677,6 +720,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     required String createdAt,
     required String updatedAt,
     this.folderId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
   }) : createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<NoteTableData> custom({
@@ -686,6 +730,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? folderId,
+    Expression<double>? sortOrder,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -694,6 +739,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (folderId != null) 'folder_id': folderId,
+      if (sortOrder != null) 'sort_order': sortOrder,
     });
   }
 
@@ -704,6 +750,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int?>? folderId,
+    Value<double>? sortOrder,
   }) {
     return NoteTableCompanion(
       id: id ?? this.id,
@@ -712,6 +759,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       folderId: folderId ?? this.folderId,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
@@ -736,6 +784,9 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     if (folderId.present) {
       map['folder_id'] = Variable<int>(folderId.value);
     }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<double>(sortOrder.value);
+    }
     return map;
   }
 
@@ -747,7 +798,8 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('folderId: $folderId')
+          ..write('folderId: $folderId, ')
+          ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
   }
@@ -2361,7 +2413,7 @@ typedef $$FolderTableTableCreateCompanionBuilder =
       Value<int> id,
       required String name,
       Value<int?> parentId,
-      Value<int> sortOrder,
+      Value<double> sortOrder,
       required String createdAt,
     });
 typedef $$FolderTableTableUpdateCompanionBuilder =
@@ -2369,7 +2421,7 @@ typedef $$FolderTableTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> name,
       Value<int?> parentId,
-      Value<int> sortOrder,
+      Value<double> sortOrder,
       Value<String> createdAt,
     });
 
@@ -2434,7 +2486,7 @@ class $$FolderTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get sortOrder => $composableBuilder(
+  ColumnFilters<double> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnFilters(column),
   );
@@ -2512,7 +2564,7 @@ class $$FolderTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get sortOrder => $composableBuilder(
+  ColumnOrderings<double> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
   );
@@ -2561,7 +2613,7 @@ class $$FolderTableTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  GeneratedColumn<int> get sortOrder =>
+  GeneratedColumn<double> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
   GeneratedColumn<String> get createdAt =>
@@ -2647,7 +2699,7 @@ class $$FolderTableTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<int?> parentId = const Value.absent(),
-                Value<int> sortOrder = const Value.absent(),
+                Value<double> sortOrder = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
               }) => FolderTableCompanion(
                 id: id,
@@ -2661,7 +2713,7 @@ class $$FolderTableTableTableManager
                 Value<int> id = const Value.absent(),
                 required String name,
                 Value<int?> parentId = const Value.absent(),
-                Value<int> sortOrder = const Value.absent(),
+                Value<double> sortOrder = const Value.absent(),
                 required String createdAt,
               }) => FolderTableCompanion.insert(
                 id: id,
@@ -2765,6 +2817,7 @@ typedef $$NoteTableTableCreateCompanionBuilder =
       required String createdAt,
       required String updatedAt,
       Value<int?> folderId,
+      Value<double> sortOrder,
     });
 typedef $$NoteTableTableUpdateCompanionBuilder =
     NoteTableCompanion Function({
@@ -2774,6 +2827,7 @@ typedef $$NoteTableTableUpdateCompanionBuilder =
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int?> folderId,
+      Value<double> sortOrder,
     });
 
 final class $$NoteTableTableReferences
@@ -2869,6 +2923,11 @@ class $$NoteTableTableFilterComposer
 
   ColumnFilters<String> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2980,6 +3039,11 @@ class $$NoteTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FolderTableTableOrderingComposer get folderId {
     final $$FolderTableTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -3027,6 +3091,9 @@ class $$NoteTableTableAnnotationComposer
 
   GeneratedColumn<String> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<double> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
   $$FolderTableTableAnnotationComposer get folderId {
     final $$FolderTableTableAnnotationComposer composer = $composerBuilder(
@@ -3140,6 +3207,7 @@ class $$NoteTableTableTableManager
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int?> folderId = const Value.absent(),
+                Value<double> sortOrder = const Value.absent(),
               }) => NoteTableCompanion(
                 id: id,
                 title: title,
@@ -3147,6 +3215,7 @@ class $$NoteTableTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 folderId: folderId,
+                sortOrder: sortOrder,
               ),
           createCompanionCallback:
               ({
@@ -3156,6 +3225,7 @@ class $$NoteTableTableTableManager
                 required String createdAt,
                 required String updatedAt,
                 Value<int?> folderId = const Value.absent(),
+                Value<double> sortOrder = const Value.absent(),
               }) => NoteTableCompanion.insert(
                 id: id,
                 title: title,
@@ -3163,6 +3233,7 @@ class $$NoteTableTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 folderId: folderId,
+                sortOrder: sortOrder,
               ),
           withReferenceMapper: (p0) => p0
               .map(

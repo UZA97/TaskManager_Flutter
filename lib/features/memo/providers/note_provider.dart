@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/note_repository.dart';
 import '../models/note.dart';
+import '../providers/folder_provider.dart';
 
 // 검색어 상태
 class SearchQueryNotifier extends Notifier<String> {
@@ -44,7 +45,12 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
 
   Future<void> createNote() async {
     final repo = ref.read(noteRepositoryProvider);
-    final note = await repo.createNote();
+    final selectedFolder = ref.read(selectedFolderProvider);
+
+    // 선택된 폴더 없으면 생성 불가
+    if (selectedFolder == null) return;
+
+    final note = await repo.createNote(folderId: selectedFolder.id);
     final current = state.value ?? [];
     state = AsyncData([note, ...current]);
     ref.read(selectedNoteProvider.notifier).select(note);
