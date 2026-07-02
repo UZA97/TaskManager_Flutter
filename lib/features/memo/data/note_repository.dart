@@ -22,6 +22,7 @@ class NoteRepository {
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
           folderId: row.folderId, // 추가
+          sortOrder: row.sortOrder, // 추가
         );
       }),
     );
@@ -67,12 +68,14 @@ class NoteRepository {
           tags: tags,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
+          folderId: row.folderId, // 추가
+          sortOrder: row.sortOrder, // 추가
         );
       }),
     );
   }
 
-  Future<Note> createNote({int? folderId}) async {
+  Future<Note> createNote({int? folderId, double sortOrder = 0.0}) async {
     final now = DateTime.now().toIso8601String();
     final id = await _db
         .into(_db.noteTable)
@@ -80,7 +83,8 @@ class NoteRepository {
           NoteTableCompanion.insert(
             title: const Value(''),
             content: const Value(''),
-            folderId: Value(folderId), // 추가
+            folderId: Value(folderId),
+            sortOrder: Value(sortOrder),
             createdAt: now,
             updatedAt: now,
           ),
@@ -91,7 +95,8 @@ class NoteRepository {
       content: '',
       createdAt: now,
       updatedAt: now,
-      folderId: folderId, // 추가
+      folderId: folderId,
+      sortOrder: sortOrder,
     );
   }
 
@@ -148,10 +153,10 @@ class NoteRepository {
     )..where((t) => t.folderId.equals(folderId))).go();
   }
 
-  Future<void> moveNote(int noteId, int newFolderId) async {
+  Future<void> moveNote(int noteId, int? newFolderId) async {
     await (_db.update(_db.noteTable)..where((t) => t.id.equals(noteId))).write(
       NoteTableCompanion(folderId: Value(newFolderId)),
-    );
+    ); // Value(null) 허용
   }
 
   Future<void> updateSortOrders(Map<int, double> sortOrders) async {
@@ -159,6 +164,12 @@ class NoteRepository {
       await (_db.update(_db.folderTable)..where((t) => t.id.equals(entry.key)))
           .write(FolderTableCompanion(sortOrder: Value(entry.value)));
     }
+  }
+
+  Future<void> updateNoteSortOrder(int noteId, double sortOrder) async {
+    await (_db.update(_db.noteTable)..where((t) => t.id.equals(noteId))).write(
+      NoteTableCompanion(sortOrder: Value(sortOrder)),
+    );
   }
 }
 

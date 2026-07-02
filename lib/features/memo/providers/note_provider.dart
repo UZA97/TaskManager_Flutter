@@ -34,6 +34,27 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     return _fetchNotes();
   }
 
+  Future<void> moveNoteWithOrder(
+    int noteId,
+    int? folderId,
+    double newSortOrder,
+  ) async {
+    print(
+      'moveNoteWithOrder: noteId=$noteId folderId=$folderId newSortOrder=$newSortOrder',
+    );
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.moveNote(noteId, folderId);
+    await repo.updateNoteSortOrder(noteId, newSortOrder);
+    print('moveNoteWithOrder 완료');
+    ref.invalidateSelf();
+  }
+
+  Future<void> moveNote(int noteId, int folderId) async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.moveNote(noteId, folderId);
+    ref.invalidateSelf();
+  }
+
   Future<List<Note>> _fetchNotes() async {
     final query = ref.watch(searchQueryProvider);
     final repo = ref.watch(noteRepositoryProvider);
@@ -47,10 +68,23 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     final repo = ref.read(noteRepositoryProvider);
     final selectedFolder = ref.read(selectedFolderProvider);
 
-    // 선택된 폴더 없으면 생성 불가
-    if (selectedFolder == null) return;
+    // 현재 폴더의 메모 중 가장 큰 sortOrder + 1
+    final currentNotes = (state.value ?? [])
+        .where((n) => n.folderId == selectedFolder?.id)
+        .toList();
+    final maxSortOrder = currentNotes.isEmpty
+        ? 0.0
+        : currentNotes
+              .map((n) => n.sortOrder ?? 0.0)
+              .reduce((a, b) => a > b ? a : b);
+    print(
+      'createNote: folderId=${selectedFolder?.id} currentNotes=${currentNotes.length} maxSortOrder=$maxSortOrder sortOrder=${maxSortOrder + 1.0}',
+    );
 
-    final note = await repo.createNote(folderId: selectedFolder.id);
+    final note = await repo.createNote(
+      folderId: selectedFolder?.id,
+      sortOrder: maxSortOrder + 1.0,
+    );
     final current = state.value ?? [];
     state = AsyncData([note, ...current]);
     ref.read(selectedNoteProvider.notifier).select(note);

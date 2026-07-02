@@ -6,6 +6,7 @@ class Note {
   final String createdAt;
   final String updatedAt;
   final int? folderId;
+  final double? sortOrder;
 
   const Note({
     this.id,
@@ -15,6 +16,7 @@ class Note {
     required this.createdAt,
     required this.updatedAt,
     this.folderId,
+    this.sortOrder,
   });
 
   Note copyWith({
@@ -25,6 +27,7 @@ class Note {
     String? createdAt,
     String? updatedAt,
     int? folderId,
+    double? sortOrder,
   }) {
     return Note(
       id: id ?? this.id,
@@ -34,6 +37,7 @@ class Note {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       folderId: folderId ?? this.folderId,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 }

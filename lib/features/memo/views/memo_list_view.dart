@@ -41,9 +41,8 @@ class MemoListView extends ConsumerWidget {
               // + 메모
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: selectedFolder == null
-                      ? null
-                      : () => ref.read(noteListProvider.notifier).createNote(),
+                  onPressed: () =>
+                      ref.read(noteListProvider.notifier).createNote(),
                   icon: const Icon(Icons.note_add, size: 14),
                   label: const Text('메모', style: TextStyle(fontSize: 12)),
                   style: ElevatedButton.styleFrom(
@@ -142,24 +141,65 @@ class _FolderTree extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 루트 폴더 (parentId == null)
-    final rootFolders = folders.where((f) => f.parentId == null).toList();
+    final rootFolders = folders.where((f) => f.parentId == null).toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-    if (rootFolders.isEmpty) {
+    final rootNotes = notes.where((n) => n.folderId == null).toList()
+      ..sort((a, b) => (a.sortOrder ?? 0.0).compareTo(b.sortOrder ?? 0.0));
+
+    if (rootFolders.isEmpty && rootNotes.isEmpty) {
       return const Center(
         child: Text('폴더가 없어요', style: TextStyle(color: Colors.grey)),
       );
     }
 
-    return ListView.builder(
-      itemCount: rootFolders.length,
-      itemBuilder: (context, index) => _FolderNode(
-        folder: rootFolders[index],
-        allFolders: folders,
-        allNotes: notes,
-        depth: 0,
+    // 폴더랑 메모를 sortOrder 기준으로 합쳐서 렌더링
+    final allItems = [
+      ...rootFolders.map((f) => _TreeItem.folder(f)),
+      ...rootNotes.map((n) => _TreeItem.note(n)),
+    ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    final items = <Widget>[];
+
+    items.add(
+      _DropIndicator(
+        parentId: null,
+        beforeSortOrder: allItems.isEmpty
+            ? 0.0
+            : allItems.first.sortOrder - 1.0,
+        afterSortOrder: allItems.isEmpty ? 1.0 : allItems.first.sortOrder,
       ),
     );
+
+    for (int i = 0; i < allItems.length; i++) {
+      final item = allItems[i];
+      if (item.isFolder) {
+        items.add(
+          _FolderNode(
+            folder: item.folder!,
+            allFolders: folders,
+            allNotes: notes,
+            depth: 0,
+          ),
+        );
+      } else {
+        items.add(_NoteNode(note: item.note!, depth: 0));
+      }
+
+      final after = i < allItems.length - 1
+          ? allItems[i + 1].sortOrder
+          : allItems[i].sortOrder + 1.0;
+
+      items.add(
+        _DropIndicator(
+          parentId: null,
+          beforeSortOrder: allItems[i].sortOrder,
+          afterSortOrder: after,
+        ),
+      );
+    }
+
+    return ListView(children: items);
   }
 }
 
@@ -272,17 +312,67 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
 
         // 펼쳐진 상태
         if (_isExpanded) ...[
-          // 하위 폴더 (재귀)
-          ...childFolders.map(
-            (f) => _FolderNode(
-              folder: f,
-              allFolders: widget.allFolders,
-              allNotes: widget.allNotes,
-              depth: widget.depth + 1,
-            ),
-          ),
-          // 메모 노드
-          ...childNotes.map((n) => _NoteNode(note: n, depth: widget.depth + 1)),
+          // 폴더랑 메모를 sortOrder 기준으로 합쳐서 렌더링
+          () {
+            final allItems = [
+              ...childFolders.map((f) => _TreeItem.folder(f)),
+              ...childNotes.map((n) => _TreeItem.note(n)),
+            ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+            // 임시 로그
+            for (final item in allItems) {
+              print(
+                'item: ${item.isFolder ? 'folder' : 'note'} sortOrder=${item.sortOrder}',
+              );
+            }
+
+            final items = <Widget>[];
+
+            items.add(
+              _DropIndicator(
+                parentId: widget.folder.id,
+                beforeSortOrder: allItems.isEmpty
+                    ? 0.0
+                    : allItems.first.sortOrder - 1.0,
+                afterSortOrder: allItems.isEmpty
+                    ? 1.0
+                    : allItems.first.sortOrder,
+              ),
+            );
+
+            for (int i = 0; i < allItems.length; i++) {
+              final item = allItems[i];
+              if (item.isFolder) {
+                items.add(
+                  _FolderNode(
+                    folder: item.folder!,
+                    allFolders: widget.allFolders,
+                    allNotes: widget.allNotes,
+                    depth: widget.depth + 1,
+                  ),
+                );
+              } else {
+                items.add(_NoteNode(note: item.note!, depth: widget.depth + 1));
+              }
+
+              final after = i < allItems.length - 1
+                  ? allItems[i + 1].sortOrder
+                  : allItems[i].sortOrder + 1.0;
+
+              items.add(
+                _DropIndicator(
+                  parentId: widget.folder.id,
+                  beforeSortOrder: allItems[i].sortOrder,
+                  afterSortOrder: after,
+                ),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: items,
+            );
+          }(),
         ],
       ],
     );
@@ -348,7 +438,15 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
   }
 
   void _onDrop(TreeDragData data) {
-    // 나중에 추가
+    if (data.isFolder) {
+      // 폴더 → 폴더 안으로 이동
+      ref
+          .read(folderListProvider.notifier)
+          .moveFolder(data.id, widget.folder.id);
+    } else {
+      // 메모 → 폴더 안으로 이동
+      ref.read(noteListProvider.notifier).moveNote(data.id, widget.folder.id!);
+    }
   }
 
   void _showContextMenu(BuildContext context, Offset position) async {
@@ -486,7 +584,7 @@ class _NoteNode extends ConsumerWidget {
     final selectedNote = ref.watch(selectedNoteProvider);
     final isSelected = selectedNote?.id == note.id;
 
-    return GestureDetector(
+    final noteRow = GestureDetector(
       onTap: () => ref.read(selectedNoteProvider.notifier).select(note),
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
@@ -515,6 +613,36 @@ class _NoteNode extends ConsumerWidget {
           ],
         ),
       ),
+    );
+
+    return Draggable<TreeDragData>(
+      data: TreeDragData(
+        isFolder: false,
+        id: note.id!,
+        parentId: note.folderId,
+        sortOrder: note.sortOrder ?? 0.0,
+      ),
+      feedback: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          color: const Color(0xFFE8F0FE),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.note, size: 14, color: Colors.grey),
+              const SizedBox(width: 6),
+              Text(
+                note.title.isEmpty ? '제목 없음' : note.title,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: noteRow),
+      child: noteRow,
     );
   }
 
@@ -553,4 +681,67 @@ class _NoteNode extends ConsumerWidget {
         break;
     }
   }
+}
+
+class _DropIndicator extends ConsumerWidget {
+  final int? parentId;
+  final double beforeSortOrder;
+  final double afterSortOrder;
+
+  const _DropIndicator({
+    this.parentId,
+    required this.beforeSortOrder,
+    required this.afterSortOrder,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DragTarget<TreeDragData>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (details) {
+        print(
+          'DropIndicator accept: isFolder=${details.data.isFolder} id=${details.data.id} parentId=$parentId before=$beforeSortOrder after=$afterSortOrder',
+        );
+
+        final newSortOrder = (beforeSortOrder + afterSortOrder) / 2;
+        if (details.data.isFolder) {
+          ref
+              .read(folderListProvider.notifier)
+              .moveFolderWithOrder(details.data.id, parentId, newSortOrder);
+        } else {
+          ref
+              .read(noteListProvider.notifier)
+              .moveNoteWithOrder(details.data.id, parentId, newSortOrder);
+        }
+      },
+      builder: (context, candidateData, _) {
+        final isHovered = candidateData.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: isHovered ? 3 : 2,
+          margin: const EdgeInsets.symmetric(vertical: 1),
+          color: isHovered ? const Color(0xFF4A90E2) : Colors.transparent,
+        );
+      },
+    );
+  }
+}
+
+class _TreeItem {
+  final bool isFolder;
+  final Folder? folder;
+  final Note? note;
+  final double sortOrder;
+
+  _TreeItem.folder(Folder f)
+    : isFolder = true,
+      folder = f,
+      note = null,
+      sortOrder = f.sortOrder;
+
+  _TreeItem.note(Note n)
+    : isFolder = false,
+      folder = null,
+      note = n,
+      sortOrder = n.sortOrder ?? 0.0;
 }

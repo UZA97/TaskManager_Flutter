@@ -13,6 +13,23 @@ class FolderListNotifier extends AsyncNotifier<List<Folder>> {
     return repo.getAllFolders();
   }
 
+  Future<void> moveFolderWithOrder(
+    int id,
+    int? newParentId,
+    double newSortOrder,
+  ) async {
+    final allFolders = state.value ?? [];
+    final repo = ref.read(folderRepositoryProvider);
+
+    // 순환 참조 방지
+    final descendants = repo.collectDescendantIds(allFolders, id);
+    if (newParentId != null && descendants.contains(newParentId)) return;
+
+    await repo.moveFolder(id, newParentId);
+    await repo.updateSortOrder(id, newSortOrder);
+    ref.invalidateSelf();
+  }
+
   Future<void> createFolder({required String name, int? parentId}) async {
     final repo = ref.read(folderRepositoryProvider);
     await repo.createFolder(name: name, parentId: parentId);
@@ -69,7 +86,14 @@ class SelectedFolderNotifier extends Notifier<Folder?> {
   @override
   Folder? build() => null;
 
-  void select(Folder? folder) => state = folder;
+  void select(Folder? folder) {
+    // 같은 폴더 클릭 시 선택 해제
+    if (state?.id == folder?.id) {
+      state = null;
+    } else {
+      state = folder;
+    }
+  }
 }
 
 final selectedFolderProvider =
@@ -81,6 +105,6 @@ final selectedFolderProvider =
 final filteredNotesProvider = Provider<List<Note>>((ref) {
   final notes = ref.watch(noteListProvider).value ?? [];
   final selectedFolder = ref.watch(selectedFolderProvider);
-  if (selectedFolder == null) return [];
-  return notes.where((n) => n.folderId == selectedFolder.id).toList();
+  // null이면 루트 메모 (folderId == null)
+  return notes.where((n) => n.folderId == selectedFolder?.id).toList();
 });
