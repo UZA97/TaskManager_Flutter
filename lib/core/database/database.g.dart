@@ -3,6 +3,358 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
+class $FolderTableTable extends FolderTable
+    with TableInfo<$FolderTableTable, FolderTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FolderTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<int> parentId = GeneratedColumn<int>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES folders (id)',
+    ),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    parentId,
+    sortOrder,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'folders';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FolderTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FolderTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FolderTableData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}parent_id'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $FolderTableTable createAlias(String alias) {
+    return $FolderTableTable(attachedDatabase, alias);
+  }
+}
+
+class FolderTableData extends DataClass implements Insertable<FolderTableData> {
+  final int id;
+  final String name;
+  final int? parentId;
+  final int sortOrder;
+  final String createdAt;
+  const FolderTableData({
+    required this.id,
+    required this.name,
+    this.parentId,
+    required this.sortOrder,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<int>(parentId);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<String>(createdAt);
+    return map;
+  }
+
+  FolderTableCompanion toCompanion(bool nullToAbsent) {
+    return FolderTableCompanion(
+      id: Value(id),
+      name: Value(name),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory FolderTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FolderTableData(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      parentId: serializer.fromJson<int?>(json['parentId']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'parentId': serializer.toJson<int?>(parentId),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<String>(createdAt),
+    };
+  }
+
+  FolderTableData copyWith({
+    int? id,
+    String? name,
+    Value<int?> parentId = const Value.absent(),
+    int? sortOrder,
+    String? createdAt,
+  }) => FolderTableData(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    parentId: parentId.present ? parentId.value : this.parentId,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  FolderTableData copyWithCompanion(FolderTableCompanion data) {
+    return FolderTableData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FolderTableData(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('parentId: $parentId, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, parentId, sortOrder, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FolderTableData &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.parentId == this.parentId &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt);
+}
+
+class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<int?> parentId;
+  final Value<int> sortOrder;
+  final Value<String> createdAt;
+  const FolderTableCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  FolderTableCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.parentId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    required String createdAt,
+  }) : name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<FolderTableData> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<int>? parentId,
+    Expression<int>? sortOrder,
+    Expression<String>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (parentId != null) 'parent_id': parentId,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  FolderTableCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<int?>? parentId,
+    Value<int>? sortOrder,
+    Value<String>? createdAt,
+  }) {
+    return FolderTableCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      parentId: parentId ?? this.parentId,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<int>(parentId.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FolderTableCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('parentId: $parentId, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $NoteTableTable extends NoteTable
     with TableInfo<$NoteTableTable, NoteTableData> {
   @override
@@ -66,6 +418,20 @@ class $NoteTableTable extends NoteTable
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _folderIdMeta = const VerificationMeta(
+    'folderId',
+  );
+  @override
+  late final GeneratedColumn<int> folderId = GeneratedColumn<int>(
+    'folder_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES folders (id)',
+    ),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -73,6 +439,7 @@ class $NoteTableTable extends NoteTable
     content,
     createdAt,
     updatedAt,
+    folderId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -117,6 +484,12 @@ class $NoteTableTable extends NoteTable
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('folder_id')) {
+      context.handle(
+        _folderIdMeta,
+        folderId.isAcceptableOrUnknown(data['folder_id']!, _folderIdMeta),
+      );
+    }
     return context;
   }
 
@@ -146,6 +519,10 @@ class $NoteTableTable extends NoteTable
         DriftSqlType.string,
         data['${effectivePrefix}updated_at'],
       )!,
+      folderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}folder_id'],
+      ),
     );
   }
 
@@ -161,12 +538,14 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
   final String content;
   final String createdAt;
   final String updatedAt;
+  final int? folderId;
   const NoteTableData({
     required this.id,
     required this.title,
     required this.content,
     required this.createdAt,
     required this.updatedAt,
+    this.folderId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -176,6 +555,9 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     map['content'] = Variable<String>(content);
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
+    if (!nullToAbsent || folderId != null) {
+      map['folder_id'] = Variable<int>(folderId);
+    }
     return map;
   }
 
@@ -186,6 +568,9 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       content: Value(content),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      folderId: folderId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(folderId),
     );
   }
 
@@ -200,6 +585,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       content: serializer.fromJson<String>(json['content']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
+      folderId: serializer.fromJson<int?>(json['folderId']),
     );
   }
   @override
@@ -211,6 +597,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       'content': serializer.toJson<String>(content),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
+      'folderId': serializer.toJson<int?>(folderId),
     };
   }
 
@@ -220,12 +607,14 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     String? content,
     String? createdAt,
     String? updatedAt,
+    Value<int?> folderId = const Value.absent(),
   }) => NoteTableData(
     id: id ?? this.id,
     title: title ?? this.title,
     content: content ?? this.content,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    folderId: folderId.present ? folderId.value : this.folderId,
   );
   NoteTableData copyWithCompanion(NoteTableCompanion data) {
     return NoteTableData(
@@ -234,6 +623,7 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       content: data.content.present ? data.content.value : this.content,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      folderId: data.folderId.present ? data.folderId.value : this.folderId,
     );
   }
 
@@ -244,13 +634,15 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
           ..write('title: $title, ')
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('folderId: $folderId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, content, createdAt, updatedAt);
+  int get hashCode =>
+      Object.hash(id, title, content, createdAt, updatedAt, folderId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -259,7 +651,8 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
           other.title == this.title &&
           other.content == this.content &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.folderId == this.folderId);
 }
 
 class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
@@ -268,12 +661,14 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
   final Value<String> content;
   final Value<String> createdAt;
   final Value<String> updatedAt;
+  final Value<int?> folderId;
   const NoteTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.content = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.folderId = const Value.absent(),
   });
   NoteTableCompanion.insert({
     this.id = const Value.absent(),
@@ -281,6 +676,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     this.content = const Value.absent(),
     required String createdAt,
     required String updatedAt,
+    this.folderId = const Value.absent(),
   }) : createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<NoteTableData> custom({
@@ -289,6 +685,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     Expression<String>? content,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
+    Expression<int>? folderId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -296,6 +693,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
       if (content != null) 'content': content,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (folderId != null) 'folder_id': folderId,
     });
   }
 
@@ -305,6 +703,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     Value<String>? content,
     Value<String>? createdAt,
     Value<String>? updatedAt,
+    Value<int?>? folderId,
   }) {
     return NoteTableCompanion(
       id: id ?? this.id,
@@ -312,6 +711,7 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      folderId: folderId ?? this.folderId,
     );
   }
 
@@ -333,6 +733,9 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<String>(updatedAt.value);
     }
+    if (folderId.present) {
+      map['folder_id'] = Variable<int>(folderId.value);
+    }
     return map;
   }
 
@@ -343,7 +746,8 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
           ..write('title: $title, ')
           ..write('content: $content, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('folderId: $folderId')
           ..write(')'))
         .toString();
   }
@@ -1928,6 +2332,7 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final $FolderTableTable folderTable = $FolderTableTable(this);
   late final $NoteTableTable noteTable = $NoteTableTable(this);
   late final $TagTableTable tagTable = $TagTableTable(this);
   late final $NoteTagTableTable noteTagTable = $NoteTagTableTable(this);
@@ -1941,6 +2346,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    folderTable,
     noteTable,
     tagTable,
     noteTagTable,
@@ -1950,6 +2356,407 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ];
 }
 
+typedef $$FolderTableTableCreateCompanionBuilder =
+    FolderTableCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<int?> parentId,
+      Value<int> sortOrder,
+      required String createdAt,
+    });
+typedef $$FolderTableTableUpdateCompanionBuilder =
+    FolderTableCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<int?> parentId,
+      Value<int> sortOrder,
+      Value<String> createdAt,
+    });
+
+final class $$FolderTableTableReferences
+    extends BaseReferences<_$AppDatabase, $FolderTableTable, FolderTableData> {
+  $$FolderTableTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $FolderTableTable _parentIdTable(_$AppDatabase db) =>
+      db.folderTable.createAlias(
+        $_aliasNameGenerator(db.folderTable.parentId, db.folderTable.id),
+      );
+
+  $$FolderTableTableProcessedTableManager? get parentId {
+    final $_column = $_itemColumn<int>('parent_id');
+    if ($_column == null) return null;
+    final manager = $$FolderTableTableTableManager(
+      $_db,
+      $_db.folderTable,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_parentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$NoteTableTable, List<NoteTableData>>
+  _noteTableRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.noteTable,
+    aliasName: $_aliasNameGenerator(db.folderTable.id, db.noteTable.folderId),
+  );
+
+  $$NoteTableTableProcessedTableManager get noteTableRefs {
+    final manager = $$NoteTableTableTableManager(
+      $_db,
+      $_db.noteTable,
+    ).filter((f) => f.folderId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_noteTableRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$FolderTableTableFilterComposer
+    extends Composer<_$AppDatabase, $FolderTableTable> {
+  $$FolderTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$FolderTableTableFilterComposer get parentId {
+    final $$FolderTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentId,
+      referencedTable: $db.folderTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FolderTableTableFilterComposer(
+            $db: $db,
+            $table: $db.folderTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> noteTableRefs(
+    Expression<bool> Function($$NoteTableTableFilterComposer f) f,
+  ) {
+    final $$NoteTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.noteTable,
+      getReferencedColumn: (t) => t.folderId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteTableTableFilterComposer(
+            $db: $db,
+            $table: $db.noteTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$FolderTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $FolderTableTable> {
+  $$FolderTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$FolderTableTableOrderingComposer get parentId {
+    final $$FolderTableTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentId,
+      referencedTable: $db.folderTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FolderTableTableOrderingComposer(
+            $db: $db,
+            $table: $db.folderTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$FolderTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FolderTableTable> {
+  $$FolderTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$FolderTableTableAnnotationComposer get parentId {
+    final $$FolderTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.parentId,
+      referencedTable: $db.folderTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FolderTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.folderTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> noteTableRefs<T extends Object>(
+    Expression<T> Function($$NoteTableTableAnnotationComposer a) f,
+  ) {
+    final $$NoteTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.noteTable,
+      getReferencedColumn: (t) => t.folderId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NoteTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.noteTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$FolderTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FolderTableTable,
+          FolderTableData,
+          $$FolderTableTableFilterComposer,
+          $$FolderTableTableOrderingComposer,
+          $$FolderTableTableAnnotationComposer,
+          $$FolderTableTableCreateCompanionBuilder,
+          $$FolderTableTableUpdateCompanionBuilder,
+          (FolderTableData, $$FolderTableTableReferences),
+          FolderTableData,
+          PrefetchHooks Function({bool parentId, bool noteTableRefs})
+        > {
+  $$FolderTableTableTableManager(_$AppDatabase db, $FolderTableTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FolderTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FolderTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FolderTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int?> parentId = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> createdAt = const Value.absent(),
+              }) => FolderTableCompanion(
+                id: id,
+                name: name,
+                parentId: parentId,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<int?> parentId = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                required String createdAt,
+              }) => FolderTableCompanion.insert(
+                id: id,
+                name: name,
+                parentId: parentId,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$FolderTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({parentId = false, noteTableRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (noteTableRefs) db.noteTable],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (parentId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.parentId,
+                                referencedTable: $$FolderTableTableReferences
+                                    ._parentIdTable(db),
+                                referencedColumn: $$FolderTableTableReferences
+                                    ._parentIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (noteTableRefs)
+                    await $_getPrefetchedData<
+                      FolderTableData,
+                      $FolderTableTable,
+                      NoteTableData
+                    >(
+                      currentTable: table,
+                      referencedTable: $$FolderTableTableReferences
+                          ._noteTableRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$FolderTableTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).noteTableRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.folderId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$FolderTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FolderTableTable,
+      FolderTableData,
+      $$FolderTableTableFilterComposer,
+      $$FolderTableTableOrderingComposer,
+      $$FolderTableTableAnnotationComposer,
+      $$FolderTableTableCreateCompanionBuilder,
+      $$FolderTableTableUpdateCompanionBuilder,
+      (FolderTableData, $$FolderTableTableReferences),
+      FolderTableData,
+      PrefetchHooks Function({bool parentId, bool noteTableRefs})
+    >;
 typedef $$NoteTableTableCreateCompanionBuilder =
     NoteTableCompanion Function({
       Value<int> id,
@@ -1957,6 +2764,7 @@ typedef $$NoteTableTableCreateCompanionBuilder =
       Value<String> content,
       required String createdAt,
       required String updatedAt,
+      Value<int?> folderId,
     });
 typedef $$NoteTableTableUpdateCompanionBuilder =
     NoteTableCompanion Function({
@@ -1965,11 +2773,31 @@ typedef $$NoteTableTableUpdateCompanionBuilder =
       Value<String> content,
       Value<String> createdAt,
       Value<String> updatedAt,
+      Value<int?> folderId,
     });
 
 final class $$NoteTableTableReferences
     extends BaseReferences<_$AppDatabase, $NoteTableTable, NoteTableData> {
   $$NoteTableTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $FolderTableTable _folderIdTable(_$AppDatabase db) =>
+      db.folderTable.createAlias(
+        $_aliasNameGenerator(db.noteTable.folderId, db.folderTable.id),
+      );
+
+  $$FolderTableTableProcessedTableManager? get folderId {
+    final $_column = $_itemColumn<int>('folder_id');
+    if ($_column == null) return null;
+    final manager = $$FolderTableTableTableManager(
+      $_db,
+      $_db.folderTable,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_folderIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 
   static MultiTypedResultKey<$NoteTagTableTable, List<NoteTagTableData>>
   _noteTagTableRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -2043,6 +2871,29 @@ class $$NoteTableTableFilterComposer
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  $$FolderTableTableFilterComposer get folderId {
+    final $$FolderTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.folderId,
+      referencedTable: $db.folderTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FolderTableTableFilterComposer(
+            $db: $db,
+            $table: $db.folderTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<bool> noteTagTableRefs(
     Expression<bool> Function($$NoteTagTableTableFilterComposer f) f,
@@ -2128,6 +2979,29 @@ class $$NoteTableTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$FolderTableTableOrderingComposer get folderId {
+    final $$FolderTableTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.folderId,
+      referencedTable: $db.folderTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FolderTableTableOrderingComposer(
+            $db: $db,
+            $table: $db.folderTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$NoteTableTableAnnotationComposer
@@ -2153,6 +3027,29 @@ class $$NoteTableTableAnnotationComposer
 
   GeneratedColumn<String> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$FolderTableTableAnnotationComposer get folderId {
+    final $$FolderTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.folderId,
+      referencedTable: $db.folderTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FolderTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.folderTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<T> noteTagTableRefs<T extends Object>(
     Expression<T> Function($$NoteTagTableTableAnnotationComposer a) f,
@@ -2219,6 +3116,7 @@ class $$NoteTableTableTableManager
           (NoteTableData, $$NoteTableTableReferences),
           NoteTableData,
           PrefetchHooks Function({
+            bool folderId,
             bool noteTagTableRefs,
             bool attachmentTableRefs,
           })
@@ -2241,12 +3139,14 @@ class $$NoteTableTableTableManager
                 Value<String> content = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
+                Value<int?> folderId = const Value.absent(),
               }) => NoteTableCompanion(
                 id: id,
                 title: title,
                 content: content,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                folderId: folderId,
               ),
           createCompanionCallback:
               ({
@@ -2255,12 +3155,14 @@ class $$NoteTableTableTableManager
                 Value<String> content = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
+                Value<int?> folderId = const Value.absent(),
               }) => NoteTableCompanion.insert(
                 id: id,
                 title: title,
                 content: content,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                folderId: folderId,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -2271,14 +3173,49 @@ class $$NoteTableTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({noteTagTableRefs = false, attachmentTableRefs = false}) {
+              ({
+                folderId = false,
+                noteTagTableRefs = false,
+                attachmentTableRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (noteTagTableRefs) db.noteTagTable,
                     if (attachmentTableRefs) db.attachmentTable,
                   ],
-                  addJoins: null,
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (folderId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.folderId,
+                                    referencedTable: $$NoteTableTableReferences
+                                        ._folderIdTable(db),
+                                    referencedColumn: $$NoteTableTableReferences
+                                        ._folderIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
                   getPrefetchedDataCallback: (items) async {
                     return [
                       if (noteTagTableRefs)
@@ -2343,7 +3280,11 @@ typedef $$NoteTableTableProcessedTableManager =
       $$NoteTableTableUpdateCompanionBuilder,
       (NoteTableData, $$NoteTableTableReferences),
       NoteTableData,
-      PrefetchHooks Function({bool noteTagTableRefs, bool attachmentTableRefs})
+      PrefetchHooks Function({
+        bool folderId,
+        bool noteTagTableRefs,
+        bool attachmentTableRefs,
+      })
     >;
 typedef $$TagTableTableCreateCompanionBuilder =
     TagTableCompanion Function({Value<int> id, required String name});
@@ -3683,6 +4624,8 @@ typedef $$EventTableTableProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $$FolderTableTableTableManager get folderTable =>
+      $$FolderTableTableTableManager(_db, _db.folderTable);
   $$NoteTableTableTableManager get noteTable =>
       $$NoteTableTableTableManager(_db, _db.noteTable);
   $$TagTableTableTableManager get tagTable =>

@@ -19,23 +19,23 @@ class MailDetailView extends ConsumerWidget {
           children: [
             Icon(Icons.mail_outline, size: 64, color: Colors.grey[300]),
             const SizedBox(height: 16),
-            const Text(
-              '메일 서비스를 이용하려면\n로그인이 필요합니다',
-              style: TextStyle(fontSize: 15, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => showMailLoginDialog(context),
-              icon: const Icon(Icons.login, size: 18),
-              label: const Text('로그인'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4A90E2),
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
+            // const Text(
+            //   '',
+            //   style: TextStyle(fontSize: 15, color: Colors.grey),
+            //   textAlign: TextAlign.center,
+            // ),
+            // const SizedBox(height: 24),
+            // ElevatedButton.icon(
+            //   onPressed: () => showMailLoginDialog(context),
+            //   icon: const Icon(Icons.login, size: 18),
+            //   label: const Text('로그인'),
+            //   style: ElevatedButton.styleFrom(
+            //     backgroundColor: const Color(0xFF4A90E2),
+            //     foregroundColor: Colors.white,
+            //     padding:
+            //         const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            //   ),
+            // ),
           ],
         ),
       );
@@ -44,10 +44,7 @@ class MailDetailView extends ConsumerWidget {
     // 메일 선택 안 됐으면
     if (selectedMail == null) {
       return const Center(
-        child: Text(
-          '메일을 선택하세요',
-          style: TextStyle(color: Colors.grey),
-        ),
+        child: Text('메일을 선택하세요', style: TextStyle(color: Colors.grey)),
       );
     }
 
@@ -70,8 +67,11 @@ class MailDetailView extends ConsumerWidget {
                   color: const Color(0xFF4A90E2).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(Icons.person,
-                    color: Color(0xFF4A90E2), size: 18),
+                child: const Icon(
+                  Icons.person,
+                  color: Color(0xFF4A90E2),
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -81,7 +81,9 @@ class MailDetailView extends ConsumerWidget {
                     Text(
                       selectedMail.from,
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w500),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Text(
                       '${selectedMail.date.year}.'

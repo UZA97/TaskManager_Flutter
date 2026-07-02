@@ -3,6 +3,17 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 part 'database.g.dart';
 
+class FolderTable extends Table {
+  @override
+  String get tableName => 'folders';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  IntColumn get parentId => integer().nullable().references(FolderTable, #id)();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  TextColumn get createdAt => text()();
+}
+
 class NoteTable extends Table {
   @override
   String get tableName => 'notes';
@@ -12,6 +23,7 @@ class NoteTable extends Table {
   TextColumn get content => text().withDefault(const Constant(''))();
   TextColumn get createdAt => text()();
   TextColumn get updatedAt => text()();
+  IntColumn get folderId => integer().nullable().references(FolderTable, #id)();
 }
 
 class TagTable extends Table {
@@ -79,6 +91,7 @@ class EventTable extends Table {
     AttachmentTable,
     SettingTable,
     EventTable,
+    FolderTable,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -94,14 +107,19 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(eventTable);
       }
       if (from < 3) {
-        await m.addColumn(
-          eventTable,
-          eventTable.googleEventId as GeneratedColumn,
-        ); // 추가
+        await m.createTable(folderTable);
+        await m.addColumn(noteTable, noteTable.folderId as GeneratedColumn);
+
+        final now = DateTime.now().toIso8601String();
+        final defaultFolderId = await into(
+          folderTable,
+        ).insert(FolderTableCompanion.insert(name: '기본 폴더', createdAt: now));
+        await (update(noteTable)..where((t) => t.folderId.isNull())).write(
+          NoteTableCompanion(folderId: Value(defaultFolderId)),
+        );
       }
     },
   );
-
   static QueryExecutor _openConnection() {
     return driftDatabase(name: 'taskmanager');
   }

@@ -2,9 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/event_repository.dart';
 import '../models/event.dart';
 import '../services/google_calendar_service.dart';
-import '../../mail/data/mail_repository.dart';
+import '../../../core/database/database_provider.dart';
 import '../../mail/services/google_auth_service.dart';
-import '../../mail/services/mail_check_service.dart';
+import '../../../core/database/database.dart';
 
 // 현재 월
 class CurrentMonthNotifier extends Notifier<DateTime> {
@@ -48,17 +48,35 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
   }
 
   Future<String?> _getAccessToken() async {
-    final mailRepo = ref.read(mailRepositoryProvider);
-    final account = await mailRepo.getAccount();
-    print('account: ${account?.email}');
-    print('isOutlook: ${account?.isOutlook}');
-    if (account == null || account.isOutlook) return null;
+    final db = ref.read(databaseProvider);
 
-    final token = await ref
-        .read(mailCheckServiceProvider)
-        .getGoogleAccessToken();
-    print('token: $token');
-    return token;
+    // access token 읽기
+    final tokenRow = await (db.select(
+      db.settingTable,
+    )..where((t) => t.key.equals('calendar_access_token'))).getSingleOrNull();
+    if (tokenRow == null || tokenRow.value.isEmpty) return null;
+
+    // refresh token으로 갱신 시도
+    final refreshRow = await (db.select(
+      db.settingTable,
+    )..where((t) => t.key.equals('calendar_refresh_token'))).getSingleOrNull();
+    if (refreshRow == null) return tokenRow.value;
+
+    final authService = GoogleAuthService();
+    final newToken = await authService.refreshAccessToken(refreshRow.value);
+    if (newToken == null) return tokenRow.value;
+
+    // 갱신된 token 저장
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(
+            key: 'calendar_access_token',
+            value: newToken,
+          ),
+        );
+
+    return newToken;
   }
 
   Future<void> _syncGoogleCalendar(int year, int month) async {

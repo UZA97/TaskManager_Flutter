@@ -26,6 +26,7 @@ class GoogleAuthService {
 
   Future<GoogleAuthResult?> signIn() async {
     try {
+      await _googleSignIn.signOut();
       final credentials = await _googleSignIn.signIn();
       if (credentials == null) return null;
 
@@ -45,6 +46,31 @@ class GoogleAuthService {
       );
     } catch (e) {
       print('signIn error: $e');
+      return null;
+    }
+  }
+
+  // 캘린더 전용 로그인 — scope 검증 후 재로그인
+  Future<GoogleAuthResult?> signInForCalendar() async {
+    try {
+      await _googleSignIn.signOut(); // 첫 연동 시 scope 보장
+      final credentials = await _googleSignIn.signIn();
+      if (credentials == null) return null;
+
+      String accessToken = credentials.accessToken;
+      if (credentials.refreshToken != null) {
+        final newToken = await refreshAccessToken(credentials.refreshToken!);
+        if (newToken != null) accessToken = newToken;
+      }
+
+      final email = await _getEmail(accessToken);
+      return GoogleAuthResult(
+        accessToken: accessToken,
+        refreshToken: credentials.refreshToken,
+        email: email,
+      );
+    } catch (e) {
+      print('signInForCalendar error: $e');
       return null;
     }
   }

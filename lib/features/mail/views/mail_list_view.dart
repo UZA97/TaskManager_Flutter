@@ -67,20 +67,22 @@ class _MailListViewState extends ConsumerState<MailListView> {
             Icon(Icons.mail_outline, size: 48, color: Colors.grey[300]),
             const SizedBox(height: 12),
             const Text(
-              '로그인이 필요합니다',
+              '메일 서비스를 이용하려면\n로그인이 필요합니다',
               style: TextStyle(color: Colors.grey, fontSize: 13),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => showMailLoginDialog(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90E2),
-                  foregroundColor: Colors.white,
+            ElevatedButton.icon(
+              onPressed: () => showMailLoginDialog(context),
+              icon: const Icon(Icons.login, size: 18),
+              label: const Text('로그인'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4A90E2),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
                 ),
-                child: const Text('로그인'),
               ),
             ),
           ],
@@ -106,7 +108,30 @@ class _MailListViewState extends ConsumerState<MailListView> {
                 '받은편지함',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
+              // 계정 이메일 — Expanded로 감싸서 남은 공간만 사용
+              Expanded(
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final account = ref.watch(mailAccountProvider).value;
+                    if (account == null) return const SizedBox();
+                    return Text(
+                      account.email,
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
+                ),
+              ),
+              // 계정 관리 버튼
+              IconButton(
+                icon: const Icon(Icons.manage_accounts, size: 18),
+                tooltip: '계정 관리',
+                onPressed: () => showMailLoginDialog(context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 18),
                 tooltip: '새로고침',
@@ -124,8 +149,10 @@ class _MailListViewState extends ConsumerState<MailListView> {
           child: messagesAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
-              child: Text('$e',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              child: Text(
+                '$e',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
             ),
             data: (messages) {
               if (messages.isEmpty) {
@@ -145,8 +172,9 @@ class _MailListViewState extends ConsumerState<MailListView> {
                               child: SizedBox(
                                 width: 20,
                                 height: 20,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               ),
                             ),
                           )
@@ -189,9 +217,7 @@ class _MailListItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
-          border: const Border(
-            bottom: BorderSide(color: Color(0xFFEEEEEE)),
-          ),
+          border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,8 +239,9 @@ class _MailListItem extends StatelessWidget {
                     message.from,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight:
-                          message.isRead ? FontWeight.normal : FontWeight.bold,
+                      fontWeight: message.isRead
+                          ? FontWeight.normal
+                          : FontWeight.bold,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -230,8 +257,9 @@ class _MailListItem extends StatelessWidget {
               message.subject,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight:
-                    message.isRead ? FontWeight.normal : FontWeight.w600,
+                fontWeight: message.isRead
+                    ? FontWeight.normal
+                    : FontWeight.w600,
               ),
               overflow: TextOverflow.ellipsis,
             ),
