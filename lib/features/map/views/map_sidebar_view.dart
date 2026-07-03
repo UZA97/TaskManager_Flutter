@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../providers/map_provider.dart';
 import '../services/vworld_service.dart';
-
-enum SearchType { place, address }
+import '../model/search_type.dart';
 
 class MapSidebarView extends ConsumerStatefulWidget {
   const MapSidebarView({super.key});
