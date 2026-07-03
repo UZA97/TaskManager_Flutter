@@ -141,6 +141,11 @@ class _FolderTree extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final searchQuery = ref.watch(searchQueryProvider);
+
+    if (searchQuery.isNotEmpty) {
+      return _buildSearchResult(searchQuery);
+    }
     final rootFolders = folders.where((f) => f.parentId == null).toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
@@ -201,6 +206,69 @@ class _FolderTree extends ConsumerWidget {
 
     return ListView(children: items);
   }
+
+  Widget _buildSearchResult(String searchQuery) {
+    // 검색된 메모만
+    final matchedNotes = notes
+        .where(
+          (n) =>
+              n.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
+              n.content.toLowerCase().contains(searchQuery.toLowerCase()),
+        )
+        .toList();
+
+    if (matchedNotes.isEmpty) {
+      return const Center(
+        child: Text('검색 결과 없음', style: TextStyle(color: Colors.grey)),
+      );
+    }
+
+    // 검색된 메모의 조상 폴더 id 수집
+    final ancestorIds = <int>{};
+    for (final note in matchedNotes) {
+      if (note.folderId == null) continue;
+      _collectAncestors(note.folderId!, ancestorIds);
+    }
+
+    // 조상 폴더만 필터
+    final visibleFolders = folders
+        .where((f) => ancestorIds.contains(f.id))
+        .toList();
+
+    return ListView(
+      children: [
+        // 루트 메모 (folderId == null)
+        ...matchedNotes
+            .where((n) => n.folderId == null)
+            .map((n) => _NoteNode(note: n, depth: 0)),
+
+        // 조상 폴더 트리 (루트만)
+        ...visibleFolders
+            .where((f) => f.parentId == null)
+            .map(
+              (f) => _FolderNode(
+                folder: f,
+                allFolders: visibleFolders,
+                allNotes: matchedNotes,
+                depth: 0,
+                forceExpanded: true, // 추가
+              ),
+            ),
+      ],
+    );
+  }
+
+  void _collectAncestors(int folderId, Set<int> result) {
+    final folder = folders.firstWhere(
+      (f) => f.id == folderId,
+      orElse: () => Folder(id: -1, name: '', createdAt: ''),
+    );
+    if (folder.id == -1) return;
+    result.add(folder.id!);
+    if (folder.parentId != null) {
+      _collectAncestors(folder.parentId!, result);
+    }
+  }
 }
 
 // 폴더 노드 (재귀)
@@ -209,12 +277,13 @@ class _FolderNode extends ConsumerStatefulWidget {
   final List<Folder> allFolders;
   final List<Note> allNotes;
   final int depth;
-
+  final bool forceExpanded; // 추가
   const _FolderNode({
     required this.folder,
     required this.allFolders,
     required this.allNotes,
     required this.depth,
+    this.forceExpanded = false,
   });
 
   @override
@@ -225,7 +294,23 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
   bool _isExpanded = false;
 
   @override
+  void didUpdateWidget(_FolderNode oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.forceExpanded && !_isExpanded) {
+      setState(() => _isExpanded = true);
+    } else if (!widget.forceExpanded && oldWidget.forceExpanded) {
+      setState(() => _isExpanded = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    @override
+    void initState() {
+      super.initState();
+      if (widget.forceExpanded) _isExpanded = true;
+    }
+
     final childFolders = widget.allFolders
         .where((f) => f.parentId == widget.folder.id)
         .toList();
@@ -319,13 +404,6 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
               ...childNotes.map((n) => _TreeItem.note(n)),
             ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-            // 임시 로그
-            for (final item in allItems) {
-              print(
-                'item: ${item.isFolder ? 'folder' : 'note'} sortOrder=${item.sortOrder}',
-              );
-            }
-
             final items = <Widget>[];
 
             items.add(
@@ -349,6 +427,7 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
                     allFolders: widget.allFolders,
                     allNotes: widget.allNotes,
                     depth: widget.depth + 1,
+                    forceExpanded: widget.forceExpanded, // 추가
                   ),
                 );
               } else {

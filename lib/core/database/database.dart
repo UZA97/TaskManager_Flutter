@@ -84,7 +84,12 @@ class EventTable extends Table {
   IntColumn get alarmDaysBefore => integer().withDefault(const Constant(0))();
   BoolColumn get isCompleted => boolean().withDefault(const Constant(false))();
   IntColumn get priority => integer().withDefault(const Constant(1))();
+
   TextColumn get googleEventId => text().withDefault(const Constant(''))();
+
+  TextColumn get locationName => text().nullable()();
+  RealColumn get locationLat => real().nullable()();
+  RealColumn get locationLng => real().nullable()();
 }
 
 @DriftDatabase(
@@ -102,7 +107,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3; // 2 → 3
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -131,6 +136,20 @@ class AppDatabase extends _$AppDatabase {
         ).insert(FolderTableCompanion.insert(name: '기본 폴더', createdAt: now));
         await (update(noteTable)..where((t) => t.folderId.isNull())).write(
           NoteTableCompanion(folderId: Value(defaultFolderId)),
+        );
+      }
+      if (from < 4) {
+        await m.addColumn(
+          eventTable,
+          eventTable.locationName as GeneratedColumn,
+        );
+        await m.addColumn(
+          eventTable,
+          eventTable.locationLat as GeneratedColumn,
+        );
+        await m.addColumn(
+          eventTable,
+          eventTable.locationLng as GeneratedColumn,
         );
       }
     },

@@ -1902,6 +1902,39 @@ class $EventTableTable extends EventTable
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _locationNameMeta = const VerificationMeta(
+    'locationName',
+  );
+  @override
+  late final GeneratedColumn<String> locationName = GeneratedColumn<String>(
+    'location_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _locationLatMeta = const VerificationMeta(
+    'locationLat',
+  );
+  @override
+  late final GeneratedColumn<double> locationLat = GeneratedColumn<double>(
+    'location_lat',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _locationLngMeta = const VerificationMeta(
+    'locationLng',
+  );
+  @override
+  late final GeneratedColumn<double> locationLng = GeneratedColumn<double>(
+    'location_lng',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1914,6 +1947,9 @@ class $EventTableTable extends EventTable
     isCompleted,
     priority,
     googleEventId,
+    locationName,
+    locationLat,
+    locationLng,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2000,6 +2036,33 @@ class $EventTableTable extends EventTable
         ),
       );
     }
+    if (data.containsKey('location_name')) {
+      context.handle(
+        _locationNameMeta,
+        locationName.isAcceptableOrUnknown(
+          data['location_name']!,
+          _locationNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('location_lat')) {
+      context.handle(
+        _locationLatMeta,
+        locationLat.isAcceptableOrUnknown(
+          data['location_lat']!,
+          _locationLatMeta,
+        ),
+      );
+    }
+    if (data.containsKey('location_lng')) {
+      context.handle(
+        _locationLngMeta,
+        locationLng.isAcceptableOrUnknown(
+          data['location_lng']!,
+          _locationLngMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2049,6 +2112,18 @@ class $EventTableTable extends EventTable
         DriftSqlType.string,
         data['${effectivePrefix}google_event_id'],
       )!,
+      locationName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location_name'],
+      ),
+      locationLat: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}location_lat'],
+      ),
+      locationLng: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}location_lng'],
+      ),
     );
   }
 
@@ -2069,6 +2144,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
   final bool isCompleted;
   final int priority;
   final String googleEventId;
+  final String? locationName;
+  final double? locationLat;
+  final double? locationLng;
   const EventTableData({
     required this.id,
     required this.title,
@@ -2080,6 +2158,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     required this.isCompleted,
     required this.priority,
     required this.googleEventId,
+    this.locationName,
+    this.locationLat,
+    this.locationLng,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2094,6 +2175,15 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     map['is_completed'] = Variable<bool>(isCompleted);
     map['priority'] = Variable<int>(priority);
     map['google_event_id'] = Variable<String>(googleEventId);
+    if (!nullToAbsent || locationName != null) {
+      map['location_name'] = Variable<String>(locationName);
+    }
+    if (!nullToAbsent || locationLat != null) {
+      map['location_lat'] = Variable<double>(locationLat);
+    }
+    if (!nullToAbsent || locationLng != null) {
+      map['location_lng'] = Variable<double>(locationLng);
+    }
     return map;
   }
 
@@ -2109,6 +2199,15 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       isCompleted: Value(isCompleted),
       priority: Value(priority),
       googleEventId: Value(googleEventId),
+      locationName: locationName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locationName),
+      locationLat: locationLat == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locationLat),
+      locationLng: locationLng == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locationLng),
     );
   }
 
@@ -2128,6 +2227,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       isCompleted: serializer.fromJson<bool>(json['isCompleted']),
       priority: serializer.fromJson<int>(json['priority']),
       googleEventId: serializer.fromJson<String>(json['googleEventId']),
+      locationName: serializer.fromJson<String?>(json['locationName']),
+      locationLat: serializer.fromJson<double?>(json['locationLat']),
+      locationLng: serializer.fromJson<double?>(json['locationLng']),
     );
   }
   @override
@@ -2144,6 +2246,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       'isCompleted': serializer.toJson<bool>(isCompleted),
       'priority': serializer.toJson<int>(priority),
       'googleEventId': serializer.toJson<String>(googleEventId),
+      'locationName': serializer.toJson<String?>(locationName),
+      'locationLat': serializer.toJson<double?>(locationLat),
+      'locationLng': serializer.toJson<double?>(locationLng),
     };
   }
 
@@ -2158,6 +2263,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     bool? isCompleted,
     int? priority,
     String? googleEventId,
+    Value<String?> locationName = const Value.absent(),
+    Value<double?> locationLat = const Value.absent(),
+    Value<double?> locationLng = const Value.absent(),
   }) => EventTableData(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -2169,6 +2277,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     isCompleted: isCompleted ?? this.isCompleted,
     priority: priority ?? this.priority,
     googleEventId: googleEventId ?? this.googleEventId,
+    locationName: locationName.present ? locationName.value : this.locationName,
+    locationLat: locationLat.present ? locationLat.value : this.locationLat,
+    locationLng: locationLng.present ? locationLng.value : this.locationLng,
   );
   EventTableData copyWithCompanion(EventTableCompanion data) {
     return EventTableData(
@@ -2190,6 +2301,15 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       googleEventId: data.googleEventId.present
           ? data.googleEventId.value
           : this.googleEventId,
+      locationName: data.locationName.present
+          ? data.locationName.value
+          : this.locationName,
+      locationLat: data.locationLat.present
+          ? data.locationLat.value
+          : this.locationLat,
+      locationLng: data.locationLng.present
+          ? data.locationLng.value
+          : this.locationLng,
     );
   }
 
@@ -2205,7 +2325,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           ..write('alarmDaysBefore: $alarmDaysBefore, ')
           ..write('isCompleted: $isCompleted, ')
           ..write('priority: $priority, ')
-          ..write('googleEventId: $googleEventId')
+          ..write('googleEventId: $googleEventId, ')
+          ..write('locationName: $locationName, ')
+          ..write('locationLat: $locationLat, ')
+          ..write('locationLng: $locationLng')
           ..write(')'))
         .toString();
   }
@@ -2222,6 +2345,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     isCompleted,
     priority,
     googleEventId,
+    locationName,
+    locationLat,
+    locationLng,
   );
   @override
   bool operator ==(Object other) =>
@@ -2236,7 +2362,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           other.alarmDaysBefore == this.alarmDaysBefore &&
           other.isCompleted == this.isCompleted &&
           other.priority == this.priority &&
-          other.googleEventId == this.googleEventId);
+          other.googleEventId == this.googleEventId &&
+          other.locationName == this.locationName &&
+          other.locationLat == this.locationLat &&
+          other.locationLng == this.locationLng);
 }
 
 class EventTableCompanion extends UpdateCompanion<EventTableData> {
@@ -2250,6 +2379,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
   final Value<bool> isCompleted;
   final Value<int> priority;
   final Value<String> googleEventId;
+  final Value<String?> locationName;
+  final Value<double?> locationLat;
+  final Value<double?> locationLng;
   const EventTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -2261,6 +2393,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.isCompleted = const Value.absent(),
     this.priority = const Value.absent(),
     this.googleEventId = const Value.absent(),
+    this.locationName = const Value.absent(),
+    this.locationLat = const Value.absent(),
+    this.locationLng = const Value.absent(),
   });
   EventTableCompanion.insert({
     this.id = const Value.absent(),
@@ -2273,6 +2408,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.isCompleted = const Value.absent(),
     this.priority = const Value.absent(),
     this.googleEventId = const Value.absent(),
+    this.locationName = const Value.absent(),
+    this.locationLat = const Value.absent(),
+    this.locationLng = const Value.absent(),
   }) : eventDate = Value(eventDate),
        createdAt = Value(createdAt);
   static Insertable<EventTableData> custom({
@@ -2286,6 +2424,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Expression<bool>? isCompleted,
     Expression<int>? priority,
     Expression<String>? googleEventId,
+    Expression<String>? locationName,
+    Expression<double>? locationLat,
+    Expression<double>? locationLng,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2298,6 +2439,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       if (isCompleted != null) 'is_completed': isCompleted,
       if (priority != null) 'priority': priority,
       if (googleEventId != null) 'google_event_id': googleEventId,
+      if (locationName != null) 'location_name': locationName,
+      if (locationLat != null) 'location_lat': locationLat,
+      if (locationLng != null) 'location_lng': locationLng,
     });
   }
 
@@ -2312,6 +2456,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Value<bool>? isCompleted,
     Value<int>? priority,
     Value<String>? googleEventId,
+    Value<String?>? locationName,
+    Value<double?>? locationLat,
+    Value<double?>? locationLng,
   }) {
     return EventTableCompanion(
       id: id ?? this.id,
@@ -2324,6 +2471,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       isCompleted: isCompleted ?? this.isCompleted,
       priority: priority ?? this.priority,
       googleEventId: googleEventId ?? this.googleEventId,
+      locationName: locationName ?? this.locationName,
+      locationLat: locationLat ?? this.locationLat,
+      locationLng: locationLng ?? this.locationLng,
     );
   }
 
@@ -2360,6 +2510,15 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     if (googleEventId.present) {
       map['google_event_id'] = Variable<String>(googleEventId.value);
     }
+    if (locationName.present) {
+      map['location_name'] = Variable<String>(locationName.value);
+    }
+    if (locationLat.present) {
+      map['location_lat'] = Variable<double>(locationLat.value);
+    }
+    if (locationLng.present) {
+      map['location_lng'] = Variable<double>(locationLng.value);
+    }
     return map;
   }
 
@@ -2375,7 +2534,10 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
           ..write('alarmDaysBefore: $alarmDaysBefore, ')
           ..write('isCompleted: $isCompleted, ')
           ..write('priority: $priority, ')
-          ..write('googleEventId: $googleEventId')
+          ..write('googleEventId: $googleEventId, ')
+          ..write('locationName: $locationName, ')
+          ..write('locationLat: $locationLat, ')
+          ..write('locationLng: $locationLng')
           ..write(')'))
         .toString();
   }
@@ -4406,6 +4568,9 @@ typedef $$EventTableTableCreateCompanionBuilder =
       Value<bool> isCompleted,
       Value<int> priority,
       Value<String> googleEventId,
+      Value<String?> locationName,
+      Value<double?> locationLat,
+      Value<double?> locationLng,
     });
 typedef $$EventTableTableUpdateCompanionBuilder =
     EventTableCompanion Function({
@@ -4419,6 +4584,9 @@ typedef $$EventTableTableUpdateCompanionBuilder =
       Value<bool> isCompleted,
       Value<int> priority,
       Value<String> googleEventId,
+      Value<String?> locationName,
+      Value<double?> locationLat,
+      Value<double?> locationLng,
     });
 
 class $$EventTableTableFilterComposer
@@ -4477,6 +4645,21 @@ class $$EventTableTableFilterComposer
 
   ColumnFilters<String> get googleEventId => $composableBuilder(
     column: $table.googleEventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get locationName => $composableBuilder(
+    column: $table.locationName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get locationLat => $composableBuilder(
+    column: $table.locationLat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get locationLng => $composableBuilder(
+    column: $table.locationLng,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4539,6 +4722,21 @@ class $$EventTableTableOrderingComposer
     column: $table.googleEventId,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get locationName => $composableBuilder(
+    column: $table.locationName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get locationLat => $composableBuilder(
+    column: $table.locationLat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get locationLng => $composableBuilder(
+    column: $table.locationLng,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EventTableTableAnnotationComposer
@@ -4587,6 +4785,21 @@ class $$EventTableTableAnnotationComposer
     column: $table.googleEventId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get locationName => $composableBuilder(
+    column: $table.locationName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get locationLat => $composableBuilder(
+    column: $table.locationLat,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get locationLng => $composableBuilder(
+    column: $table.locationLng,
+    builder: (column) => column,
+  );
 }
 
 class $$EventTableTableTableManager
@@ -4630,6 +4843,9 @@ class $$EventTableTableTableManager
                 Value<bool> isCompleted = const Value.absent(),
                 Value<int> priority = const Value.absent(),
                 Value<String> googleEventId = const Value.absent(),
+                Value<String?> locationName = const Value.absent(),
+                Value<double?> locationLat = const Value.absent(),
+                Value<double?> locationLng = const Value.absent(),
               }) => EventTableCompanion(
                 id: id,
                 title: title,
@@ -4641,6 +4857,9 @@ class $$EventTableTableTableManager
                 isCompleted: isCompleted,
                 priority: priority,
                 googleEventId: googleEventId,
+                locationName: locationName,
+                locationLat: locationLat,
+                locationLng: locationLng,
               ),
           createCompanionCallback:
               ({
@@ -4654,6 +4873,9 @@ class $$EventTableTableTableManager
                 Value<bool> isCompleted = const Value.absent(),
                 Value<int> priority = const Value.absent(),
                 Value<String> googleEventId = const Value.absent(),
+                Value<String?> locationName = const Value.absent(),
+                Value<double?> locationLat = const Value.absent(),
+                Value<double?> locationLng = const Value.absent(),
               }) => EventTableCompanion.insert(
                 id: id,
                 title: title,
@@ -4665,6 +4887,9 @@ class $$EventTableTableTableManager
                 isCompleted: isCompleted,
                 priority: priority,
                 googleEventId: googleEventId,
+                locationName: locationName,
+                locationLat: locationLat,
+                locationLng: locationLng,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

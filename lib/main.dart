@@ -12,6 +12,9 @@ import 'features/mail/services/mail_check_service.dart';
 import 'features/settings/views/settings_view.dart';
 import 'features/mail/views/mail_list_view.dart';
 import 'features/mail/views/mail_detail_view.dart';
+import 'features/map/views/map_view.dart';
+import 'features/map/views/map_sidebar_view.dart';
+import 'core/providers/navigation_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,15 +56,14 @@ class TaskManagerApp extends StatelessWidget {
   }
 }
 
-class MainShell extends StatefulWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> with WindowListener {
-  int _selectedIndex = 0;
+class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   final _trayService = TrayService();
 
   @override
@@ -118,9 +120,9 @@ class _MainShellState extends State<MainShell> with WindowListener {
         children: [
           NavigationRail(
             backgroundColor: const Color(0xFF2C2C2C),
-            selectedIndex: _selectedIndex,
+            selectedIndex: ref.watch(navigationProvider),
             onDestinationSelected: (index) {
-              setState(() => _selectedIndex = index);
+              ref.read(navigationProvider.notifier).navigateTo(index);
             },
             labelType: NavigationRailLabelType.none,
             destinations: const [
@@ -143,6 +145,11 @@ class _MainShellState extends State<MainShell> with WindowListener {
                 label: Text('메일'),
               ),
               NavigationRailDestination(
+                icon: Icon(Icons.map, color: Colors.white),
+                selectedIcon: Icon(Icons.map, color: Color(0xFF4A90E2)),
+                label: Text('지도'),
+              ),
+              NavigationRailDestination(
                 icon: Icon(Icons.settings, color: Colors.white),
                 selectedIcon: Icon(Icons.settings, color: Color(0xFF4A90E2)),
                 label: Text('설정'),
@@ -153,24 +160,26 @@ class _MainShellState extends State<MainShell> with WindowListener {
             width: 250,
             color: const Color(0xFFF5F5F5),
             child: IndexedStack(
-              index: _selectedIndex,
+              index: ref.watch(navigationProvider),
               children: const [
                 MemoListView(), // 0: 메모
                 CalendarView(), // 1: 캘린더
-                MailListView(), // 2: 메일 (좌측 빈칸)
-                SettingsView(), // 3: 설정
+                MailListView(), // 2: 메일
+                MapSidebarView(), // 3: 지도 (새로 만들 거)
+                SettingsView(), // 4: 설정
               ],
             ),
           ),
           const VerticalDivider(width: 1, color: Color(0xFFDDDDDD)),
           Expanded(
             child: IndexedStack(
-              index: _selectedIndex,
+              index: ref.watch(navigationProvider),
               children: const [
                 MemoEditorView(), // 0: 메모
                 CalendarEditorView(), // 1: 캘린더
                 MailDetailView(), // 2: 메일
-                SizedBox(), // 3: 설정 우측 빈칸
+                MapView(), // 3: 지도 (새로 만들 거)
+                SizedBox(), // 4: 설정
               ],
             ),
           ),

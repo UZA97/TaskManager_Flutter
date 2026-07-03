@@ -46,6 +46,9 @@ class EventRepository {
             isCompleted: Value(event.isCompleted),
             priority: Value(event.priority),
             googleEventId: Value(event.googleEventId ?? ''),
+            locationName: Value(event.locationName),
+            locationLat: Value(event.locationLat),
+            locationLng: Value(event.locationLng),
           ),
         );
   }
@@ -95,6 +98,9 @@ class EventRepository {
       isCompleted: row.isCompleted,
       priority: row.priority,
       googleEventId: row.googleEventId.isEmpty ? null : row.googleEventId,
+      locationName: row.locationName,
+      locationLat: row.locationLat,
+      locationLng: row.locationLng,
     );
   }
 }

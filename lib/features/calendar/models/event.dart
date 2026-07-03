@@ -1,3 +1,5 @@
+import 'package:drift/drift.dart';
+
 class Event {
   final int? id;
   final String title;
@@ -9,6 +11,9 @@ class Event {
   final bool isCompleted;
   final int priority;
   final String? googleEventId;
+  final String? locationName;
+  final double? locationLat;
+  final double? locationLng;
 
   const Event({
     this.id,
@@ -21,6 +26,9 @@ class Event {
     this.isCompleted = false,
     this.priority = 1,
     this.googleEventId,
+    this.locationName,
+    this.locationLat,
+    this.locationLng,
   });
 
   Event copyWith({
@@ -34,6 +42,10 @@ class Event {
     bool? isCompleted,
     int? priority,
     String? googleEventId,
+    // 위치 필드만 Value<T> 패턴
+    Value<String?> locationName = const Value.absent(),
+    Value<double?> locationLat = const Value.absent(),
+    Value<double?> locationLng = const Value.absent(),
   }) {
     return Event(
       id: id ?? this.id,
@@ -46,6 +58,11 @@ class Event {
       isCompleted: isCompleted ?? this.isCompleted,
       priority: priority ?? this.priority,
       googleEventId: googleEventId ?? this.googleEventId,
+      locationName: locationName.present
+          ? locationName.value
+          : this.locationName,
+      locationLat: locationLat.present ? locationLat.value : this.locationLat,
+      locationLng: locationLng.present ? locationLng.value : this.locationLng,
     );
   }
 }

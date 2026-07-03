@@ -12,7 +12,7 @@ import '../models/note.dart';
 import '../providers/note_provider.dart';
 import '../widgets/local_image_block.dart';
 import '../widgets/local_file_block.dart';
-import 'package:pasteboard/pasteboard.dart';
+import '../widgets/local_location_block.dart';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -22,7 +22,6 @@ class MemoEditorView extends ConsumerStatefulWidget {
 }
 
 class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
-  Selection? _lastSelection;
   EditorState? _editorState;
   Note? _currentNote;
   final _titleController = TextEditingController();
@@ -58,10 +57,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     } else {
       editorState = EditorState.blank();
     }
-    editorState.selectionNotifier.addListener(() {
-      final sel = editorState.selection;
-      if (sel != null) _lastSelection = sel;
-    });
+
     editorState.transactionStream.listen((_) => _onContentChanged());
 
     setState(() => _editorState = editorState);
@@ -103,20 +99,14 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final editorState = _editorState;
     if (editorState == null) return;
 
-    final selection = editorState.selection ?? _lastSelection;
+    final selection = editorState.selection;
     if (selection == null) return;
 
-    final nodes = editorState.getNodesInSelection(selection);
-    if (nodes.isEmpty) return;
+    final node = editorState.getNodeAtPath(selection.end.path);
+    if (node == null) return;
 
     final transaction = editorState.transaction;
-    for (final node in nodes) {
-      transaction.updateNode(node, {
-        ...node.attributes,
-        'align': align, // text_align → align
-      });
-    }
-    transaction.afterSelection = selection;
+    transaction.updateNode(node, {...node.attributes, 'text_align': align});
     editorState.apply(transaction);
   }
 
@@ -132,13 +122,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final transaction = editorState.transaction;
     transaction.insertNode(insertPath, node);
     editorState.apply(transaction);
-
-    // 삽입한 노드 바로 이전 path로 selection 복원
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      editorState.selection = Selection.collapsed(
-        Position(path: selection?.end.path ?? insertPath, offset: 0),
-      );
-    });
   }
 
   Future<void> _processFile(String srcPath) async {
@@ -254,73 +237,48 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       return KeyEventResult.handled;
     },
   );
+  // Backspace 핸들러 — local_image / local_file 블록일 때 삭제 다이얼로그
+  void _handlePasteImage(EditorState editorState) async {
+    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+    if (clipboardData?.text == null) return;
 
-  void _handlePasteImage(EditorState editorState, Uint8List imageBytes) async {
-    if (_currentNote == null) return;
+    final imagePath = clipboardData!.text!.trim();
 
-    final appDir = await getApplicationSupportDirectory();
-    final tempPath =
-        '${appDir.path}\\temp_${DateTime.now().millisecondsSinceEpoch}.png';
-    final tempFile = File(tempPath);
-    await tempFile.writeAsBytes(imageBytes);
+    if (!_isImage(imagePath)) return;
 
-    final destPath = await _copyToAppDir(tempPath);
-    await tempFile.delete();
+    final file = File(imagePath);
+    if (!file.existsSync()) return;
 
     final selection = editorState.selection;
     if (selection == null) return;
 
     final path = selection.end.path;
-    final transaction = editorState.transaction;
-    transaction.insertNode(path.next, localImageNode(src: destPath));
-    editorState.apply(transaction);
+    final node = editorState.getNodeAtPath(path);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      editorState.selection = Selection.collapsed(
-        Position(path: path, offset: 0),
-      );
-    });
+    if (node != null && node.type == 'paragraph') {
+      final transaction = editorState.transaction;
+      transaction.deleteNode(node);
+      transaction.insertNode(path, localImageNode(src: imagePath));
+      transaction.insertNode([
+        ...path.sublist(0, path.length - 1),
+        path.last + 1,
+      ], Node(type: 'paragraph'));
+      editorState.apply(transaction);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        editorState.selection = Selection.collapsed(
+          Position(path: [...path.sublist(0, path.length - 1), path.last + 1]),
+        );
+      });
+    }
   }
 
   late final _pasteHandler = CommandShortcutEvent(
     key: 'paste local image',
-    getDescription: () => 'Paste image or text',
+    getDescription: () => 'Paste local image from clipboard',
     command: 'ctrl+v',
     handler: (editorState) {
-      Pasteboard.image.then((imageBytes) {
-        if (imageBytes != null) {
-          _handlePasteImage(editorState, imageBytes);
-        } else {
-          // 파일로 복사된 이미지 확인
-          Pasteboard.files().then((files) {
-            if (files.isNotEmpty) {
-              final imagePath = files.first;
-              final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
-                  .contains(
-                    imagePath.split('.').last.toLowerCase().contains('.')
-                        ? imagePath.split('.').last.toLowerCase()
-                        : '.${imagePath.split('.').last.toLowerCase()}',
-                  );
-              if (isImage) {
-                final file = File(imagePath);
-                file.readAsBytes().then(
-                  (bytes) => _handlePasteImage(editorState, bytes),
-                );
-              } else {
-                final pasteCommand = standardCommandShortcutEvents.firstWhere(
-                  (e) => e.command == 'ctrl+v',
-                );
-                pasteCommand.handler(editorState);
-              }
-            } else {
-              final pasteCommand = standardCommandShortcutEvents.firstWhere(
-                (e) => e.command == 'ctrl+v',
-              );
-              pasteCommand.handler(editorState);
-            }
-          });
-        }
-      });
+      _handlePasteImage(editorState);
       return KeyEventResult.handled;
     },
   );
@@ -419,6 +377,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       'image': LocalImageBlockComponentBuilder(),
       localImageType: LocalImageBlockComponentBuilder(),
       localFileType: LocalFileBlockComponentBuilder(),
+      localLocationType: LocalLocationBlockComponentBuilder(),
     };
   }
 
@@ -447,7 +406,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
 
     final standardPaste = standardCommandShortcutEvents
-        .where((e) => e.command != 'ctrl+v')
+        .where((e) => e.key != 'paste' && e.command != 'ctrl+v')
         .toList();
 
     final shortcutEvents = [
@@ -456,9 +415,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _deleteHandler,
       _moveUpHandler,
       _moveDownHandler,
-      _alignLeftHandler,
-      _alignCenterHandler,
-      _alignRightHandler,
       ...standardPaste,
     ];
 
