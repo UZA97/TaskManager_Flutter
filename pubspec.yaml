@@ -58,6 +58,8 @@ dependencies:
   # provider (appflowy_editor 내부 사용)
   provider: ^6.1.2
 
+  flutter_highlight: ^0.7.0
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
