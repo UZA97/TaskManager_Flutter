@@ -59,6 +59,7 @@ dependencies:
   provider: ^6.1.2
 
   flutter_highlight: ^0.7.0
+  highlight: ^0.7.0
   
 dev_dependencies:
   flutter_test:

@@ -13,9 +13,11 @@ import '../providers/note_provider.dart';
 import '../widgets/local_image_block.dart';
 import '../widgets/local_file_block.dart';
 import '../widgets/local_location_block.dart';
+import '../widgets/local_code_block.dart';
 import '../../map/services/vworld_service.dart';
 import '../../map/model/search_type.dart';
 import '../../map/widgets/location_search_dialog.dart';
+import 'package:pasteboard/pasteboard.dart';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -39,6 +41,27 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     handler: (editorState, menuService, context) {
       menuService.dismiss();
       _showLocationSearchDialog(editorState);
+    },
+  );
+
+  SelectionMenuItem get _codeMenuItem => SelectionMenuItem(
+    getName: () => '코드',
+    icon: (editorState, isSelected, style) =>
+        const Icon(Icons.code, size: 18, color: Colors.grey),
+    keywords: ['코드', 'code', '코드블록'],
+    handler: (editorState, _, __) {
+      insertNodeAfterSelection(editorState, localCodeNode());
+    },
+  );
+
+  SelectionMenuItem get _fileMenuItem => SelectionMenuItem(
+    getName: () => '파일',
+    icon: (editorState, isSelected, style) =>
+        const Icon(Icons.attach_file, size: 18, color: Colors.grey),
+    keywords: ['파일', 'file', '첨부'],
+    handler: (editorState, menuService, context) {
+      menuService.dismiss();
+      _pickFile();
     },
   );
 
@@ -87,8 +110,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
 
     editorState.selectionMenuItems = [
-      ...standardSelectionMenuItems,
+      ...standardSelectionMenuItems.where((e) => !e.keywords.contains('image')),
       _locationMenuItem,
+      _codeMenuItem,
+      _fileMenuItem,
     ];
     editorState.transactionStream.listen((_) => _onContentChanged());
     setState(() => _editorState = editorState);
@@ -137,7 +162,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     if (node == null) return;
 
     final transaction = editorState.transaction;
-    transaction.updateNode(node, {...node.attributes, 'text_align': align});
+    transaction.updateNode(node, {
+      ...node.attributes,
+      'align': align,
+    }); // text_align → align
     editorState.apply(transaction);
   }
 
@@ -270,11 +298,26 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   );
   // Backspace 핸들러 — local_image / local_file 블록일 때 삭제 다이얼로그
   void _handlePasteImage(EditorState editorState) async {
+    // 1. 먼저 이미지 바이트 확인 (캡처 도구 등)
+    final imageBytes = await Pasteboard.image;
+    if (imageBytes != null) {
+      // 임시 파일로 저장
+      final appDir = await getApplicationSupportDirectory();
+      final tempDir = Directory('${appDir.path}\\Temp');
+      await tempDir.create(recursive: true);
+      final tempFile = File(
+        '${tempDir.path}\\paste_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await tempFile.writeAsBytes(imageBytes);
+      _insertAtCursor(localImageNode(src: tempFile.path));
+      return;
+    }
+
+    // 2. 텍스트 경로 확인 (파일 경로 복사)
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     if (clipboardData?.text == null) return;
 
     final imagePath = clipboardData!.text!.trim();
-
     if (!_isImage(imagePath)) return;
 
     final file = File(imagePath);
@@ -283,24 +326,19 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final selection = editorState.selection;
     if (selection == null) return;
 
-    final path = selection.end.path;
-    final node = editorState.getNodeAtPath(path);
-
-    if (node != null && node.type == 'paragraph') {
+    final pathNode = editorState.getNodeAtPath(selection.end.path);
+    if (pathNode != null && pathNode.type == 'paragraph') {
       final transaction = editorState.transaction;
-      transaction.deleteNode(node);
-      transaction.insertNode(path, localImageNode(src: imagePath));
+      transaction.deleteNode(pathNode);
+      transaction.insertNode(
+        selection.end.path,
+        localImageNode(src: imagePath),
+      );
       transaction.insertNode([
-        ...path.sublist(0, path.length - 1),
-        path.last + 1,
+        ...selection.end.path.sublist(0, selection.end.path.length - 1),
+        selection.end.path.last + 1,
       ], Node(type: 'paragraph'));
       editorState.apply(transaction);
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        editorState.selection = Selection.collapsed(
-          Position(path: [...path.sublist(0, path.length - 1), path.last + 1]),
-        );
-      });
     }
   }
 
@@ -309,8 +347,18 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     getDescription: () => 'Paste local image from clipboard',
     command: 'ctrl+v',
     handler: (editorState) {
+      // 코드 블록 편집 중이면 TextField가 처리하도록 통과
+      final selection = editorState.selection;
+      if (selection != null) {
+        final node = editorState.getNodeAtPath(selection.end.path);
+        if (node?.type == localCodeType) {
+          return KeyEventResult.ignored;
+        }
+      }
+
+      // 이미지/텍스트 처리
       _handlePasteImage(editorState);
-      return KeyEventResult.handled;
+      return KeyEventResult.ignored;
     },
   );
 
@@ -319,6 +367,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     getDescription: () => 'Align left',
     command: 'ctrl+shift+l',
     handler: (editorState) {
+      print('align left 실행됨'); // ← 추가
       _setTextAlign('left');
       return KeyEventResult.handled;
     },
@@ -329,6 +378,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     getDescription: () => 'Align center',
     command: 'ctrl+shift+c',
     handler: (editorState) {
+      print('align center 실행됨'); // ← 추가
       _setTextAlign('center');
       return KeyEventResult.handled;
     },
@@ -409,6 +459,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       localImageType: LocalImageBlockComponentBuilder(),
       localFileType: LocalFileBlockComponentBuilder(),
       localLocationType: LocalLocationBlockComponentBuilder(),
+      localCodeType: LocalCodeBlockComponentBuilder(),
     };
   }
 
@@ -437,7 +488,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
 
     final standardPaste = standardCommandShortcutEvents
-        .where((e) => e.key != 'paste' && e.command != 'ctrl+v')
+        .where(
+          (e) =>
+              e.key != 'paste the content' &&
+              e.key != 'paste the content as plain text',
+        )
         .toList();
 
     final shortcutEvents = [
@@ -447,6 +502,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _moveUpHandler,
       _moveDownHandler,
       ...standardPaste,
+      pasteCommand, // 표준 붙여넣기 다시 추가
+      pasteTextWithoutFormattingCommand,
+      _alignLeftHandler,
+      _alignCenterHandler,
+      _alignRightHandler,
     ];
 
     return DropTarget(
@@ -487,8 +547,12 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                     commandShortcutEvents: shortcutEvents,
                     characterShortcutEvents: [
                       customSlashCommand([
-                        ...standardSelectionMenuItems,
+                        ...standardSelectionMenuItems.where(
+                          (e) => !e.keywords.contains('image'),
+                        ),
                         _locationMenuItem,
+                        _codeMenuItem,
+                        _fileMenuItem,
                       ]),
                       ...standardCharacterShortcutEvents.where(
                         (e) => e.key != 'show the slash menu',
