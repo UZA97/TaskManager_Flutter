@@ -7,21 +7,21 @@ import 'package:provider/provider.dart';
 const localImageType = 'local_image';
 
 Node localImageNode({required String src, double width = 300}) {
-  return Node(
-    type: localImageType,
-    attributes: {'src': src, 'width': width},
-  );
+  return Node(type: localImageType, attributes: {'src': src, 'width': width});
 }
 
 class LocalImageBlockComponentBuilder extends BlockComponentBuilder {
   LocalImageBlockComponentBuilder()
-      : super(
+    : super(
         configuration: BlockComponentConfiguration(
           padding: (_) => EdgeInsets.zero,
         ),
       ) {
     validate = (node) => node.type == localImageType;
   }
+
+  @override
+  Position end(Node node) => Position(path: node.path, offset: 1); // ← 추가
 
   @override
   BlockComponentWidget build(BlockComponentContext blockComponentContext) {
@@ -59,11 +59,7 @@ class _ImageMenuButtonState extends State<_ImageMenuButton> {
           color: Colors.black.withOpacity(0.6),
           borderRadius: BorderRadius.circular(4),
         ),
-        child: const Icon(
-          Icons.menu,
-          color: Colors.white,
-          size: 16,
-        ),
+        child: const Icon(Icons.menu, color: Colors.white, size: 16),
       ),
     );
   }
@@ -156,14 +152,16 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
     if (!file.existsSync()) return;
 
     final image = Image.file(file);
-    image.image.resolve(const ImageConfiguration()).addListener(
-      ImageStreamListener((info, _) {
-        if (!mounted) return;
-        final w = info.image.width.toDouble();
-        final h = info.image.height.toDouble();
-        if (h > 0) setState(() => _aspectRatio = w / h);
-      }),
-    );
+    image.image
+        .resolve(const ImageConfiguration())
+        .addListener(
+          ImageStreamListener((info, _) {
+            if (!mounted) return;
+            final w = info.image.width.toDouble();
+            final h = info.image.height.toDouble();
+            if (h > 0) setState(() => _aspectRatio = w / h);
+          }),
+        );
   }
 
   void _saveWidth(double newWidth) {
@@ -324,8 +322,10 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                           final deltaY = e.position.dy - _dragStartY;
                           final delta = (deltaX + deltaY) / 2;
                           setState(() {
-                            _width =
-                                (_dragStartWidth + delta).clamp(100.0, 800.0);
+                            _width = (_dragStartWidth + delta).clamp(
+                              100.0,
+                              800.0,
+                            );
                           });
                         },
                         onPointerUp: (_) {

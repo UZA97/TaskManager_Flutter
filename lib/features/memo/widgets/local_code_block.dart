@@ -26,6 +26,9 @@ class LocalCodeBlockComponentBuilder extends BlockComponentBuilder {
   }
 
   @override
+  Position end(Node node) => Position(path: node.path, offset: 1); // ← 추가
+
+  @override
   BlockComponentWidget build(BlockComponentContext blockComponentContext) {
     return LocalCodeBlockWidget(
       key: blockComponentContext.node.key,
