@@ -34,6 +34,9 @@ class LocalCodeBlockComponentBuilder extends BlockComponentBuilder {
       key: blockComponentContext.node.key,
       node: blockComponentContext.node,
       configuration: configuration,
+      showActions: showActions(blockComponentContext.node), // ← 추가
+      actionBuilder: (context, state) =>
+          actionBuilder(blockComponentContext, state), // ← 추가
     );
   }
 }
@@ -43,13 +46,85 @@ class LocalCodeBlockWidget extends BlockComponentStatefulWidget {
     super.key,
     required super.node,
     required super.configuration,
+    super.showActions,
+    super.actionBuilder,
   });
 
   @override
   State<LocalCodeBlockWidget> createState() => _LocalCodeBlockWidgetState();
 }
 
-class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget> {
+class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget>
+    with SelectableMixin, BlockComponentConfigurable {
+  @override
+  BlockComponentConfiguration get configuration => widget.configuration;
+
+  @override
+  Node get node => widget.node;
+  @override
+  Position start() => Position(path: widget.node.path, offset: 0);
+
+  @override
+  Position end() => Position(path: widget.node.path, offset: 1);
+
+  @override
+  Position getPositionInOffset(Offset start) => end();
+  @override
+  bool get shouldCursorBlink => false;
+
+  @override
+  CursorStyle get cursorStyle => CursorStyle.cover;
+
+  @override
+  Rect getBlockRect({bool shiftWithBaseOffset = false}) {
+    return getRectsInSelection(Selection.invalid()).first;
+  }
+
+  @override
+  Rect? getCursorRectInPosition(
+    Position position, {
+    bool shiftWithBaseOffset = false,
+  }) {
+    if (_renderBox == null) return null;
+    return getRectsInSelection(
+      Selection.collapsed(position),
+      shiftWithBaseOffset: shiftWithBaseOffset,
+    ).firstOrNull;
+  }
+
+  @override
+  List<Rect> getRectsInSelection(
+    Selection selection, {
+    bool shiftWithBaseOffset = false,
+  }) {
+    if (_renderBox == null) return [];
+    final parentBox = context.findRenderObject();
+    final blockBox = _blockKey.currentContext?.findRenderObject();
+    if (parentBox is RenderBox && blockBox is RenderBox) {
+      return [
+        (shiftWithBaseOffset
+                ? blockBox.localToGlobal(Offset.zero, ancestor: parentBox)
+                : Offset.zero) &
+            blockBox.size,
+      ];
+    }
+    return [Offset.zero & _renderBox!.size];
+  }
+
+  @override
+  Selection getSelectionInRange(Offset start, Offset end) =>
+      Selection.single(path: widget.node.path, startOffset: 0, endOffset: 1);
+
+  @override
+  Offset localToGlobal(Offset offset, {bool shiftWithBaseOffset = false}) =>
+      _renderBox!.localToGlobal(offset);
+
+  @override
+  TextDirection textDirection() => TextDirection.ltr;
+
+  final _blockKey = GlobalKey();
+  RenderBox? get _renderBox => context.findRenderObject() as RenderBox?;
+
   late TextEditingController _controller;
   String get _code => widget.node.attributes['code'] as String? ?? '';
   String get _language =>
@@ -136,12 +211,15 @@ class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final editorState = context.read<EditorState>();
+
+    Widget child = Padding(
+      key: _blockKey,
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: GestureDetector(
         onTap: () => setState(() => _isEditing = true),
         onSecondaryTap: _showDeleteDialog,
-        behavior: HitTestBehavior.translucent, // ← 추가
+        behavior: HitTestBehavior.translucent,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
@@ -154,7 +232,6 @@ class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 헤더
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -190,8 +267,6 @@ class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget> {
                   ],
                 ),
               ),
-
-              // 편집 모드
               if (_isEditing)
                 TextField(
                   controller: _controller,
@@ -203,7 +278,6 @@ class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget> {
                   ),
                   onChanged: _saveCode,
                 )
-              // 뷰 모드
               else
                 _code.isEmpty
                     ? const Padding(
@@ -227,10 +301,36 @@ class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget> {
                           fontSize: 13,
                         ),
                       ),
-            ], // ← Column children 닫기
+            ],
           ),
         ),
       ),
     );
+
+    child = BlockSelectionContainer(
+      node: node,
+      delegate: this,
+      listenable: editorState.selectionNotifier,
+      remoteSelection: editorState.remoteSelections,
+      blockColor: editorState.editorStyle.selectionColor,
+      cursorColor: editorState.editorStyle.cursorColor,
+      selectionColor: editorState.editorStyle.selectionColor,
+      supportTypes: const [
+        BlockSelectionType.block,
+        BlockSelectionType.cursor,
+        BlockSelectionType.selection,
+      ],
+      child: child,
+    );
+
+    if (widget.showActions && widget.actionBuilder != null) {
+      child = BlockComponentActionWrapper(
+        node: node,
+        actionBuilder: widget.actionBuilder!,
+        child: child,
+      );
+    }
+
+    return child;
   }
 }

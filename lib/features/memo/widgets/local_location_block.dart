@@ -39,6 +39,9 @@ class LocalLocationBlockComponentBuilder extends BlockComponentBuilder {
       key: blockComponentContext.node.key,
       node: blockComponentContext.node,
       configuration: configuration,
+      showActions: showActions(blockComponentContext.node), // ← 추가
+      actionBuilder: (context, state) =>
+          actionBuilder(blockComponentContext, state), // ← 추가
     );
   }
 }
@@ -48,6 +51,8 @@ class LocalLocationBlockWidget extends BlockComponentStatefulWidget {
     super.key,
     required super.node,
     required super.configuration,
+    required super.showActions,
+    required super.actionBuilder,
   });
 
   @override
@@ -55,7 +60,79 @@ class LocalLocationBlockWidget extends BlockComponentStatefulWidget {
       _LocalLocationBlockWidgetState();
 }
 
-class _LocalLocationBlockWidgetState extends State<LocalLocationBlockWidget> {
+class _LocalLocationBlockWidgetState extends State<LocalLocationBlockWidget>
+    with SelectableMixin, BlockComponentConfigurable {
+  @override
+  BlockComponentConfiguration get configuration => widget.configuration;
+
+  @override
+  Node get node => widget.node;
+
+  final _blockKey = GlobalKey();
+  RenderBox? get _renderBox => context.findRenderObject() as RenderBox?;
+
+  @override
+  Position start() => Position(path: widget.node.path, offset: 0);
+
+  @override
+  Position end() => Position(path: widget.node.path, offset: 1);
+
+  @override
+  Position getPositionInOffset(Offset start) => end();
+
+  @override
+  bool get shouldCursorBlink => false;
+
+  @override
+  CursorStyle get cursorStyle => CursorStyle.cover;
+
+  @override
+  Rect getBlockRect({bool shiftWithBaseOffset = false}) {
+    return getRectsInSelection(Selection.invalid()).first;
+  }
+
+  @override
+  Rect? getCursorRectInPosition(
+    Position position, {
+    bool shiftWithBaseOffset = false,
+  }) {
+    if (_renderBox == null) return null;
+    return getRectsInSelection(
+      Selection.collapsed(position),
+      shiftWithBaseOffset: shiftWithBaseOffset,
+    ).firstOrNull;
+  }
+
+  @override
+  List<Rect> getRectsInSelection(
+    Selection selection, {
+    bool shiftWithBaseOffset = false,
+  }) {
+    if (_renderBox == null) return [];
+    final parentBox = context.findRenderObject();
+    final blockBox = _blockKey.currentContext?.findRenderObject();
+    if (parentBox is RenderBox && blockBox is RenderBox) {
+      return [
+        (shiftWithBaseOffset
+                ? blockBox.localToGlobal(Offset.zero, ancestor: parentBox)
+                : Offset.zero) &
+            blockBox.size,
+      ];
+    }
+    return [Offset.zero & _renderBox!.size];
+  }
+
+  @override
+  Selection getSelectionInRange(Offset start, Offset end) =>
+      Selection.single(path: widget.node.path, startOffset: 0, endOffset: 1);
+
+  @override
+  Offset localToGlobal(Offset offset, {bool shiftWithBaseOffset = false}) =>
+      _renderBox!.localToGlobal(offset);
+
+  @override
+  TextDirection textDirection() => TextDirection.ltr;
+
   String get _name => widget.node.attributes['name'] as String;
   double get _lat => (widget.node.attributes['lat'] as num).toDouble();
   double get _lng => (widget.node.attributes['lng'] as num).toDouble();
@@ -104,6 +181,7 @@ class _LocalLocationBlockWidgetState extends State<LocalLocationBlockWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final editorState = context.read<EditorState>();
     final imageUrl = VworldService.staticImageUrl(
       lat: _lat,
       lng: _lng,
@@ -111,7 +189,7 @@ class _LocalLocationBlockWidgetState extends State<LocalLocationBlockWidget> {
       height: 150,
     );
 
-    return GestureDetector(
+    Widget child = GestureDetector(
       onTap: _onTap,
       onSecondaryTap: _showDeleteDialog,
       child: Padding(
@@ -162,5 +240,28 @@ class _LocalLocationBlockWidgetState extends State<LocalLocationBlockWidget> {
         ),
       ),
     );
+    child = BlockSelectionContainer(
+      node: node,
+      delegate: this,
+      listenable: editorState.selectionNotifier,
+      remoteSelection: editorState.remoteSelections,
+      blockColor: editorState.editorStyle.selectionColor,
+      cursorColor: editorState.editorStyle.cursorColor,
+      selectionColor: editorState.editorStyle.selectionColor,
+      supportTypes: const [
+        BlockSelectionType.block,
+        BlockSelectionType.cursor,
+        BlockSelectionType.selection,
+      ],
+      child: child,
+    );
+    if (widget.showActions && widget.actionBuilder != null) {
+      child = BlockComponentActionWrapper(
+        node: node,
+        actionBuilder: widget.actionBuilder!,
+        child: child,
+      );
+    }
+    return child;
   }
 }

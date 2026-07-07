@@ -29,6 +29,9 @@ class LocalImageBlockComponentBuilder extends BlockComponentBuilder {
       key: blockComponentContext.node.key,
       node: blockComponentContext.node,
       configuration: configuration,
+      showActions: showActions(blockComponentContext.node), // ← 추가
+      actionBuilder: (context, state) =>
+          actionBuilder(blockComponentContext, state), // ← 추가
     );
   }
 }
@@ -118,13 +121,87 @@ class LocalImageBlockWidget extends BlockComponentStatefulWidget {
     super.key,
     required super.node,
     required super.configuration,
+    super.showActions,
+    super.actionBuilder,
   });
 
   @override
   State<LocalImageBlockWidget> createState() => _LocalImageBlockWidgetState();
 }
 
-class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
+class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget>
+    with SelectableMixin, BlockComponentConfigurable {
+  @override
+  BlockComponentConfiguration get configuration => widget.configuration;
+
+  @override
+  Node get node => widget.node;
+
+  final _blockKey = GlobalKey();
+  RenderBox? get _renderBox => context.findRenderObject() as RenderBox?;
+
+  @override
+  Position start() => Position(path: widget.node.path, offset: 0);
+
+  @override
+  Position end() => Position(path: widget.node.path, offset: 1);
+
+  @override
+  Position getPositionInOffset(Offset start) => end();
+
+  @override
+  bool get shouldCursorBlink => false;
+
+  @override
+  CursorStyle get cursorStyle => CursorStyle.cover;
+
+  @override
+  Rect getBlockRect({bool shiftWithBaseOffset = false}) {
+    return getRectsInSelection(Selection.invalid()).first;
+  }
+
+  @override
+  Rect? getCursorRectInPosition(
+    Position position, {
+    bool shiftWithBaseOffset = false,
+  }) {
+    if (_renderBox == null) return null;
+    return getRectsInSelection(
+      Selection.collapsed(position),
+      shiftWithBaseOffset: shiftWithBaseOffset,
+    ).firstOrNull;
+  }
+
+  @override
+  List<Rect> getRectsInSelection(
+    Selection selection, {
+    bool shiftWithBaseOffset = false,
+  }) {
+    if (_renderBox == null) return [];
+    final parentBox = context.findRenderObject();
+    final blockBox = _blockKey.currentContext?.findRenderObject();
+    if (parentBox is RenderBox && blockBox is RenderBox) {
+      return [
+        (shiftWithBaseOffset
+                ? blockBox.localToGlobal(Offset.zero, ancestor: parentBox)
+                : Offset.zero) &
+            blockBox.size,
+      ];
+    }
+    return [Offset.zero & _renderBox!.size];
+  }
+
+  @override
+  Selection getSelectionInRange(Offset start, Offset end) =>
+      Selection.single(path: widget.node.path, startOffset: 0, endOffset: 1);
+
+  @override
+  Offset localToGlobal(Offset offset, {bool shiftWithBaseOffset = false}) =>
+      _renderBox!.localToGlobal(offset);
+
+  @override
+  TextDirection textDirection() => TextDirection.ltr;
+
   late double _width;
   double? _aspectRatio;
   bool _isSelected = false;
@@ -238,8 +315,9 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
   @override
   Widget build(BuildContext context) {
     final src = _imageSrc;
+    final editorState = context.read<EditorState>();
 
-    return TapRegion(
+    Widget child = TapRegion(
       onTapOutside: (_) {
         if (!_isDragging && _isSelected) {
           setState(() => _isSelected = false);
@@ -255,7 +333,6 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                // 이미지 + 탭 감지
                 Positioned.fill(
                   child: GestureDetector(
                     onTap: () => setState(() => _isSelected = true),
@@ -273,8 +350,6 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                     ),
                   ),
                 ),
-
-                // 선택 테두리
                 if (_isSelected)
                   Positioned.fill(
                     child: IgnorePointer(
@@ -289,8 +364,6 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                       ),
                     ),
                   ),
-
-                // 우측 상단 햄버거 메뉴
                 if (_isSelected)
                   Positioned(
                     top: 8,
@@ -301,8 +374,6 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
                       onDelete: _showDeleteDialog,
                     ),
                   ),
-
-                // 우측 하단 리사이즈 핸들 — 별도 GestureDetector
                 if (_isSelected)
                   Positioned(
                     right: 0,
@@ -354,5 +425,31 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget> {
         ),
       ),
     );
+
+    child = BlockSelectionContainer(
+      node: node,
+      delegate: this,
+      listenable: editorState.selectionNotifier,
+      remoteSelection: editorState.remoteSelections,
+      blockColor: editorState.editorStyle.selectionColor,
+      cursorColor: editorState.editorStyle.cursorColor,
+      selectionColor: editorState.editorStyle.selectionColor,
+      supportTypes: const [
+        BlockSelectionType.block,
+        BlockSelectionType.cursor,
+        BlockSelectionType.selection,
+      ],
+      child: child,
+    );
+
+    if (widget.showActions && widget.actionBuilder != null) {
+      child = BlockComponentActionWrapper(
+        node: node,
+        actionBuilder: widget.actionBuilder!,
+        child: child,
+      );
+    }
+
+    return child;
   }
 }

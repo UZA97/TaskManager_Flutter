@@ -525,32 +525,20 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   void initState() {
     super.initState();
 
-    final imageBuilder = LocalImageBlockComponentBuilder();
-    imageBuilder.showActions = (_) => true;
-    imageBuilder.actionBuilder = _buildBlockAction;
-
-    final fileBuilder = LocalFileBlockComponentBuilder();
-    fileBuilder.showActions = (_) => true;
-    fileBuilder.actionBuilder = _buildBlockAction;
-
-    final locationBuilder = LocalLocationBlockComponentBuilder();
-    locationBuilder.showActions = (_) => true;
-    locationBuilder.actionBuilder = _buildBlockAction;
-
-    final codeBuilder = LocalCodeBlockComponentBuilder();
-    codeBuilder.showActions = (_) => true;
-    codeBuilder.actionBuilder = _buildBlockAction;
+    T applyAction<T extends BlockComponentBuilder>(T builder) {
+      builder.showActions = (_) => true;
+      builder.actionBuilder = _buildBlockAction;
+      return builder;
+    }
 
     _blockBuilders = {
-      ...standardBlockComponentBuilderMap.map((key, value) {
-        value.showActions = (_) => true;
-        value.actionBuilder = _buildBlockAction;
-        return MapEntry(key, value);
-      }),
-      localImageType: imageBuilder,
-      localFileType: fileBuilder,
-      localLocationType: locationBuilder,
-      localCodeType: codeBuilder,
+      ...standardBlockComponentBuilderMap.map(
+        (key, value) => MapEntry(key, applyAction(value)),
+      ),
+      localImageType: applyAction(LocalImageBlockComponentBuilder()),
+      localFileType: applyAction(LocalFileBlockComponentBuilder()),
+      localLocationType: applyAction(LocalLocationBlockComponentBuilder()),
+      localCodeType: applyAction(LocalCodeBlockComponentBuilder()),
     };
   }
 

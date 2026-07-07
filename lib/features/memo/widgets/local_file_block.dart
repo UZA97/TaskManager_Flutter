@@ -28,6 +28,9 @@ class LocalFileBlockComponentBuilder extends BlockComponentBuilder {
       key: blockComponentContext.node.key,
       node: blockComponentContext.node,
       configuration: configuration,
+      showActions: showActions(blockComponentContext.node), // ← 추가
+      actionBuilder: (context, state) =>
+          actionBuilder(blockComponentContext, state), // ← 추가
     );
   }
 }
@@ -37,6 +40,8 @@ class LocalFileBlockWidget extends BlockComponentStatefulWidget {
     super.key,
     required super.node,
     required super.configuration,
+    required super.showActions,
+    super.actionBuilder,
   });
 
   @override
@@ -145,7 +150,13 @@ class _LocalFileBlockWidgetState extends State<LocalFileBlockWidget>
       ],
       child: child,
     );
-
+    if (widget.showActions && widget.actionBuilder != null) {
+      child = BlockComponentActionWrapper(
+        node: node,
+        actionBuilder: widget.actionBuilder!,
+        child: child,
+      );
+    }
     return child;
   }
 
