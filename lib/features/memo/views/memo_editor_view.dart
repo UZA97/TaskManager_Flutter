@@ -450,16 +450,107 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
   late final Map<String, BlockComponentBuilder> _blockBuilders;
 
+  Widget _buildBlockAction(
+    BlockComponentContext blockComponentContext,
+    BlockComponentActionState state,
+  ) {
+    final editorState = _editorState;
+    if (editorState == null) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // + 버튼
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: () => insertNodeAfterSelection(editorState, paragraphNode()),
+            child: const Icon(Icons.add, size: 18, color: Colors.grey),
+          ),
+        ),
+        const SizedBox(width: 4),
+        // 드래그 핸들
+        MouseRegion(
+          cursor: SystemMouseCursors.grab,
+          child: Draggable<Node>(
+            data: blockComponentContext.node,
+            onDragUpdate: (details) {
+              editorState.service.selectionService.renderDropTargetForOffset(
+                details.globalPosition,
+              );
+            },
+            onDragEnd: (details) {
+              editorState.service.selectionService.removeDropTarget();
+              final renderData = editorState.service.selectionService
+                  .getDropTargetRenderData(details.offset);
+
+              if (renderData == null) return;
+
+              var dropPath = renderData.dropPath!;
+              final node = blockComponentContext.node;
+
+              if (dropPath == node.path || dropPath == node.path.next) return;
+
+              if (dropPath.first > node.path.first) {
+                dropPath = [dropPath.first + 1];
+              }
+              final transaction = editorState.transaction;
+              transaction.moveNode(dropPath, node);
+              editorState.apply(transaction);
+            },
+            feedback: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                color: Colors.white,
+                child: const Icon(Icons.drag_indicator, size: 16),
+              ),
+            ),
+            child: const Icon(
+              Icons.drag_indicator,
+              size: 18,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+
+    final imageBuilder = LocalImageBlockComponentBuilder();
+    imageBuilder.showActions = (_) => true;
+    imageBuilder.actionBuilder = _buildBlockAction;
+
+    final fileBuilder = LocalFileBlockComponentBuilder();
+    fileBuilder.showActions = (_) => true;
+    fileBuilder.actionBuilder = _buildBlockAction;
+
+    final locationBuilder = LocalLocationBlockComponentBuilder();
+    locationBuilder.showActions = (_) => true;
+    locationBuilder.actionBuilder = _buildBlockAction;
+
+    final codeBuilder = LocalCodeBlockComponentBuilder();
+    codeBuilder.showActions = (_) => true;
+    codeBuilder.actionBuilder = _buildBlockAction;
+
     _blockBuilders = {
-      ...standardBlockComponentBuilderMap,
-      'image': LocalImageBlockComponentBuilder(),
-      localImageType: LocalImageBlockComponentBuilder(),
-      localFileType: LocalFileBlockComponentBuilder(),
-      localLocationType: LocalLocationBlockComponentBuilder(),
-      localCodeType: LocalCodeBlockComponentBuilder(),
+      ...standardBlockComponentBuilderMap.map((key, value) {
+        value.showActions = (_) => true;
+        value.actionBuilder = _buildBlockAction;
+        return MapEntry(key, value);
+      }),
+      localImageType: imageBuilder,
+      localFileType: fileBuilder,
+      localLocationType: locationBuilder,
+      localCodeType: codeBuilder,
     };
   }
 
