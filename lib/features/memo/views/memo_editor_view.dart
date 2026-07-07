@@ -34,7 +34,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   Selection? _lastSelection;
 
   SelectionMenuItem get _locationMenuItem => SelectionMenuItem(
-    getName: () => '위치',
+    getName: () => 'Location',
     icon: (editorState, onSelected, style) =>
         const Icon(Icons.location_pin, color: Color(0xFFE53935), size: 18),
     keywords: ['위치', 'location', 'map', '지도'],
@@ -45,7 +45,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   );
 
   SelectionMenuItem get _codeMenuItem => SelectionMenuItem(
-    getName: () => '코드',
+    getName: () => 'Code',
     icon: (editorState, isSelected, style) =>
         const Icon(Icons.code, size: 18, color: Colors.grey),
     keywords: ['코드', 'code', '코드블록'],
@@ -55,7 +55,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   );
 
   SelectionMenuItem get _fileMenuItem => SelectionMenuItem(
-    getName: () => '파일',
+    getName: () => 'file',
     icon: (editorState, isSelected, style) =>
         const Icon(Icons.attach_file, size: 18, color: Colors.grey),
     keywords: ['파일', 'file', '첨부'],
