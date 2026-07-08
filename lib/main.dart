@@ -15,6 +15,8 @@ import 'features/mail/views/mail_detail_view.dart';
 import 'features/map/views/map_view.dart';
 import 'features/map/views/map_sidebar_view.dart';
 import 'core/providers/navigation_provider.dart';
+import '../core/settings/settings_provider.dart';
+import 'features/settings/views/settings_detail_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,18 +41,30 @@ void main() async {
   runApp(const ProviderScope(child: TaskManagerApp()));
 }
 
-class TaskManagerApp extends StatelessWidget {
+class TaskManagerApp extends ConsumerWidget {
   const TaskManagerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider).value;
+
     return MaterialApp(
       title: 'TaskManager',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4A90E2)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: settings?.themeColor ?? const Color(0xFF4A90E2),
+        ).copyWith(primary: settings?.themeColor ?? const Color(0xFF4A90E2)),
         useMaterial3: true,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: settings?.themeColor ?? const Color(0xFF4A90E2),
+          brightness: Brightness.dark,
+        ).copyWith(primary: settings?.themeColor ?? const Color(0xFF4A90E2)),
+        useMaterial3: true,
+      ),
+      themeMode: settings?.themeMode ?? ThemeMode.light,
       home: const MainShell(),
     );
   }
@@ -90,8 +104,12 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
 
   @override
   void onWindowClose() async {
-    // 트레이로 숨기기
-    await windowManager.hide();
+    final settings = ref.read(settingsProvider).value;
+    if (settings?.trayModeEnabled ?? true) {
+      await windowManager.hide();
+    } else {
+      await windowManager.destroy();
+    }
   }
 
   @override
@@ -158,7 +176,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
           ),
           Container(
             width: 250,
-            color: const Color(0xFFF5F5F5),
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
             child: IndexedStack(
               index: ref.watch(navigationProvider),
               children: const [
@@ -179,7 +197,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
                 CalendarEditorView(), // 1: 캘린더
                 MailDetailView(), // 2: 메일
                 MapView(), // 3: 지도 (새로 만들 거)
-                SizedBox(), // 4: 설정
+                SettingsDetailView(), // 4: 설정
               ],
             ),
           ),
