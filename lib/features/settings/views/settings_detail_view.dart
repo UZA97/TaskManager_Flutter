@@ -5,6 +5,8 @@ import '../../../core/settings/settings_category_provider.dart';
 import '../../../core/settings/settings_provider.dart';
 import '../../../core/update/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../../../core/settings/app_settings.dart';
+import '../../memo/providers/note_provider.dart';
 
 class SettingsDetailView extends ConsumerWidget {
   const SettingsDetailView({super.key});
@@ -16,7 +18,7 @@ class SettingsDetailView extends ConsumerWidget {
     return switch (category) {
       SettingsCategory.general => _GeneralSettings(),
       SettingsCategory.appearance => _AppearanceSettings(),
-      SettingsCategory.notification => _PlaceholderSettings(label: '알림'),
+      SettingsCategory.notification => _NotificationSettings(),
       SettingsCategory.productivity => _PlaceholderSettings(label: '생산성'),
       SettingsCategory.security => _PlaceholderSettings(label: '보안'),
       SettingsCategory.advanced => _PlaceholderSettings(label: '고급'),
@@ -47,9 +49,173 @@ class _GeneralSettings extends ConsumerWidget {
                   ref.read(settingsProvider.notifier).setTrayMode(v),
             ),
           ),
+          const SizedBox(height: 16),
+          const _SectionHeader(title: '휴지통'),
+          _TrashSection(),
         ],
       ),
     );
+  }
+}
+
+class _TrashSection extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_TrashSection> createState() => _TrashSectionState();
+}
+
+class _TrashSectionState extends ConsumerState<_TrashSection> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final trashAsync = ref.watch(trashProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            TextButton.icon(
+              onPressed: () => setState(() => _isExpanded = !_isExpanded),
+              icon: Icon(
+                _isExpanded ? Icons.expand_less : Icons.expand_more,
+                size: 16,
+              ),
+              label: trashAsync.when(
+                loading: () => const Text('불러오는 중...'),
+                error: (e, _) => const Text('오류'),
+                data: (notes) => Text('삭제된 메모 ${notes.length}개'),
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () => _confirmEmptyTrash(context),
+              icon: const Icon(
+                Icons.delete_forever,
+                size: 16,
+                color: Colors.red,
+              ),
+              label: const Text('전체 비우기', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+        if (_isExpanded)
+          trashAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('오류: $e')),
+            data: (notes) => notes.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Text(
+                      '휴지통이 비어있습니다',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      ...notes.map(
+                        (note) => ListTile(
+                          dense: true,
+                          title: Text(
+                            note.title.isEmpty ? '제목 없음' : note.title,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          subtitle: Text(
+                            '삭제됨: ${_formatDate(note.deletedAt!)}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.restore,
+                                  size: 16,
+                                  color: Colors.green,
+                                ),
+                                tooltip: '복원',
+                                onPressed: () => ref
+                                    .read(trashProvider.notifier)
+                                    .restore(note.id!),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_forever,
+                                  size: 16,
+                                  color: Colors.red,
+                                ),
+                                tooltip: '영구 삭제',
+                                onPressed: () =>
+                                    _confirmDelete(context, note.id!),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (notes.length % 20 == 0)
+                        TextButton(
+                          onPressed: () =>
+                              ref.read(trashProvider.notifier).loadMore(),
+                          child: const Text('더 보기'),
+                        ),
+                    ],
+                  ),
+          ),
+      ],
+    );
+  }
+
+  String _formatDate(String isoDate) {
+    final date = DateTime.parse(isoDate);
+    return '${date.year}.${date.month}.${date.day}';
+  }
+
+  Future<void> _confirmEmptyTrash(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('휴지통 비우기'),
+        content: const Text('휴지통의 모든 메모가 영구 삭제됩니다. 계속할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('비우기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      ref.read(trashProvider.notifier).emptyTrash();
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, int id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('영구 삭제'),
+        content: const Text('이 메모를 영구 삭제할까요? 복원할 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      ref.read(trashProvider.notifier).permanentlyDelete(id);
+    }
   }
 }
 
@@ -80,6 +246,19 @@ class _AppearanceSettings extends ConsumerWidget {
           const _SectionHeader(title: '테마 색상'),
           const SizedBox(height: 8),
           _ThemeColorPicker(),
+          const SizedBox(height: 16),
+          const _SectionHeader(title: '글꼴 크기'),
+          const SizedBox(height: 8),
+          SegmentedButton<AppFontSize>(
+            segments: const [
+              ButtonSegment(value: AppFontSize.small, label: Text('작게')),
+              ButtonSegment(value: AppFontSize.medium, label: Text('보통')),
+              ButtonSegment(value: AppFontSize.large, label: Text('크게')),
+            ],
+            selected: {settings.fontSize},
+            onSelectionChanged: (value) =>
+                ref.read(settingsProvider.notifier).setFontSize(value.first),
+          ),
         ],
       ),
     );
@@ -294,6 +473,33 @@ class _InfoSettingsState extends State<_InfoSettings> {
             label: const Text('업데이트 확인'),
           ),
       ],
+    );
+  }
+}
+
+class _NotificationSettings extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(settingsProvider);
+
+    return settingsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('오류: $e')),
+      data: (settings) => ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const _SectionHeader(title: '알림'),
+          _SettingsRow(
+            title: '알림 활성화',
+            subtitle: '모든 알림을 켜거나 끕니다',
+            trailing: Switch(
+              value: settings.notificationEnabled,
+              onChanged: (v) =>
+                  ref.read(settingsProvider.notifier).setNotificationEnabled(v),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

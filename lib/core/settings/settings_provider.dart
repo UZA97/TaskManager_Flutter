@@ -13,11 +13,31 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
 
     return AppSettings(
       trayModeEnabled: map['tray_mode_enabled'] != 'false',
+      notificationEnabled: map['notification_enabled'] != 'false',
       themeMode: map['theme_mode'] == 'dark' ? ThemeMode.dark : ThemeMode.light,
       themeColor: map['theme_color'] != null
           ? Color(int.parse(map['theme_color']!))
           : const Color(0xFF4A90E2),
+      fontSize: map['font_size'] == 'small'
+          ? AppFontSize.small
+          : map['font_size'] == 'large'
+          ? AppFontSize.large
+          : AppFontSize.medium,
     );
+  }
+
+  // 알림모드 설정
+  Future<void> setNotificationEnabled(bool enabled) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(
+            key: 'notification_enabled',
+            value: enabled.toString(),
+          ),
+        );
+    state = AsyncData(state.value!.copyWith(notificationEnabled: enabled));
   }
 
   // 트레이 모드 설정
@@ -32,6 +52,17 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
           ),
         );
     state = AsyncData(state.value!.copyWith(trayModeEnabled: enabled));
+  }
+
+  // 글꼴 크기
+  Future<void> setFontSize(AppFontSize size) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(key: 'font_size', value: size.name),
+        );
+    state = AsyncData(state.value!.copyWith(fontSize: size));
   }
 
   // 테마 모드 설정

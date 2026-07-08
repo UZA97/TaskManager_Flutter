@@ -1,20 +1,27 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_notifier/local_notifier.dart';
+import '../settings/settings_provider.dart';
 
 class NotificationService {
-  static Future<void> init() async {
-    await localNotifier.setup(
-      appName: 'TaskManager',
-    );
+  static ProviderContainer? _container;
+
+  static void init(ProviderContainer container) {
+    _container = container;
+  }
+
+  static Future<void> setup() async {
+    await localNotifier.setup(appName: 'TaskManager');
   }
 
   static Future<void> show({
     required String title,
     required String body,
   }) async {
-    LocalNotification notification = LocalNotification(
-      title: title,
-      body: body,
-    );
+    final enabled =
+        _container?.read(settingsProvider).value?.notificationEnabled ?? true;
+    if (!enabled) return;
+
+    final notification = LocalNotification(title: title, body: body);
     await notification.show();
   }
 

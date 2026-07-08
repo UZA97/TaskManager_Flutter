@@ -17,6 +17,8 @@ import 'features/map/views/map_sidebar_view.dart';
 import 'core/providers/navigation_provider.dart';
 import '../core/settings/settings_provider.dart';
 import 'features/settings/views/settings_detail_view.dart';
+import '../core/settings/app_settings.dart';
+import 'features/memo/data/note_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +27,7 @@ void main() async {
   await windowManager.setPreventClose(true);
   await windowManager.waitUntilReadyToShow(
     const WindowOptions(
-      size: Size(950, 600),
+      size: Size(1280, 600),
       minimumSize: Size(650, 400),
       center: true,
       title: 'TaskManager',
@@ -36,7 +38,7 @@ void main() async {
       await windowManager.focus();
     },
   );
-  await NotificationService.init();
+  await NotificationService.setup();
 
   runApp(const ProviderScope(child: TaskManagerApp()));
 }
@@ -44,9 +46,17 @@ void main() async {
 class TaskManagerApp extends ConsumerWidget {
   const TaskManagerApp({super.key});
 
+  double _fontSizeBase(AppFontSize size) => switch (size) {
+    AppFontSize.small => 12.0,
+    AppFontSize.medium => 14.0,
+    AppFontSize.large => 16.0,
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider).value;
+    final fontSize = settings?.fontSize ?? AppFontSize.medium;
+    final base = _fontSizeBase(fontSize);
 
     return MaterialApp(
       title: 'TaskManager',
@@ -56,6 +66,14 @@ class TaskManagerApp extends ConsumerWidget {
           seedColor: settings?.themeColor ?? const Color(0xFF4A90E2),
         ).copyWith(primary: settings?.themeColor ?? const Color(0xFF4A90E2)),
         useMaterial3: true,
+        textTheme: TextTheme(
+          bodySmall: TextStyle(fontSize: base - 2),
+          bodyMedium: TextStyle(fontSize: base),
+          bodyLarge: TextStyle(fontSize: base + 2),
+          titleSmall: TextStyle(fontSize: base + 2),
+          titleMedium: TextStyle(fontSize: base + 4),
+          titleLarge: TextStyle(fontSize: base + 6),
+        ),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -63,6 +81,14 @@ class TaskManagerApp extends ConsumerWidget {
           brightness: Brightness.dark,
         ).copyWith(primary: settings?.themeColor ?? const Color(0xFF4A90E2)),
         useMaterial3: true,
+        textTheme: TextTheme(
+          bodySmall: TextStyle(fontSize: base - 2),
+          bodyMedium: TextStyle(fontSize: base),
+          bodyLarge: TextStyle(fontSize: base + 2),
+          titleSmall: TextStyle(fontSize: base + 2),
+          titleMedium: TextStyle(fontSize: base + 4),
+          titleLarge: TextStyle(fontSize: base + 6),
+        ),
       ),
       themeMode: settings?.themeMode ?? ThemeMode.light,
       home: const MainShell(),
@@ -91,7 +117,14 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    NotificationService.init(ProviderScope.containerOf(context));
     _initMailService();
+    _deleteExpiredNotes();
+  }
+
+  Future<void> _deleteExpiredNotes() async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.deleteExpiredNotes();
   }
 
   Future<void> _initMailService() async {

@@ -6,14 +6,14 @@ import 'package:http/http.dart' as http;
 final json = jsonDecode(File('config/google_oauth.json').readAsStringSync());
 
 final _clientId = json['installed']['client_id'];
-final _clientSecret = json['installed']['client_secret'];
+final _screet = json['installed']['client_secret'];
 
 class GoogleAuthService {
   static final _googleSignIn = GoogleSignIn(
     // static으로 변경
     params: GoogleSignInParams(
       clientId: _clientId,
-      clientSecret: _clientSecret,
+      clientSecret: _screet,
       scopes: [
         'openid',
         'email',
@@ -81,7 +81,7 @@ class GoogleAuthService {
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body: {
         'client_id': _clientId,
-        'client_secret': _clientSecret,
+        'client_secret': _screet,
         'refresh_token': refreshToken,
         'grant_type': 'refresh_token',
       },

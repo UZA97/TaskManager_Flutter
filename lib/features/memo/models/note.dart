@@ -1,3 +1,5 @@
+import 'package:drift/drift.dart';
+
 class Note {
   final int? id;
   final String title;
@@ -7,7 +9,7 @@ class Note {
   final String updatedAt;
   final int? folderId;
   final double? sortOrder;
-
+  final String? deletedAt;
   const Note({
     this.id,
     required this.title,
@@ -17,6 +19,7 @@ class Note {
     required this.updatedAt,
     this.folderId,
     this.sortOrder,
+    this.deletedAt,
   });
 
   Note copyWith({
@@ -28,6 +31,7 @@ class Note {
     String? updatedAt,
     int? folderId,
     double? sortOrder,
+    Value<String?> deletedAt = const Value.absent(),
   }) {
     return Note(
       id: id ?? this.id,
@@ -38,6 +42,7 @@ class Note {
       updatedAt: updatedAt ?? this.updatedAt,
       folderId: folderId ?? this.folderId,
       sortOrder: sortOrder ?? this.sortOrder,
+      deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     );
   }
 }

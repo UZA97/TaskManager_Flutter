@@ -8,22 +8,28 @@ class NoteRepository {
   final AppDatabase _db;
 
   NoteRepository(this._db);
+  Note _rowToNote(NoteTableData row, List<String> tags) {
+    return Note(
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      tags: tags,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      folderId: row.folderId,
+      sortOrder: row.sortOrder,
+      deletedAt: row.deletedAt,
+    );
+  }
 
   Future<List<Note>> getAllNotes() async {
-    final rows = await _db.select(_db.noteTable).get();
+    final rows = await (_db.select(
+      _db.noteTable,
+    )..where((t) => t.deletedAt.isNull())).get();
     return Future.wait(
       rows.map((row) async {
         final tags = await getNoteTags(row.id);
-        return Note(
-          id: row.id,
-          title: row.title,
-          content: row.content,
-          tags: tags,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-          folderId: row.folderId, // 추가
-          sortOrder: row.sortOrder, // 추가
-        );
+        return _rowToNote(row, tags);
       }),
     );
   }
@@ -112,8 +118,58 @@ class NoteRepository {
     );
   }
 
+  // 소프트 삭제
   Future<void> deleteNote(int id) async {
+    await (_db.update(_db.noteTable)..where((t) => t.id.equals(id))).write(
+      NoteTableCompanion(deletedAt: Value(DateTime.now().toIso8601String())),
+    );
+  }
+
+  // 휴지통 목록 (페이지네이션)
+  Future<List<Note>> getDeletedNotes({int page = 0, int pageSize = 20}) async {
+    final rows =
+        await (_db.select(_db.noteTable)
+              ..where((t) => t.deletedAt.isNotNull())
+              ..orderBy([(t) => OrderingTerm.desc(t.deletedAt)])
+              ..limit(pageSize, offset: page * pageSize))
+            .get();
+    return Future.wait(
+      rows.map((row) async {
+        final tags = await getNoteTags(row.id);
+        return _rowToNote(row, tags);
+      }),
+    );
+  }
+
+  // 복원
+  Future<void> restoreNote(int id) async {
+    await (_db.update(_db.noteTable)..where((t) => t.id.equals(id))).write(
+      NoteTableCompanion(deletedAt: const Value(null)),
+    );
+  }
+
+  // 영구 삭제
+  Future<void> permanentlyDeleteNote(int id) async {
     await (_db.delete(_db.noteTable)..where((t) => t.id.equals(id))).go();
+  }
+
+  // 전체 비우기
+  Future<void> emptyTrash() async {
+    await (_db.delete(
+      _db.noteTable,
+    )..where((t) => t.deletedAt.isNotNull())).go();
+  }
+
+  // 30일 만료 자동 삭제
+  Future<void> deleteExpiredNotes() async {
+    final expiry = DateTime.now()
+        .subtract(const Duration(days: 30))
+        .toIso8601String();
+    await (_db.delete(_db.noteTable)..where(
+          (t) =>
+              t.deletedAt.isNotNull() & t.deletedAt.isSmallerThanValue(expiry),
+        ))
+        .go();
   }
 
   Future<List<String>> getNoteTags(int noteId) async {

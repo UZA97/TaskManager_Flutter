@@ -28,6 +28,7 @@ class NoteTable extends Table {
   TextColumn get updatedAt => text()();
   IntColumn get folderId => integer().nullable().references(FolderTable, #id)();
   RealColumn get sortOrder => real().withDefault(const Constant(0.0))();
+  TextColumn get deletedAt => text().nullable()();
 }
 
 class TagTable extends Table {
@@ -107,14 +108,12 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAllTables();
-
-      // 기본 폴더 생성
       final now = DateTime.now().toIso8601String();
       final defaultFolderId = await into(
         folderTable,
@@ -151,6 +150,9 @@ class AppDatabase extends _$AppDatabase {
           eventTable,
           eventTable.locationLng as GeneratedColumn,
         );
+      }
+      if (from < 5) {
+        await m.addColumn(noteTable, noteTable.deletedAt as GeneratedColumn);
       }
     },
   );

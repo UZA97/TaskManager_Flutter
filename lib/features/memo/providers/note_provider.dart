@@ -113,3 +113,42 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
 final noteListProvider = AsyncNotifierProvider<NoteListNotifier, List<Note>>(
   NoteListNotifier.new,
 );
+
+class TrashNotifier extends AsyncNotifier<List<Note>> {
+  @override
+  Future<List<Note>> build() async {
+    final repo = ref.watch(noteRepositoryProvider);
+    return repo.getDeletedNotes();
+  }
+
+  Future<void> loadMore() async {
+    final repo = ref.read(noteRepositoryProvider);
+    final current = state.value ?? [];
+    final page = current.length ~/ 20;
+    final more = await repo.getDeletedNotes(page: page);
+    state = AsyncData([...current, ...more]);
+  }
+
+  Future<void> restore(int id) async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.restoreNote(id);
+    ref.invalidateSelf();
+    ref.invalidate(noteListProvider);
+  }
+
+  Future<void> permanentlyDelete(int id) async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.permanentlyDeleteNote(id);
+    ref.invalidateSelf();
+  }
+
+  Future<void> emptyTrash() async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.emptyTrash();
+    ref.invalidateSelf();
+  }
+}
+
+final trashProvider = AsyncNotifierProvider<TrashNotifier, List<Note>>(
+  TrashNotifier.new,
+);
