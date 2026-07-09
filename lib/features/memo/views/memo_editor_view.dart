@@ -546,11 +546,15 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
 
-    if (selectedNote != null && selectedNote.id != _currentNote?.id) {
-      _currentNote = selectedNote;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _initEditor(selectedNote);
-      });
+    if (selectedNote != null) {
+      if (selectedNote.id != _currentNote?.id) {
+        _currentNote = selectedNote;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _initEditor(selectedNote);
+        });
+      } else {
+        _currentNote = selectedNote; // 같은 메모도 상태 동기화
+      }
     }
 
     if (selectedNote == null) {
@@ -601,18 +605,65 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                child: TextField(
-                  controller: _titleController,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: '제목 없음',
-                    border: InputBorder.none,
-                    hintStyle: TextStyle(color: Colors.grey),
-                  ),
-                  onChanged: (_) => _onContentChanged(),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _titleController,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: '제목 없음',
+                          border: InputBorder.none,
+                          hintStyle: TextStyle(color: Colors.grey),
+                        ),
+                        onChanged: (_) => _onContentChanged(),
+                      ),
+                    ),
+                    // 토글 버튼들
+                    if (_currentNote != null) ...[
+                      _buildToggleButton(
+                        icon: Icons.star,
+                        activeColor: Colors.amber,
+                        isActive: _currentNote!.isFavorite,
+                        tooltip: _currentNote!.isFavorite ? '즐겨찾기 해제' : '즐겨찾기',
+                        onTap: () => ref
+                            .read(noteListProvider.notifier)
+                            .toggleFavorite(
+                              _currentNote!.id!,
+                              !_currentNote!.isFavorite,
+                            ),
+                      ),
+                      const SizedBox(width: 4),
+                      _buildToggleButton(
+                        icon: Icons.push_pin,
+                        activeColor: const Color(0xFF4A90E2),
+                        isActive: _currentNote!.isPinned,
+                        tooltip: _currentNote!.isPinned ? '고정 해제' : '고정',
+                        onTap: () => ref
+                            .read(noteListProvider.notifier)
+                            .togglePin(
+                              _currentNote!.id!,
+                              !_currentNote!.isPinned,
+                            ),
+                      ),
+                      const SizedBox(width: 4),
+                      _buildToggleButton(
+                        icon: Icons.priority_high,
+                        activeColor: Colors.orange,
+                        isActive: _currentNote!.isImportant,
+                        tooltip: _currentNote!.isImportant ? '중요 해제' : '중요',
+                        onTap: () => ref
+                            .read(noteListProvider.notifier)
+                            .toggleImportant(
+                              _currentNote!.id!,
+                              !_currentNote!.isImportant,
+                            ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const Divider(height: 1, color: Color(0xFFDDDDDD)),
@@ -706,6 +757,33 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildToggleButton({
+    required IconData icon,
+    required Color activeColor,
+    required bool isActive,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: isActive ? activeColor.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: isActive ? activeColor : Colors.grey,
+          ),
+        ),
       ),
     );
   }

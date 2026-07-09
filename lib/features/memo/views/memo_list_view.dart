@@ -147,7 +147,6 @@ class _FolderTree extends ConsumerWidget {
       return _buildSearchResult(searchQuery);
     }
 
-    // 즐겨찾기 항목
     final favFolders = folders.where((f) => f.isFavorite).toList()
       ..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
     final favNotes = notes.where((n) => n.isFavorite).toList()
@@ -158,17 +157,104 @@ class _FolderTree extends ConsumerWidget {
     final rootNotes = notes.where((n) => n.folderId == null).toList()
       ..sort((a, b) => (a.sortOrder ?? 0.0).compareTo(b.sortOrder ?? 0.0));
 
+    final favItems = [
+      ...favFolders.map((f) => _TreeItem.folder(f)),
+      ...favNotes.map((n) => _TreeItem.note(n)),
+    ]..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
+
+    final favWidgets = <Widget>[];
+
+    // 즐겨찾기 첫 번째 DropIndicator
+    favWidgets.add(
+      _FavoriteDropIndicator(
+        beforeSortOrder: favItems.isEmpty
+            ? 0.0
+            : favItems.first.favoriteSortOrder - 1.0,
+        afterSortOrder: favItems.isEmpty
+            ? 1.0
+            : favItems.first.favoriteSortOrder,
+      ),
+    );
+
+    for (int i = 0; i < favItems.length; i++) {
+      final item = favItems[i];
+      if (item.isFolder) {
+        favWidgets.add(
+          _FavoriteItem(
+            folder: item.folder!,
+            allFolders: folders,
+            allNotes: notes,
+          ),
+        );
+      } else {
+        favWidgets.add(_FavoriteNoteItem(note: item.note!));
+      }
+
+      final after = i < favItems.length - 1
+          ? favItems[i + 1].favoriteSortOrder
+          : favItems[i].favoriteSortOrder + 1.0;
+
+      favWidgets.add(
+        _FavoriteDropIndicator(
+          beforeSortOrder: favItems[i].favoriteSortOrder,
+          afterSortOrder: after,
+        ),
+      );
+    }
+
+    // 일반 트리
+    final allItems = [
+      ...rootFolders.map((f) => _TreeItem.folder(f)),
+      ...rootNotes.map((n) => _TreeItem.note(n)),
+    ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    final normalWidgets = <Widget>[];
+    normalWidgets.add(
+      _DropIndicator(
+        parentId: null,
+        beforeSortOrder: allItems.isEmpty
+            ? 0.0
+            : allItems.first.sortOrder - 1.0,
+        afterSortOrder: allItems.isEmpty ? 1.0 : allItems.first.sortOrder,
+      ),
+    );
+
+    for (int i = 0; i < allItems.length; i++) {
+      final item = allItems[i];
+      if (item.isFolder) {
+        normalWidgets.add(
+          _FolderNode(
+            folder: item.folder!,
+            allFolders: folders,
+            allNotes: notes,
+            depth: 0,
+          ),
+        );
+      } else {
+        normalWidgets.add(_NoteNode(note: item.note!, depth: 0));
+      }
+
+      final after = i < allItems.length - 1
+          ? allItems[i + 1].sortOrder
+          : allItems[i].sortOrder + 1.0;
+
+      normalWidgets.add(
+        _DropIndicator(
+          parentId: null,
+          beforeSortOrder: allItems[i].sortOrder,
+          afterSortOrder: after,
+        ),
+      );
+    }
+
     return ListView(
       children: [
-        // 즐겨찾기 섹션
-        if (favFolders.isNotEmpty || favNotes.isNotEmpty) ...[
-          const _FavoriteSectionHeader(),
-          ..._buildFavoriteItems(context, ref, favFolders, favNotes),
-          const Divider(height: 1, color: Color(0xFFDDDDDD)),
-        ],
-
+        // 즐겨찾기 섹션 (항상 표시)
+        const _FavoriteSectionHeader(),
+        ...favWidgets,
+        const Divider(height: 1, color: Color(0xFFDDDDDD)),
         // 일반 트리
-        ..._buildNormalTree(context, ref, rootFolders, rootNotes),
+        ...normalWidgets,
       ],
     );
   }
@@ -640,6 +726,8 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (widget.folder.isFavorite)
+              const Icon(Icons.star, size: 10, color: Colors.amber),
           ],
         ),
       ),
@@ -862,6 +950,8 @@ class _NoteNode extends ConsumerWidget {
               const Icon(Icons.priority_high, size: 12, color: Colors.orange),
             if (note.isPinned)
               const Icon(Icons.push_pin, size: 12, color: Color(0xFF4A90E2)),
+            if (note.isFavorite)
+              const Icon(Icons.star, size: 10, color: Colors.amber),
           ],
         ),
       ),
@@ -1003,12 +1093,9 @@ class _DropIndicator extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DragTarget<TreeDragData>(
-      onWillAcceptWithDetails: (_) => true,
+      onWillAcceptWithDetails: (details) =>
+          !details.data.isFavoriteItem, // 즐겨찾기 아이템 막기
       onAcceptWithDetails: (details) {
-        print(
-          'DropIndicator accept: isFolder=${details.data.isFolder} id=${details.data.id} parentId=$parentId before=$beforeSortOrder after=$afterSortOrder',
-        );
-
         final newSortOrder = (beforeSortOrder + afterSortOrder) / 2;
         if (details.data.isFolder) {
           ref
@@ -1027,6 +1114,58 @@ class _DropIndicator extends ConsumerWidget {
           height: isHovered ? 3 : 2,
           margin: const EdgeInsets.symmetric(vertical: 1),
           color: isHovered ? const Color(0xFF4A90E2) : Colors.transparent,
+        );
+      },
+    );
+  }
+}
+
+class _FavoriteDropIndicator extends ConsumerWidget {
+  final double beforeSortOrder;
+  final double afterSortOrder;
+
+  const _FavoriteDropIndicator({
+    required this.beforeSortOrder,
+    required this.afterSortOrder,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DragTarget<TreeDragData>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (details) {
+        final newSortOrder = (beforeSortOrder + afterSortOrder) / 2;
+        if (details.data.isFavoriteItem) {
+          // 즐겨찾기 내 순서 변경
+          if (details.data.isFolder) {
+            ref
+                .read(folderListProvider.notifier)
+                .updateFolderFavoriteSortOrder(details.data.id, newSortOrder);
+          } else {
+            ref
+                .read(noteListProvider.notifier)
+                .updateFavoriteSortOrder(details.data.id, newSortOrder);
+          }
+        } else {
+          // 일반 아이템 → 즐겨찾기 등록
+          if (details.data.isFolder) {
+            ref
+                .read(folderListProvider.notifier)
+                .toggleFavorite(details.data.id, true);
+          } else {
+            ref
+                .read(noteListProvider.notifier)
+                .toggleFavorite(details.data.id, true);
+          }
+        }
+      },
+      builder: (context, candidateData, _) {
+        final isHovered = candidateData.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: isHovered ? 3 : 2,
+          margin: const EdgeInsets.symmetric(vertical: 1),
+          color: isHovered ? Colors.amber : Colors.transparent,
         );
       },
     );
@@ -1100,15 +1239,16 @@ class _FavoriteItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return GestureDetector(
-      onTap: () {
-        // 원본 폴더 선택
-        ref.read(selectedFolderProvider.notifier).select(folder);
-      },
+    final selectedFolder = ref.watch(selectedFolderProvider);
+    final isSelected = selectedFolder?.id == folder.id;
+
+    final child = GestureDetector(
+      onTap: () => ref.read(selectedFolderProvider.notifier).select(folder),
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
       child: Container(
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
         child: Row(
           children: [
             const Icon(Icons.folder, size: 14, color: Color(0xFF4A90E2)),
@@ -1124,6 +1264,34 @@ class _FavoriteItem extends ConsumerWidget {
           ],
         ),
       ),
+    );
+
+    return Draggable<TreeDragData>(
+      data: TreeDragData(
+        isFolder: true,
+        id: folder.id!,
+        parentId: folder.parentId,
+        sortOrder: folder.favoriteSortOrder,
+        isFavoriteItem: true,
+      ),
+      feedback: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          color: const Color(0xFFE8F0FE),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.folder, size: 14, color: Color(0xFF4A90E2)),
+              const SizedBox(width: 6),
+              Text(folder.name, style: const TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: child),
+      child: child,
     );
   }
 
@@ -1158,12 +1326,12 @@ class _FavoriteNoteItem extends ConsumerWidget {
     final selectedNote = ref.watch(selectedNoteProvider);
     final isSelected = selectedNote?.id == note.id;
 
-    return GestureDetector(
+    final child = GestureDetector(
       onTap: () => ref.read(selectedNoteProvider.notifier).select(note),
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
         color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
         child: Row(
           children: [
@@ -1180,6 +1348,37 @@ class _FavoriteNoteItem extends ConsumerWidget {
           ],
         ),
       ),
+    );
+
+    return Draggable<TreeDragData>(
+      data: TreeDragData(
+        isFolder: false,
+        id: note.id!,
+        parentId: note.folderId,
+        sortOrder: note.favoriteSortOrder,
+        isFavoriteItem: true,
+      ),
+      feedback: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          color: const Color(0xFFE8F0FE),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.note, size: 14, color: Colors.grey),
+              const SizedBox(width: 6),
+              Text(
+                note.title.isEmpty ? '제목 없음' : note.title,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: child),
+      child: child,
     );
   }
 
