@@ -578,22 +578,116 @@ class _SecuritySettings extends ConsumerStatefulWidget {
 }
 
 class _SecuritySettingsState extends ConsumerState<_SecuritySettings> {
-  final _newPasswordController = TextEditingController();
+  Future<bool> _hasPassword() =>
+      ref.read(settingsProvider.notifier).hasPassword();
+
+  Future<void> _showPasswordDialog({bool isChange = false}) async {
+    await showDialog(
+      context: context,
+      builder: (context) => _PasswordDialog(isChange: isChange),
+    );
+    setState(() {}); // 다이얼로그 닫힌 후 UI 갱신
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(settingsProvider);
+
+    return settingsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('오류: $e')),
+      data: (settings) => ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const _SectionHeader(title: '앱 잠금'),
+          FutureBuilder<bool>(
+            future: _hasPassword(),
+            builder: (context, snapshot) {
+              final hasPw = snapshot.data ?? false;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _SettingsRow(
+                    title: '잠금 모드',
+                    subtitle: '앱 시작 및 트레이 복귀 시 비밀번호 입력',
+                    trailing: Switch(
+                      value: settings.lockEnabled,
+                      onChanged: (v) async {
+                        if (v && !hasPw) {
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('비밀번호 미등록'),
+                              content: const Text('비밀번호 등록 후 이용하세요'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: const Text('확인'),
+                                ),
+                              ],
+                            ),
+                          );
+                          return;
+                        }
+                        ref.read(settingsProvider.notifier).setLockEnabled(v);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      if (!hasPw)
+                        OutlinedButton.icon(
+                          onPressed: () => _showPasswordDialog(isChange: false),
+                          icon: const Icon(Icons.lock_outline, size: 16),
+                          label: const Text('비밀번호 등록'),
+                        ),
+                      if (hasPw)
+                        OutlinedButton.icon(
+                          onPressed: () => _showPasswordDialog(isChange: true),
+                          icon: const Icon(Icons.edit, size: 16),
+                          label: const Text('비밀번호 변경'),
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PasswordDialog extends ConsumerStatefulWidget {
+  final bool isChange;
+  const _PasswordDialog({required this.isChange});
+
+  @override
+  ConsumerState<_PasswordDialog> createState() => _PasswordDialogState();
+}
+
+class _PasswordDialogState extends ConsumerState<_PasswordDialog> {
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
   final _confirmController = TextEditingController();
+  bool _showCurrent = false;
   bool _showNew = false;
   bool _showConfirm = false;
   String? _error;
-  String? _success;
 
   @override
   void dispose() {
-    _newPasswordController.dispose();
+    _currentController.dispose();
+    _newController.dispose();
     _confirmController.dispose();
     super.dispose();
   }
 
-  Future<void> _savePassword() async {
-    final pw = _newPasswordController.text;
+  Future<void> _save() async {
+    final pw = _newController.text;
     final confirm = _confirmController.text;
 
     if (pw.length < 4) {
@@ -609,102 +703,121 @@ class _SecuritySettingsState extends ConsumerState<_SecuritySettings> {
       return;
     }
 
+    // 변경 시 현재 비밀번호 검증
+    if (widget.isChange) {
+      final ok = await ref
+          .read(settingsProvider.notifier)
+          .verifyPassword(_currentController.text);
+      if (!ok) {
+        setState(() => _error = '현재 비밀번호가 틀렸습니다');
+        return;
+      }
+    }
+
     await ref.read(settingsProvider.notifier).setPassword(pw);
-    setState(() {
-      _error = null;
-      _success = '비밀번호가 설정되었습니다';
-      _newPasswordController.clear();
-      _confirmController.clear();
-    });
+    if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final settingsAsync = ref.watch(settingsProvider);
-
-    return settingsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('오류: $e')),
-      data: (settings) => ListView(
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: 360,
         padding: const EdgeInsets.all(24),
-        children: [
-          const _SectionHeader(title: '앱 잠금'),
-          _SettingsRow(
-            title: '잠금 모드',
-            subtitle: '앱 시작 및 트레이 복귀 시 비밀번호 입력',
-            trailing: Switch(
-              value: settings.lockEnabled,
-              onChanged: (v) {
-                if (v && _newPasswordController.text.isEmpty) {
-                  // 비밀번호 먼저 설정하도록
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('먼저 비밀번호를 설정하세요')),
-                  );
-                  return;
-                }
-                ref.read(settingsProvider.notifier).setLockEnabled(v);
-              },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.isChange ? '비밀번호 변경' : '비밀번호 등록',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-          ),
-          const SizedBox(height: 16),
-          const _SectionHeader(title: '비밀번호 설정'),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _newPasswordController,
-            obscureText: !_showNew,
-            decoration: InputDecoration(
-              hintText: '새 비밀번호 (4~36자)',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              isDense: true,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _showNew ? Icons.visibility_off : Icons.visibility,
-                  size: 18,
+            const SizedBox(height: 20),
+            if (widget.isChange) ...[
+              TextField(
+                controller: _currentController,
+                obscureText: !_showCurrent,
+                decoration: InputDecoration(
+                  hintText: '현재 비밀번호',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  isDense: true,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showCurrent ? Icons.visibility_off : Icons.visibility,
+                      size: 18,
+                    ),
+                    onPressed: () =>
+                        setState(() => _showCurrent = !_showCurrent),
+                  ),
                 ),
-                onPressed: () => setState(() => _showNew = !_showNew),
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _confirmController,
-            obscureText: !_showConfirm,
-            decoration: InputDecoration(
-              hintText: '비밀번호 확인',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              isDense: true,
-              errorText: _error,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _showConfirm ? Icons.visibility_off : Icons.visibility,
-                  size: 18,
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: _newController,
+              obscureText: !_showNew,
+              decoration: InputDecoration(
+                hintText: '새 비밀번호 (4~36자)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                onPressed: () => setState(() => _showConfirm = !_showConfirm),
+                isDense: true,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showNew ? Icons.visibility_off : Icons.visibility,
+                    size: 18,
+                  ),
+                  onPressed: () => setState(() => _showNew = !_showNew),
+                ),
               ),
             ),
-          ),
-          if (_success != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                _success!,
-                style: const TextStyle(color: Colors.green, fontSize: 12),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _confirmController,
+              obscureText: !_showConfirm,
+              decoration: InputDecoration(
+                hintText: '비밀번호 확인',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                isDense: true,
+                errorText: _error,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showConfirm ? Icons.visibility_off : Icons.visibility,
+                    size: 18,
+                  ),
+                  onPressed: () => setState(() => _showConfirm = !_showConfirm),
+                ),
               ),
             ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: _savePassword,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4A90E2),
-              foregroundColor: Colors.white,
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('취소'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4A90E2),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('저장'),
+                  ),
+                ),
+              ],
             ),
-            child: const Text('비밀번호 저장'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

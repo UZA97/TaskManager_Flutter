@@ -158,6 +158,14 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
         );
     state = AsyncData(state.value!.copyWith(themeColor: color));
   }
+
+  Future<bool> hasPassword() async {
+    final db = ref.read(databaseProvider);
+    final row = await (db.select(
+      db.settingTable,
+    )..where((t) => t.key.equals('lock_password'))).getSingleOrNull();
+    return row != null;
+  }
 }
 
 final settingsProvider = AsyncNotifierProvider<SettingsNotifier, AppSettings>(

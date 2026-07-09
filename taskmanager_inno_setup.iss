@@ -1,5 +1,5 @@
 ﻿#define MyAppName "TaskManager"
-#define MyAppVersion "0.0.2"
+#define MyAppVersion "0.0.3"
 #define MyAppPublisher "JH"
 #define MyAppExeName "taskmanager.exe"
 #define MyAppId "{{052817F2-E157-48D0-BF2A-AFBBC5A06B65}"
@@ -46,13 +46,12 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{tmp}\{#VcRedistExe}"; Parameters: "/install /quiet /norestart"; StatusMsg: "Visual C++ Runtime installing..."; Flags: waituntilterminated
-Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: IsUpdate
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; Check: not IsUpdate
-
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: IsSilentUpdate
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; Check: not IsSilentUpdate
 [UninstallDelete]
 
 [Code]
-function IsUpdate(): Boolean;
+function IsSilentUpdate(): Boolean;
 begin
-  Result := RegKeyExists(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1');
+  Result := WizardSilent();
 end;

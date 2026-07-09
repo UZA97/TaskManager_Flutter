@@ -25,7 +25,7 @@ void main() async {
   await windowManager.setPreventClose(true);
   await windowManager.waitUntilReadyToShow(
     const WindowOptions(
-      size: Size(1280, 600),
+      size: Size(1280, 720),
       minimumSize: Size(650, 400),
       center: true,
       title: 'TaskManager',

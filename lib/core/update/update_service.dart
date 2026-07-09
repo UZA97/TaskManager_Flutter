@@ -105,7 +105,6 @@ class UpdateService {
     // 🌟 Inno Setup 인스톨러 백그라운드 무소음 실행 후 즉시 종료
     await Process.start(installerPath, [
       '/VERYSILENT',
-      '/RESTARTAPPLICATIONS',
     ], mode: ProcessStartMode.detached);
     await windowManager.destroy();
     exit(0);
