@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database.dart';
 import '../database/database_provider.dart';
 import 'app_settings.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 
 class SettingsNotifier extends AsyncNotifier<AppSettings> {
   @override
@@ -23,7 +25,71 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
           : map['font_size'] == 'large'
           ? AppFontSize.large
           : AppFontSize.medium,
+      dateFormat: switch (map['date_format']) {
+        'iso' => AppDateFormat.iso,
+        'us' => AppDateFormat.us,
+        _ => AppDateFormat.korean,
+      },
+      timeFormat: switch (map['time_format']) {
+        'h12' => AppTimeFormat.h12,
+        _ => AppTimeFormat.h24,
+      },
+      lockEnabled: map['lock_enabled'] == 'true',
     );
+  }
+
+  Future<void> setLockEnabled(bool enabled) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(
+            key: 'lock_enabled',
+            value: enabled.toString(),
+          ),
+        );
+    state = AsyncData(state.value!.copyWith(lockEnabled: enabled));
+  }
+
+  Future<void> setPassword(String password) async {
+    final db = ref.read(databaseProvider);
+    final hash = sha256.convert(utf8.encode(password)).toString();
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(key: 'lock_password', value: hash),
+        );
+  }
+
+  Future<bool> verifyPassword(String password) async {
+    final db = ref.read(databaseProvider);
+    final row = await (db.select(
+      db.settingTable,
+    )..where((t) => t.key.equals('lock_password'))).getSingleOrNull();
+    if (row == null) return false;
+    final hash = sha256.convert(utf8.encode(password)).toString();
+    return row.value == hash;
+  }
+
+  // 날짜 형식
+  Future<void> setDateFormat(AppDateFormat format) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(key: 'date_format', value: format.name),
+        );
+    state = AsyncData(state.value!.copyWith(dateFormat: format));
+  }
+
+  Future<void> setTimeFormat(AppTimeFormat format) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(key: 'time_format', value: format.name),
+        );
+    state = AsyncData(state.value!.copyWith(timeFormat: format));
   }
 
   // 알림모드 설정

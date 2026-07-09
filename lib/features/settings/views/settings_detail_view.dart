@@ -20,7 +20,7 @@ class SettingsDetailView extends ConsumerWidget {
       SettingsCategory.appearance => _AppearanceSettings(),
       SettingsCategory.notification => _NotificationSettings(),
       SettingsCategory.productivity => _PlaceholderSettings(label: '생산성'),
-      SettingsCategory.security => _PlaceholderSettings(label: '보안'),
+      SettingsCategory.security => _SecuritySettings(),
       SettingsCategory.advanced => _PlaceholderSettings(label: '고급'),
       SettingsCategory.info => _InfoSettings(),
     };
@@ -48,6 +48,37 @@ class _GeneralSettings extends ConsumerWidget {
               onChanged: (v) =>
                   ref.read(settingsProvider.notifier).setTrayMode(v),
             ),
+          ),
+          const SizedBox(height: 16),
+          const _SectionHeader(title: '날짜 형식'),
+          const SizedBox(height: 8),
+          SegmentedButton<AppDateFormat>(
+            segments: const [
+              ButtonSegment(
+                value: AppDateFormat.iso,
+                label: Text('yyyy-mm-dd'),
+              ),
+              ButtonSegment(
+                value: AppDateFormat.korean,
+                label: Text('yyyy년 mm월 dd일'),
+              ),
+              ButtonSegment(value: AppDateFormat.us, label: Text('mm/dd/yyyy')),
+            ],
+            selected: {settings.dateFormat},
+            onSelectionChanged: (value) =>
+                ref.read(settingsProvider.notifier).setDateFormat(value.first),
+          ),
+          const SizedBox(height: 16),
+          const _SectionHeader(title: '시간 형식'),
+          const SizedBox(height: 8),
+          SegmentedButton<AppTimeFormat>(
+            segments: const [
+              ButtonSegment(value: AppTimeFormat.h24, label: Text('14:30')),
+              ButtonSegment(value: AppTimeFormat.h12, label: Text('2:30 PM')),
+            ],
+            selected: {settings.timeFormat},
+            onSelectionChanged: (value) =>
+                ref.read(settingsProvider.notifier).setTimeFormat(value.first),
           ),
           const SizedBox(height: 16),
           const _SectionHeader(title: '휴지통'),
@@ -535,6 +566,144 @@ class _SettingsRow extends StatelessWidget {
             ),
           ),
           trailing,
+        ],
+      ),
+    );
+  }
+}
+
+class _SecuritySettings extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_SecuritySettings> createState() => _SecuritySettingsState();
+}
+
+class _SecuritySettingsState extends ConsumerState<_SecuritySettings> {
+  final _newPasswordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _showNew = false;
+  bool _showConfirm = false;
+  String? _error;
+  String? _success;
+
+  @override
+  void dispose() {
+    _newPasswordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _savePassword() async {
+    final pw = _newPasswordController.text;
+    final confirm = _confirmController.text;
+
+    if (pw.length < 4) {
+      setState(() => _error = '비밀번호는 최소 4자리입니다');
+      return;
+    }
+    if (pw.length > 36) {
+      setState(() => _error = '비밀번호는 최대 36자리입니다');
+      return;
+    }
+    if (pw != confirm) {
+      setState(() => _error = '비밀번호가 일치하지 않습니다');
+      return;
+    }
+
+    await ref.read(settingsProvider.notifier).setPassword(pw);
+    setState(() {
+      _error = null;
+      _success = '비밀번호가 설정되었습니다';
+      _newPasswordController.clear();
+      _confirmController.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(settingsProvider);
+
+    return settingsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('오류: $e')),
+      data: (settings) => ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const _SectionHeader(title: '앱 잠금'),
+          _SettingsRow(
+            title: '잠금 모드',
+            subtitle: '앱 시작 및 트레이 복귀 시 비밀번호 입력',
+            trailing: Switch(
+              value: settings.lockEnabled,
+              onChanged: (v) {
+                if (v && _newPasswordController.text.isEmpty) {
+                  // 비밀번호 먼저 설정하도록
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('먼저 비밀번호를 설정하세요')),
+                  );
+                  return;
+                }
+                ref.read(settingsProvider.notifier).setLockEnabled(v);
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          const _SectionHeader(title: '비밀번호 설정'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _newPasswordController,
+            obscureText: !_showNew,
+            decoration: InputDecoration(
+              hintText: '새 비밀번호 (4~36자)',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              isDense: true,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _showNew ? Icons.visibility_off : Icons.visibility,
+                  size: 18,
+                ),
+                onPressed: () => setState(() => _showNew = !_showNew),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _confirmController,
+            obscureText: !_showConfirm,
+            decoration: InputDecoration(
+              hintText: '비밀번호 확인',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              isDense: true,
+              errorText: _error,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _showConfirm ? Icons.visibility_off : Icons.visibility,
+                  size: 18,
+                ),
+                onPressed: () => setState(() => _showConfirm = !_showConfirm),
+              ),
+            ),
+          ),
+          if (_success != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _success!,
+                style: const TextStyle(color: Colors.green, fontSize: 12),
+              ),
+            ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: _savePassword,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4A90E2),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('비밀번호 저장'),
+          ),
         ],
       ),
     );

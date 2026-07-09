@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:window_manager/window_manager.dart';
 
 class UpdateService {
   static const _owner = 'UZA97';
@@ -15,7 +16,7 @@ class UpdateService {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version; // 예: "1.0.0"
-
+      print('현재 버전: $currentVersion'); // 추가
       final response = await http.get(
         Uri.parse(_apiUrl),
         headers: {
@@ -24,7 +25,8 @@ class UpdateService {
           'User-Agent': 'Flutter-Update-Service-$_owner-$_repo',
         },
       );
-
+      print('GitHub 응답: ${response.statusCode}'); // 추가
+      print('GitHub body: ${response.body}'); // 추가
       if (response.statusCode != 200) {
         return UpdateCheckResult(
           hasUpdate: false,
@@ -102,8 +104,10 @@ class UpdateService {
 
     // 🌟 Inno Setup 인스톨러 백그라운드 무소음 실행 후 즉시 종료
     await Process.start(installerPath, [
-      '/SILENT',
+      '/VERYSILENT',
+      '/RESTARTAPPLICATIONS',
     ], mode: ProcessStartMode.detached);
+    await windowManager.destroy();
     exit(0);
   }
 }

@@ -3,22 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/notification/notification_service.dart';
 import 'core/tray/tray_service.dart';
+import '../core/settings/settings_provider.dart';
+import '../core/settings/app_settings.dart';
+import 'features/lock/views/lock_screen.dart';
 import 'features/memo/views/memo_list_view.dart';
 import 'features/memo/views/memo_editor_view.dart';
 import 'features/calendar/views/calendar_view.dart';
 import 'features/calendar/views/calendar_editor_view.dart';
-import 'features/mail/providers/mail_provider.dart';
-import 'features/mail/services/mail_check_service.dart';
 import 'features/settings/views/settings_view.dart';
 import 'features/mail/views/mail_list_view.dart';
 import 'features/mail/views/mail_detail_view.dart';
 import 'features/map/views/map_view.dart';
 import 'features/map/views/map_sidebar_view.dart';
 import 'core/providers/navigation_provider.dart';
-import '../core/settings/settings_provider.dart';
 import 'features/settings/views/settings_detail_view.dart';
-import '../core/settings/app_settings.dart';
-import 'features/memo/data/note_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,35 +103,7 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   final _trayService = TrayService();
-
-  @override
-  void initState() {
-    super.initState();
-
-    windowManager.addListener(this);
-    _initTray();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    NotificationService.init(ProviderScope.containerOf(context));
-    _initMailService();
-    _deleteExpiredNotes();
-  }
-
-  Future<void> _deleteExpiredNotes() async {
-    final repo = ref.read(noteRepositoryProvider);
-    await repo.deleteExpiredNotes();
-  }
-
-  Future<void> _initMailService() async {
-    final container = ProviderScope.containerOf(context);
-    final account = await container.read(mailAccountProvider.future);
-    if (account != null) {
-      container.read(mailCheckServiceProvider).start(account);
-    }
-  }
+  bool _isLocked = false;
 
   @override
   void onWindowClose() async {
@@ -145,19 +115,35 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     }
   }
 
-  @override
-  void dispose() {
-    windowManager.removeListener(this);
-    _trayService.destroy();
-    super.dispose();
+  // 트레이에서 복귀할 때 잠금 체크
+  Future<void> _showWindow() async {
+    final settings = ref.read(settingsProvider).value;
+    if (settings?.lockEnabled ?? false) {
+      setState(() => _isLocked = true);
+    }
+    await windowManager.show();
+    await windowManager.focus();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    _initTray();
+
+    // 앱 시작 시 잠금 체크
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final settings = ref.read(settingsProvider).value;
+      if (settings?.lockEnabled ?? false) {
+        setState(() => _isLocked = true);
+      }
+    });
+  }
+
+  @override
   Future<void> _initTray() async {
     await _trayService.init(
-      onShow: () async {
-        await windowManager.show();
-        await windowManager.focus();
-      },
+      onShow: _showWindow, // 기존 람다 대신 _showWindow 사용
       onExit: () async {
         await windowManager.destroy();
       },
@@ -166,6 +152,11 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
+    // 잠금 화면
+    if (_isLocked) {
+      return LockScreen(onUnlocked: () => setState(() => _isLocked = false));
+    }
+
     return Scaffold(
       body: Row(
         children: [
