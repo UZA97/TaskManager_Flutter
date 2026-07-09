@@ -15,6 +15,9 @@ class FolderTable extends Table {
   IntColumn get parentId => integer().nullable().references(FolderTable, #id)();
   RealColumn get sortOrder => real().withDefault(const Constant(0.0))();
   TextColumn get createdAt => text()();
+  BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
+  BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
+  RealColumn get favoriteSortOrder => real().withDefault(const Constant(0.0))();
 }
 
 class NoteTable extends Table {
@@ -29,6 +32,10 @@ class NoteTable extends Table {
   IntColumn get folderId => integer().nullable().references(FolderTable, #id)();
   RealColumn get sortOrder => real().withDefault(const Constant(0.0))();
   TextColumn get deletedAt => text().nullable()();
+  BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
+  BoolColumn get isImportant => boolean().withDefault(const Constant(false))();
+  BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
+  RealColumn get favoriteSortOrder => real().withDefault(const Constant(0.0))();
 }
 
 class TagTable extends Table {
@@ -108,7 +115,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -153,6 +160,26 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 5) {
         await m.addColumn(noteTable, noteTable.deletedAt as GeneratedColumn);
+      }
+      if (from < 6) {
+        await m.addColumn(noteTable, noteTable.isPinned as GeneratedColumn);
+        await m.addColumn(noteTable, noteTable.isImportant as GeneratedColumn);
+        await m.addColumn(folderTable, folderTable.isPinned as GeneratedColumn);
+      }
+      if (from < 7) {
+        await m.addColumn(noteTable, noteTable.isFavorite as GeneratedColumn);
+        await m.addColumn(
+          noteTable,
+          noteTable.favoriteSortOrder as GeneratedColumn,
+        );
+        await m.addColumn(
+          folderTable,
+          folderTable.isFavorite as GeneratedColumn,
+        );
+        await m.addColumn(
+          folderTable,
+          folderTable.favoriteSortOrder as GeneratedColumn,
+        );
       }
     },
   );

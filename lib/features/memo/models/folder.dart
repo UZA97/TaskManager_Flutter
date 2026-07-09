@@ -4,6 +4,9 @@ class Folder {
   final int? parentId;
   final double sortOrder;
   final String createdAt;
+  final bool isPinned;
+  final bool isFavorite;
+  final double favoriteSortOrder;
 
   const Folder({
     this.id,
@@ -11,6 +14,9 @@ class Folder {
     this.parentId,
     this.sortOrder = 0.0,
     required this.createdAt,
+    this.isPinned = false,
+    this.isFavorite = false,
+    this.favoriteSortOrder = 0.0,
   });
 
   Folder copyWith({
@@ -19,6 +25,9 @@ class Folder {
     int? parentId,
     double? sortOrder,
     String? createdAt,
+    bool? isPinned,
+    bool? isFavorite,
+    double? favoriteSortOrder,
   }) {
     return Folder(
       id: id ?? this.id,
@@ -26,6 +35,9 @@ class Folder {
       parentId: parentId ?? this.parentId,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
+      isPinned: isPinned ?? this.isPinned,
+      isFavorite: isFavorite ?? this.isFavorite,
+      favoriteSortOrder: favoriteSortOrder ?? this.favoriteSortOrder,
     );
   }
 }

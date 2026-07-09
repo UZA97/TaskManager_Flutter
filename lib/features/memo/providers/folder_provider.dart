@@ -74,6 +74,35 @@ class FolderListNotifier extends AsyncNotifier<List<Folder>> {
     await repo.moveFolder(id, newParentId);
     ref.invalidateSelf();
   }
+
+  Future<void> togglePin(int id, bool isPinned) async {
+    final repo = ref.read(folderRepositoryProvider);
+    await repo.togglePin(id, isPinned);
+    ref.invalidateSelf();
+  }
+
+  Future<void> toggleFavorite(int id, bool isFavorite) async {
+    final repo = ref.read(folderRepositoryProvider);
+    final folders = state.value ?? [];
+    final maxOrder = folders
+        .where((f) => f.isFavorite)
+        .fold(
+          0.0,
+          (max, f) => f.favoriteSortOrder > max ? f.favoriteSortOrder : max,
+        );
+    await repo.toggleFavorite(
+      id,
+      isFavorite,
+      isFavorite ? maxOrder + 1.0 : 0.0,
+    );
+    ref.invalidateSelf();
+  }
+
+  Future<void> updateFolderFavoriteSortOrder(int id, double sortOrder) async {
+    final repo = ref.read(folderRepositoryProvider);
+    await repo.updateFavoriteSortOrder(id, sortOrder);
+    ref.invalidateSelf();
+  }
 }
 
 final folderListProvider =

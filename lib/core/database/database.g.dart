@@ -68,6 +68,49 @@ class $FolderTableTable extends FolderTable
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isPinnedMeta = const VerificationMeta(
+    'isPinned',
+  );
+  @override
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+    'is_pinned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_pinned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
+  );
+  @override
+  late final GeneratedColumn<bool> isFavorite = GeneratedColumn<bool>(
+    'is_favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _favoriteSortOrderMeta = const VerificationMeta(
+    'favoriteSortOrder',
+  );
+  @override
+  late final GeneratedColumn<double> favoriteSortOrder =
+      GeneratedColumn<double>(
+        'favorite_sort_order',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0.0),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -75,6 +118,9 @@ class $FolderTableTable extends FolderTable
     parentId,
     sortOrder,
     createdAt,
+    isPinned,
+    isFavorite,
+    favoriteSortOrder,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -119,6 +165,27 @@ class $FolderTableTable extends FolderTable
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('is_pinned')) {
+      context.handle(
+        _isPinnedMeta,
+        isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta),
+      );
+    }
+    if (data.containsKey('is_favorite')) {
+      context.handle(
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
+      );
+    }
+    if (data.containsKey('favorite_sort_order')) {
+      context.handle(
+        _favoriteSortOrderMeta,
+        favoriteSortOrder.isAcceptableOrUnknown(
+          data['favorite_sort_order']!,
+          _favoriteSortOrderMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -148,6 +215,18 @@ class $FolderTableTable extends FolderTable
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
       )!,
+      isPinned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_pinned'],
+      )!,
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_favorite'],
+      )!,
+      favoriteSortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}favorite_sort_order'],
+      )!,
     );
   }
 
@@ -163,12 +242,18 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
   final int? parentId;
   final double sortOrder;
   final String createdAt;
+  final bool isPinned;
+  final bool isFavorite;
+  final double favoriteSortOrder;
   const FolderTableData({
     required this.id,
     required this.name,
     this.parentId,
     required this.sortOrder,
     required this.createdAt,
+    required this.isPinned,
+    required this.isFavorite,
+    required this.favoriteSortOrder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -180,6 +265,9 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
     }
     map['sort_order'] = Variable<double>(sortOrder);
     map['created_at'] = Variable<String>(createdAt);
+    map['is_pinned'] = Variable<bool>(isPinned);
+    map['is_favorite'] = Variable<bool>(isFavorite);
+    map['favorite_sort_order'] = Variable<double>(favoriteSortOrder);
     return map;
   }
 
@@ -192,6 +280,9 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
           : Value(parentId),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
+      isPinned: Value(isPinned),
+      isFavorite: Value(isFavorite),
+      favoriteSortOrder: Value(favoriteSortOrder),
     );
   }
 
@@ -206,6 +297,9 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
       parentId: serializer.fromJson<int?>(json['parentId']),
       sortOrder: serializer.fromJson<double>(json['sortOrder']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
+      isFavorite: serializer.fromJson<bool>(json['isFavorite']),
+      favoriteSortOrder: serializer.fromJson<double>(json['favoriteSortOrder']),
     );
   }
   @override
@@ -217,6 +311,9 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
       'parentId': serializer.toJson<int?>(parentId),
       'sortOrder': serializer.toJson<double>(sortOrder),
       'createdAt': serializer.toJson<String>(createdAt),
+      'isPinned': serializer.toJson<bool>(isPinned),
+      'isFavorite': serializer.toJson<bool>(isFavorite),
+      'favoriteSortOrder': serializer.toJson<double>(favoriteSortOrder),
     };
   }
 
@@ -226,12 +323,18 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
     Value<int?> parentId = const Value.absent(),
     double? sortOrder,
     String? createdAt,
+    bool? isPinned,
+    bool? isFavorite,
+    double? favoriteSortOrder,
   }) => FolderTableData(
     id: id ?? this.id,
     name: name ?? this.name,
     parentId: parentId.present ? parentId.value : this.parentId,
     sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
+    isPinned: isPinned ?? this.isPinned,
+    isFavorite: isFavorite ?? this.isFavorite,
+    favoriteSortOrder: favoriteSortOrder ?? this.favoriteSortOrder,
   );
   FolderTableData copyWithCompanion(FolderTableCompanion data) {
     return FolderTableData(
@@ -240,6 +343,13 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
       parentId: data.parentId.present ? data.parentId.value : this.parentId,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
+      favoriteSortOrder: data.favoriteSortOrder.present
+          ? data.favoriteSortOrder.value
+          : this.favoriteSortOrder,
     );
   }
 
@@ -250,13 +360,25 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
           ..write('name: $name, ')
           ..write('parentId: $parentId, ')
           ..write('sortOrder: $sortOrder, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('favoriteSortOrder: $favoriteSortOrder')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, parentId, sortOrder, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    parentId,
+    sortOrder,
+    createdAt,
+    isPinned,
+    isFavorite,
+    favoriteSortOrder,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -265,7 +387,10 @@ class FolderTableData extends DataClass implements Insertable<FolderTableData> {
           other.name == this.name &&
           other.parentId == this.parentId &&
           other.sortOrder == this.sortOrder &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.isPinned == this.isPinned &&
+          other.isFavorite == this.isFavorite &&
+          other.favoriteSortOrder == this.favoriteSortOrder);
 }
 
 class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
@@ -274,12 +399,18 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
   final Value<int?> parentId;
   final Value<double> sortOrder;
   final Value<String> createdAt;
+  final Value<bool> isPinned;
+  final Value<bool> isFavorite;
+  final Value<double> favoriteSortOrder;
   const FolderTableCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.parentId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.isPinned = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.favoriteSortOrder = const Value.absent(),
   });
   FolderTableCompanion.insert({
     this.id = const Value.absent(),
@@ -287,6 +418,9 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
     this.parentId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     required String createdAt,
+    this.isPinned = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.favoriteSortOrder = const Value.absent(),
   }) : name = Value(name),
        createdAt = Value(createdAt);
   static Insertable<FolderTableData> custom({
@@ -295,6 +429,9 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
     Expression<int>? parentId,
     Expression<double>? sortOrder,
     Expression<String>? createdAt,
+    Expression<bool>? isPinned,
+    Expression<bool>? isFavorite,
+    Expression<double>? favoriteSortOrder,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -302,6 +439,9 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
       if (parentId != null) 'parent_id': parentId,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
+      if (isPinned != null) 'is_pinned': isPinned,
+      if (isFavorite != null) 'is_favorite': isFavorite,
+      if (favoriteSortOrder != null) 'favorite_sort_order': favoriteSortOrder,
     });
   }
 
@@ -311,6 +451,9 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
     Value<int?>? parentId,
     Value<double>? sortOrder,
     Value<String>? createdAt,
+    Value<bool>? isPinned,
+    Value<bool>? isFavorite,
+    Value<double>? favoriteSortOrder,
   }) {
     return FolderTableCompanion(
       id: id ?? this.id,
@@ -318,6 +461,9 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
       parentId: parentId ?? this.parentId,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
+      isPinned: isPinned ?? this.isPinned,
+      isFavorite: isFavorite ?? this.isFavorite,
+      favoriteSortOrder: favoriteSortOrder ?? this.favoriteSortOrder,
     );
   }
 
@@ -339,6 +485,15 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
+    }
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<bool>(isFavorite.value);
+    }
+    if (favoriteSortOrder.present) {
+      map['favorite_sort_order'] = Variable<double>(favoriteSortOrder.value);
+    }
     return map;
   }
 
@@ -349,7 +504,10 @@ class FolderTableCompanion extends UpdateCompanion<FolderTableData> {
           ..write('name: $name, ')
           ..write('parentId: $parentId, ')
           ..write('sortOrder: $sortOrder, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('favoriteSortOrder: $favoriteSortOrder')
           ..write(')'))
         .toString();
   }
@@ -455,6 +613,64 @@ class $NoteTableTable extends NoteTable
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _isPinnedMeta = const VerificationMeta(
+    'isPinned',
+  );
+  @override
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+    'is_pinned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_pinned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isImportantMeta = const VerificationMeta(
+    'isImportant',
+  );
+  @override
+  late final GeneratedColumn<bool> isImportant = GeneratedColumn<bool>(
+    'is_important',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_important" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
+  );
+  @override
+  late final GeneratedColumn<bool> isFavorite = GeneratedColumn<bool>(
+    'is_favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _favoriteSortOrderMeta = const VerificationMeta(
+    'favoriteSortOrder',
+  );
+  @override
+  late final GeneratedColumn<double> favoriteSortOrder =
+      GeneratedColumn<double>(
+        'favorite_sort_order',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0.0),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -465,6 +681,10 @@ class $NoteTableTable extends NoteTable
     folderId,
     sortOrder,
     deletedAt,
+    isPinned,
+    isImportant,
+    isFavorite,
+    favoriteSortOrder,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -527,6 +747,36 @@ class $NoteTableTable extends NoteTable
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('is_pinned')) {
+      context.handle(
+        _isPinnedMeta,
+        isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta),
+      );
+    }
+    if (data.containsKey('is_important')) {
+      context.handle(
+        _isImportantMeta,
+        isImportant.isAcceptableOrUnknown(
+          data['is_important']!,
+          _isImportantMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_favorite')) {
+      context.handle(
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
+      );
+    }
+    if (data.containsKey('favorite_sort_order')) {
+      context.handle(
+        _favoriteSortOrderMeta,
+        favoriteSortOrder.isAcceptableOrUnknown(
+          data['favorite_sort_order']!,
+          _favoriteSortOrderMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -568,6 +818,22 @@ class $NoteTableTable extends NoteTable
         DriftSqlType.string,
         data['${effectivePrefix}deleted_at'],
       ),
+      isPinned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_pinned'],
+      )!,
+      isImportant: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_important'],
+      )!,
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_favorite'],
+      )!,
+      favoriteSortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}favorite_sort_order'],
+      )!,
     );
   }
 
@@ -586,6 +852,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
   final int? folderId;
   final double sortOrder;
   final String? deletedAt;
+  final bool isPinned;
+  final bool isImportant;
+  final bool isFavorite;
+  final double favoriteSortOrder;
   const NoteTableData({
     required this.id,
     required this.title,
@@ -595,6 +865,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     this.folderId,
     required this.sortOrder,
     this.deletedAt,
+    required this.isPinned,
+    required this.isImportant,
+    required this.isFavorite,
+    required this.favoriteSortOrder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -611,6 +885,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<String>(deletedAt);
     }
+    map['is_pinned'] = Variable<bool>(isPinned);
+    map['is_important'] = Variable<bool>(isImportant);
+    map['is_favorite'] = Variable<bool>(isFavorite);
+    map['favorite_sort_order'] = Variable<double>(favoriteSortOrder);
     return map;
   }
 
@@ -628,6 +906,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      isPinned: Value(isPinned),
+      isImportant: Value(isImportant),
+      isFavorite: Value(isFavorite),
+      favoriteSortOrder: Value(favoriteSortOrder),
     );
   }
 
@@ -645,6 +927,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       folderId: serializer.fromJson<int?>(json['folderId']),
       sortOrder: serializer.fromJson<double>(json['sortOrder']),
       deletedAt: serializer.fromJson<String?>(json['deletedAt']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
+      isImportant: serializer.fromJson<bool>(json['isImportant']),
+      isFavorite: serializer.fromJson<bool>(json['isFavorite']),
+      favoriteSortOrder: serializer.fromJson<double>(json['favoriteSortOrder']),
     );
   }
   @override
@@ -659,6 +945,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       'folderId': serializer.toJson<int?>(folderId),
       'sortOrder': serializer.toJson<double>(sortOrder),
       'deletedAt': serializer.toJson<String?>(deletedAt),
+      'isPinned': serializer.toJson<bool>(isPinned),
+      'isImportant': serializer.toJson<bool>(isImportant),
+      'isFavorite': serializer.toJson<bool>(isFavorite),
+      'favoriteSortOrder': serializer.toJson<double>(favoriteSortOrder),
     };
   }
 
@@ -671,6 +961,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     Value<int?> folderId = const Value.absent(),
     double? sortOrder,
     Value<String?> deletedAt = const Value.absent(),
+    bool? isPinned,
+    bool? isImportant,
+    bool? isFavorite,
+    double? favoriteSortOrder,
   }) => NoteTableData(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -680,6 +974,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     folderId: folderId.present ? folderId.value : this.folderId,
     sortOrder: sortOrder ?? this.sortOrder,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    isPinned: isPinned ?? this.isPinned,
+    isImportant: isImportant ?? this.isImportant,
+    isFavorite: isFavorite ?? this.isFavorite,
+    favoriteSortOrder: favoriteSortOrder ?? this.favoriteSortOrder,
   );
   NoteTableData copyWithCompanion(NoteTableCompanion data) {
     return NoteTableData(
@@ -691,6 +989,16 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
       folderId: data.folderId.present ? data.folderId.value : this.folderId,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
+      isImportant: data.isImportant.present
+          ? data.isImportant.value
+          : this.isImportant,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
+      favoriteSortOrder: data.favoriteSortOrder.present
+          ? data.favoriteSortOrder.value
+          : this.favoriteSortOrder,
     );
   }
 
@@ -704,7 +1012,11 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
           ..write('updatedAt: $updatedAt, ')
           ..write('folderId: $folderId, ')
           ..write('sortOrder: $sortOrder, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('isImportant: $isImportant, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('favoriteSortOrder: $favoriteSortOrder')
           ..write(')'))
         .toString();
   }
@@ -719,6 +1031,10 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
     folderId,
     sortOrder,
     deletedAt,
+    isPinned,
+    isImportant,
+    isFavorite,
+    favoriteSortOrder,
   );
   @override
   bool operator ==(Object other) =>
@@ -731,7 +1047,11 @@ class NoteTableData extends DataClass implements Insertable<NoteTableData> {
           other.updatedAt == this.updatedAt &&
           other.folderId == this.folderId &&
           other.sortOrder == this.sortOrder &&
-          other.deletedAt == this.deletedAt);
+          other.deletedAt == this.deletedAt &&
+          other.isPinned == this.isPinned &&
+          other.isImportant == this.isImportant &&
+          other.isFavorite == this.isFavorite &&
+          other.favoriteSortOrder == this.favoriteSortOrder);
 }
 
 class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
@@ -743,6 +1063,10 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
   final Value<int?> folderId;
   final Value<double> sortOrder;
   final Value<String?> deletedAt;
+  final Value<bool> isPinned;
+  final Value<bool> isImportant;
+  final Value<bool> isFavorite;
+  final Value<double> favoriteSortOrder;
   const NoteTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -752,6 +1076,10 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     this.folderId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.isPinned = const Value.absent(),
+    this.isImportant = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.favoriteSortOrder = const Value.absent(),
   });
   NoteTableCompanion.insert({
     this.id = const Value.absent(),
@@ -762,6 +1090,10 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     this.folderId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.isPinned = const Value.absent(),
+    this.isImportant = const Value.absent(),
+    this.isFavorite = const Value.absent(),
+    this.favoriteSortOrder = const Value.absent(),
   }) : createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<NoteTableData> custom({
@@ -773,6 +1105,10 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     Expression<int>? folderId,
     Expression<double>? sortOrder,
     Expression<String>? deletedAt,
+    Expression<bool>? isPinned,
+    Expression<bool>? isImportant,
+    Expression<bool>? isFavorite,
+    Expression<double>? favoriteSortOrder,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -783,6 +1119,10 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
       if (folderId != null) 'folder_id': folderId,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (isPinned != null) 'is_pinned': isPinned,
+      if (isImportant != null) 'is_important': isImportant,
+      if (isFavorite != null) 'is_favorite': isFavorite,
+      if (favoriteSortOrder != null) 'favorite_sort_order': favoriteSortOrder,
     });
   }
 
@@ -795,6 +1135,10 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     Value<int?>? folderId,
     Value<double>? sortOrder,
     Value<String?>? deletedAt,
+    Value<bool>? isPinned,
+    Value<bool>? isImportant,
+    Value<bool>? isFavorite,
+    Value<double>? favoriteSortOrder,
   }) {
     return NoteTableCompanion(
       id: id ?? this.id,
@@ -805,6 +1149,10 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
       folderId: folderId ?? this.folderId,
       sortOrder: sortOrder ?? this.sortOrder,
       deletedAt: deletedAt ?? this.deletedAt,
+      isPinned: isPinned ?? this.isPinned,
+      isImportant: isImportant ?? this.isImportant,
+      isFavorite: isFavorite ?? this.isFavorite,
+      favoriteSortOrder: favoriteSortOrder ?? this.favoriteSortOrder,
     );
   }
 
@@ -835,6 +1183,18 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<String>(deletedAt.value);
     }
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
+    }
+    if (isImportant.present) {
+      map['is_important'] = Variable<bool>(isImportant.value);
+    }
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<bool>(isFavorite.value);
+    }
+    if (favoriteSortOrder.present) {
+      map['favorite_sort_order'] = Variable<double>(favoriteSortOrder.value);
+    }
     return map;
   }
 
@@ -848,7 +1208,11 @@ class NoteTableCompanion extends UpdateCompanion<NoteTableData> {
           ..write('updatedAt: $updatedAt, ')
           ..write('folderId: $folderId, ')
           ..write('sortOrder: $sortOrder, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('isImportant: $isImportant, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('favoriteSortOrder: $favoriteSortOrder')
           ..write(')'))
         .toString();
   }
@@ -2626,6 +2990,9 @@ typedef $$FolderTableTableCreateCompanionBuilder =
       Value<int?> parentId,
       Value<double> sortOrder,
       required String createdAt,
+      Value<bool> isPinned,
+      Value<bool> isFavorite,
+      Value<double> favoriteSortOrder,
     });
 typedef $$FolderTableTableUpdateCompanionBuilder =
     FolderTableCompanion Function({
@@ -2634,6 +3001,9 @@ typedef $$FolderTableTableUpdateCompanionBuilder =
       Value<int?> parentId,
       Value<double> sortOrder,
       Value<String> createdAt,
+      Value<bool> isPinned,
+      Value<bool> isFavorite,
+      Value<double> favoriteSortOrder,
     });
 
 final class $$FolderTableTableReferences
@@ -2704,6 +3074,21 @@ class $$FolderTableTableFilterComposer
 
   ColumnFilters<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get favoriteSortOrder => $composableBuilder(
+    column: $table.favoriteSortOrder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2785,6 +3170,21 @@ class $$FolderTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get favoriteSortOrder => $composableBuilder(
+    column: $table.favoriteSortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FolderTableTableOrderingComposer get parentId {
     final $$FolderTableTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2829,6 +3229,19 @@ class $$FolderTableTableAnnotationComposer
 
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
+
+  GeneratedColumn<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get favoriteSortOrder => $composableBuilder(
+    column: $table.favoriteSortOrder,
+    builder: (column) => column,
+  );
 
   $$FolderTableTableAnnotationComposer get parentId {
     final $$FolderTableTableAnnotationComposer composer = $composerBuilder(
@@ -2912,12 +3325,18 @@ class $$FolderTableTableTableManager
                 Value<int?> parentId = const Value.absent(),
                 Value<double> sortOrder = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
+                Value<double> favoriteSortOrder = const Value.absent(),
               }) => FolderTableCompanion(
                 id: id,
                 name: name,
                 parentId: parentId,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
+                isPinned: isPinned,
+                isFavorite: isFavorite,
+                favoriteSortOrder: favoriteSortOrder,
               ),
           createCompanionCallback:
               ({
@@ -2926,12 +3345,18 @@ class $$FolderTableTableTableManager
                 Value<int?> parentId = const Value.absent(),
                 Value<double> sortOrder = const Value.absent(),
                 required String createdAt,
+                Value<bool> isPinned = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
+                Value<double> favoriteSortOrder = const Value.absent(),
               }) => FolderTableCompanion.insert(
                 id: id,
                 name: name,
                 parentId: parentId,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
+                isPinned: isPinned,
+                isFavorite: isFavorite,
+                favoriteSortOrder: favoriteSortOrder,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -3030,6 +3455,10 @@ typedef $$NoteTableTableCreateCompanionBuilder =
       Value<int?> folderId,
       Value<double> sortOrder,
       Value<String?> deletedAt,
+      Value<bool> isPinned,
+      Value<bool> isImportant,
+      Value<bool> isFavorite,
+      Value<double> favoriteSortOrder,
     });
 typedef $$NoteTableTableUpdateCompanionBuilder =
     NoteTableCompanion Function({
@@ -3041,6 +3470,10 @@ typedef $$NoteTableTableUpdateCompanionBuilder =
       Value<int?> folderId,
       Value<double> sortOrder,
       Value<String?> deletedAt,
+      Value<bool> isPinned,
+      Value<bool> isImportant,
+      Value<bool> isFavorite,
+      Value<double> favoriteSortOrder,
     });
 
 final class $$NoteTableTableReferences
@@ -3146,6 +3579,26 @@ class $$NoteTableTableFilterComposer
 
   ColumnFilters<String> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isImportant => $composableBuilder(
+    column: $table.isImportant,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get favoriteSortOrder => $composableBuilder(
+    column: $table.favoriteSortOrder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3267,6 +3720,26 @@ class $$NoteTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+    column: $table.isPinned,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isImportant => $composableBuilder(
+    column: $table.isImportant,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get favoriteSortOrder => $composableBuilder(
+    column: $table.favoriteSortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FolderTableTableOrderingComposer get folderId {
     final $$FolderTableTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -3320,6 +3793,24 @@ class $$NoteTableTableAnnotationComposer
 
   GeneratedColumn<String> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
+
+  GeneratedColumn<bool> get isImportant => $composableBuilder(
+    column: $table.isImportant,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get favoriteSortOrder => $composableBuilder(
+    column: $table.favoriteSortOrder,
+    builder: (column) => column,
+  );
 
   $$FolderTableTableAnnotationComposer get folderId {
     final $$FolderTableTableAnnotationComposer composer = $composerBuilder(
@@ -3435,6 +3926,10 @@ class $$NoteTableTableTableManager
                 Value<int?> folderId = const Value.absent(),
                 Value<double> sortOrder = const Value.absent(),
                 Value<String?> deletedAt = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
+                Value<bool> isImportant = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
+                Value<double> favoriteSortOrder = const Value.absent(),
               }) => NoteTableCompanion(
                 id: id,
                 title: title,
@@ -3444,6 +3939,10 @@ class $$NoteTableTableTableManager
                 folderId: folderId,
                 sortOrder: sortOrder,
                 deletedAt: deletedAt,
+                isPinned: isPinned,
+                isImportant: isImportant,
+                isFavorite: isFavorite,
+                favoriteSortOrder: favoriteSortOrder,
               ),
           createCompanionCallback:
               ({
@@ -3455,6 +3954,10 @@ class $$NoteTableTableTableManager
                 Value<int?> folderId = const Value.absent(),
                 Value<double> sortOrder = const Value.absent(),
                 Value<String?> deletedAt = const Value.absent(),
+                Value<bool> isPinned = const Value.absent(),
+                Value<bool> isImportant = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
+                Value<double> favoriteSortOrder = const Value.absent(),
               }) => NoteTableCompanion.insert(
                 id: id,
                 title: title,
@@ -3464,6 +3967,10 @@ class $$NoteTableTableTableManager
                 folderId: folderId,
                 sortOrder: sortOrder,
                 deletedAt: deletedAt,
+                isPinned: isPinned,
+                isImportant: isImportant,
+                isFavorite: isFavorite,
+                favoriteSortOrder: favoriteSortOrder,
               ),
           withReferenceMapper: (p0) => p0
               .map(

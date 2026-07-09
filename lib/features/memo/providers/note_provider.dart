@@ -108,6 +108,41 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(_fetchNotes);
   }
+
+  Future<void> togglePin(int id, bool isPinned) async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.togglePin(id, isPinned);
+    ref.invalidateSelf();
+  }
+
+  Future<void> toggleImportant(int id, bool isImportant) async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.toggleImportant(id, isImportant);
+    ref.invalidateSelf();
+  }
+
+  Future<void> toggleFavorite(int id, bool isFavorite) async {
+    final repo = ref.read(noteRepositoryProvider);
+    final notes = state.value ?? [];
+    final maxOrder = notes
+        .where((n) => n.isFavorite)
+        .fold(
+          0.0,
+          (max, n) => n.favoriteSortOrder > max ? n.favoriteSortOrder : max,
+        );
+    await repo.toggleFavorite(
+      id,
+      isFavorite,
+      isFavorite ? maxOrder + 1.0 : 0.0,
+    );
+    ref.invalidateSelf();
+  }
+
+  Future<void> updateFavoriteSortOrder(int id, double sortOrder) async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.updateFavoriteSortOrder(id, sortOrder);
+    ref.invalidateSelf();
+  }
 }
 
 final noteListProvider = AsyncNotifierProvider<NoteListNotifier, List<Note>>(
@@ -145,6 +180,18 @@ class TrashNotifier extends AsyncNotifier<List<Note>> {
   Future<void> emptyTrash() async {
     final repo = ref.read(noteRepositoryProvider);
     await repo.emptyTrash();
+    ref.invalidateSelf();
+  }
+
+  Future<void> togglePin(int id, bool isPinned) async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.togglePin(id, isPinned);
+    ref.invalidateSelf();
+  }
+
+  Future<void> toggleImportant(int id, bool isImportant) async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.toggleImportant(id, isImportant);
     ref.invalidateSelf();
   }
 }

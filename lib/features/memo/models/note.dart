@@ -10,6 +10,11 @@ class Note {
   final int? folderId;
   final double? sortOrder;
   final String? deletedAt;
+  final bool isPinned;
+  final bool isImportant;
+  final bool isFavorite;
+  final double favoriteSortOrder;
+
   const Note({
     this.id,
     required this.title,
@@ -20,6 +25,10 @@ class Note {
     this.folderId,
     this.sortOrder,
     this.deletedAt,
+    this.isPinned = false,
+    this.isImportant = false,
+    this.isFavorite = false,
+    this.favoriteSortOrder = 0.0,
   });
 
   Note copyWith({
@@ -32,6 +41,10 @@ class Note {
     int? folderId,
     double? sortOrder,
     Value<String?> deletedAt = const Value.absent(),
+    bool? isPinned,
+    bool? isImportant,
+    bool? isFavorite,
+    double? favoriteSortOrder,
   }) {
     return Note(
       id: id ?? this.id,
@@ -43,6 +56,10 @@ class Note {
       folderId: folderId ?? this.folderId,
       sortOrder: sortOrder ?? this.sortOrder,
       deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+      isPinned: isPinned ?? this.isPinned,
+      isImportant: isImportant ?? this.isImportant,
+      isFavorite: isFavorite ?? this.isFavorite,
+      favoriteSortOrder: favoriteSortOrder ?? this.favoriteSortOrder,
     );
   }
 }

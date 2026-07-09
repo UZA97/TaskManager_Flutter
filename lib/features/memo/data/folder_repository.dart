@@ -73,6 +73,12 @@ class FolderRepository {
     );
   }
 
+  Future<void> togglePin(int id, bool isPinned) async {
+    await (_db.update(_db.folderTable)..where((t) => t.id.equals(id))).write(
+      FolderTableCompanion(isPinned: Value(isPinned)),
+    );
+  }
+
   Folder _rowToFolder(FolderTableData row) {
     return Folder(
       id: row.id,
@@ -80,6 +86,24 @@ class FolderRepository {
       parentId: row.parentId,
       sortOrder: row.sortOrder,
       createdAt: row.createdAt,
+      isPinned: row.isPinned,
+      isFavorite: row.isFavorite,
+      favoriteSortOrder: row.favoriteSortOrder,
+    );
+  }
+
+  Future<void> toggleFavorite(int id, bool isFavorite, double sortOrder) async {
+    await (_db.update(_db.folderTable)..where((t) => t.id.equals(id))).write(
+      FolderTableCompanion(
+        isFavorite: Value(isFavorite),
+        favoriteSortOrder: Value(sortOrder),
+      ),
+    );
+  }
+
+  Future<void> updateFavoriteSortOrder(int id, double sortOrder) async {
+    await (_db.update(_db.folderTable)..where((t) => t.id.equals(id))).write(
+      FolderTableCompanion(favoriteSortOrder: Value(sortOrder)),
     );
   }
 }

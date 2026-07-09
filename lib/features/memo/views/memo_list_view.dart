@@ -146,26 +146,69 @@ class _FolderTree extends ConsumerWidget {
     if (searchQuery.isNotEmpty) {
       return _buildSearchResult(searchQuery);
     }
+
+    // 즐겨찾기 항목
+    final favFolders = folders.where((f) => f.isFavorite).toList()
+      ..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
+    final favNotes = notes.where((n) => n.isFavorite).toList()
+      ..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
+
     final rootFolders = folders.where((f) => f.parentId == null).toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-
     final rootNotes = notes.where((n) => n.folderId == null).toList()
       ..sort((a, b) => (a.sortOrder ?? 0.0).compareTo(b.sortOrder ?? 0.0));
 
-    if (rootFolders.isEmpty && rootNotes.isEmpty) {
-      return const Center(
-        child: Text('폴더가 없어요', style: TextStyle(color: Colors.grey)),
-      );
-    }
+    return ListView(
+      children: [
+        // 즐겨찾기 섹션
+        if (favFolders.isNotEmpty || favNotes.isNotEmpty) ...[
+          const _FavoriteSectionHeader(),
+          ..._buildFavoriteItems(context, ref, favFolders, favNotes),
+          const Divider(height: 1, color: Color(0xFFDDDDDD)),
+        ],
 
-    // 폴더랑 메모를 sortOrder 기준으로 합쳐서 렌더링
+        // 일반 트리
+        ..._buildNormalTree(context, ref, rootFolders, rootNotes),
+      ],
+    );
+  }
+
+  List<Widget> _buildFavoriteItems(
+    BuildContext context,
+    WidgetRef ref,
+    List<Folder> favFolders,
+    List<Note> favNotes,
+  ) {
+    final allItems = [
+      ...favFolders.map((f) => _TreeItem.folder(f)),
+      ...favNotes.map((n) => _TreeItem.note(n)),
+    ]..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
+
+    return allItems.map((item) {
+      if (item.isFolder) {
+        return _FavoriteItem(
+          folder: item.folder!,
+          allFolders: folders,
+          allNotes: notes,
+        );
+      } else {
+        return _FavoriteNoteItem(note: item.note!);
+      }
+    }).toList();
+  }
+
+  List<Widget> _buildNormalTree(
+    BuildContext context,
+    WidgetRef ref,
+    List<Folder> rootFolders,
+    List<Note> rootNotes,
+  ) {
     final allItems = [
       ...rootFolders.map((f) => _TreeItem.folder(f)),
       ...rootNotes.map((n) => _TreeItem.note(n)),
     ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
     final items = <Widget>[];
-
     items.add(
       _DropIndicator(
         parentId: null,
@@ -204,8 +247,89 @@ class _FolderTree extends ConsumerWidget {
       );
     }
 
-    return ListView(children: items);
+    return items;
   }
+
+  /*
+  // @override
+  // Widget build(BuildContext context, WidgetRef ref) {
+  //   final searchQuery = ref.watch(searchQueryProvider);
+
+  //   if (searchQuery.isNotEmpty) {
+  //     return _buildSearchResult(searchQuery);
+  //   }
+  //   // 즐겨찾기 항목
+  //   final favFolders = folders.where((f) => f.isFavorite).toList()
+  //     ..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
+  //   final favNotes = notes.where((n) => n.isFavorite).toList()
+  //     ..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
+
+  //   final rootFolders = folders.where((f) => f.parentId == null).toList()
+  //     ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+  //   final rootNotes = notes.where((n) => n.folderId == null).toList()
+  //     ..sort((a, b) => (a.sortOrder ?? 0.0).compareTo(b.sortOrder ?? 0.0));
+
+  //   if (rootFolders.isEmpty && rootNotes.isEmpty) {
+  //     return const Center(
+  //       child: Text('폴더가 없어요', style: TextStyle(color: Colors.grey)),
+  //     );
+  //   }
+
+  //   // 폴더랑 메모를 sortOrder 기준으로 합쳐서 렌더링
+  //   final allItems =
+  //       [
+  //         ...rootFolders.map((f) => _TreeItem.folder(f)),
+  //         ...rootNotes.map((n) => _TreeItem.note(n)),
+  //       ]..sort((a, b) {
+  //         // 핀된 항목 상단
+  //         if (a.isPinned && !b.isPinned) return -1;
+  //         if (!a.isPinned && b.isPinned) return 1;
+  //         return a.sortOrder.compareTo(b.sortOrder);
+  //       });
+
+  //   final items = <Widget>[];
+
+  //   items.add(
+  //     _DropIndicator(
+  //       parentId: null,
+  //       beforeSortOrder: allItems.isEmpty
+  //           ? 0.0
+  //           : allItems.first.sortOrder - 1.0,
+  //       afterSortOrder: allItems.isEmpty ? 1.0 : allItems.first.sortOrder,
+  //     ),
+  //   );
+
+  //   for (int i = 0; i < allItems.length; i++) {
+  //     final item = allItems[i];
+  //     if (item.isFolder) {
+  //       items.add(
+  //         _FolderNode(
+  //           folder: item.folder!,
+  //           allFolders: folders,
+  //           allNotes: notes,
+  //           depth: 0,
+  //         ),
+  //       );
+  //     } else {
+  //       items.add(_NoteNode(note: item.note!, depth: 0));
+  //     }
+
+  //     final after = i < allItems.length - 1
+  //         ? allItems[i + 1].sortOrder
+  //         : allItems[i].sortOrder + 1.0;
+
+  //     items.add(
+  //       _DropIndicator(
+  //         parentId: null,
+  //         beforeSortOrder: allItems[i].sortOrder,
+  //         afterSortOrder: after,
+  //       ),
+  //     );
+  //   }
+
+  //   return ListView(children: items);
+  // }*/
 
   Widget _buildSearchResult(String searchQuery) {
     // 검색된 메모만
@@ -399,10 +523,16 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
         if (_isExpanded) ...[
           // 폴더랑 메모를 sortOrder 기준으로 합쳐서 렌더링
           () {
-            final allItems = [
-              ...childFolders.map((f) => _TreeItem.folder(f)),
-              ...childNotes.map((n) => _TreeItem.note(n)),
-            ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+            final allItems =
+                [
+                  ...childFolders.map((f) => _TreeItem.folder(f)),
+                  ...childNotes.map((n) => _TreeItem.note(n)),
+                ]..sort((a, b) {
+                  // 핀된 항목 상단
+                  if (a.isPinned && !b.isPinned) return -1;
+                  if (!a.isPinned && b.isPinned) return 1;
+                  return a.sortOrder.compareTo(b.sortOrder);
+                });
 
             final items = <Widget>[];
 
@@ -537,17 +667,51 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
         position.dx,
         position.dy,
       ),
-      items: const [
-        PopupMenuItem(value: 'new_folder', child: Text('하위 폴더 만들기')),
-        PopupMenuItem(value: 'new_note', child: Text('메모 만들기')),
-        PopupMenuItem(value: 'rename', child: Text('이름 변경')),
-        PopupMenuItem(value: 'delete', child: Text('삭제')),
+      items: [
+        PopupMenuItem(
+          value: 'favorite',
+          child: Row(
+            children: [
+              Icon(
+                widget.folder.isFavorite ? Icons.star : Icons.star_border,
+                size: 16,
+                color: Colors.amber,
+              ),
+              const SizedBox(width: 8),
+              Text(widget.folder.isFavorite ? '즐겨찾기 해제' : '즐겨찾기'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(value: 'new_folder', child: Text('하위 폴더 만들기')),
+        const PopupMenuItem(value: 'new_note', child: Text('메모 만들기')),
+        const PopupMenuItem(value: 'rename', child: Text('이름 변경')),
+        const PopupMenuItem(value: 'delete', child: Text('삭제')),
+        PopupMenuItem(
+          value: 'pin',
+          child: Row(
+            children: [
+              Icon(
+                widget.folder.isPinned
+                    ? Icons.push_pin_outlined
+                    : Icons.push_pin,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(widget.folder.isPinned ? '고정 해제' : '상단 고정'),
+            ],
+          ),
+        ),
       ],
     );
 
     if (!context.mounted) return;
 
     switch (result) {
+      case 'favorite':
+        ref
+            .read(folderListProvider.notifier)
+            .toggleFavorite(widget.folder.id!, !widget.folder.isFavorite);
+        break;
       case 'new_folder':
         _showCreateFolderDialog(context, widget.folder.id);
         break;
@@ -560,6 +724,11 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
         break;
       case 'delete':
         _showDeleteDialog(context);
+        break;
+      case 'pin':
+        ref
+            .read(folderListProvider.notifier)
+            .togglePin(widget.folder.id!, !widget.folder.isPinned);
         break;
     }
   }
@@ -689,6 +858,10 @@ class _NoteNode extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (note.isImportant)
+              const Icon(Icons.priority_high, size: 12, color: Colors.orange),
+            if (note.isPinned)
+              const Icon(Icons.push_pin, size: 12, color: Color(0xFF4A90E2)),
           ],
         ),
       ),
@@ -738,15 +911,61 @@ class _NoteNode extends ConsumerWidget {
         position.dx,
         position.dy,
       ),
-      items: const [
-        PopupMenuItem(value: 'delete', child: Text('삭제')),
-        PopupMenuItem(value: 'duplicate', child: Text('복제')),
+      items: [
+        PopupMenuItem(
+          value: 'favorite',
+          child: Row(
+            children: [
+              Icon(
+                note.isFavorite ? Icons.star : Icons.star_border,
+                size: 16,
+                color: Colors.amber,
+              ),
+              const SizedBox(width: 8),
+              Text(note.isFavorite ? '즐겨찾기 해제' : '즐겨찾기'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'pin',
+          child: Row(
+            children: [
+              Icon(
+                note.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(note.isPinned ? '고정 해제' : '상단 고정'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'important',
+          child: Row(
+            children: [
+              Icon(
+                note.isImportant ? Icons.priority_high : Icons.outlined_flag,
+                size: 16,
+                color: note.isImportant ? Colors.orange : null,
+              ),
+              const SizedBox(width: 8),
+              Text(note.isImportant ? '중요 해제' : '중요 표시'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(value: 'delete', child: Text('삭제')),
+        const PopupMenuItem(value: 'duplicate', child: Text('복제')),
       ],
     );
 
     if (!context.mounted) return;
 
     switch (result) {
+      case 'favorite':
+        ref
+            .read(noteListProvider.notifier)
+            .toggleFavorite(note.id!, !note.isFavorite);
+        break;
       case 'delete':
         ref.read(noteListProvider.notifier).deleteNote(note.id!);
         break;
@@ -757,6 +976,14 @@ class _NoteNode extends ConsumerWidget {
           newNote.copyWith(title: '${note.title} (복사)', content: note.content),
         );
         ref.read(noteListProvider.notifier).refresh();
+        break;
+      case 'pin':
+        ref.read(noteListProvider.notifier).togglePin(note.id!, !note.isPinned);
+        break;
+      case 'important':
+        ref
+            .read(noteListProvider.notifier)
+            .toggleImportant(note.id!, !note.isImportant);
         break;
     }
   }
@@ -811,16 +1038,168 @@ class _TreeItem {
   final Folder? folder;
   final Note? note;
   final double sortOrder;
+  final bool isPinned;
+  final bool isFavorite;
+  final double favoriteSortOrder;
 
   _TreeItem.folder(Folder f)
     : isFolder = true,
       folder = f,
       note = null,
-      sortOrder = f.sortOrder;
+      sortOrder = f.sortOrder,
+      isPinned = f.isPinned,
+      isFavorite = f.isFavorite,
+      favoriteSortOrder = f.favoriteSortOrder;
 
   _TreeItem.note(Note n)
     : isFolder = false,
       folder = null,
       note = n,
-      sortOrder = n.sortOrder ?? 0.0;
+      sortOrder = n.sortOrder ?? 0.0,
+      isPinned = n.isPinned,
+      isFavorite = n.isFavorite,
+      favoriteSortOrder = n.favoriteSortOrder;
+}
+
+class _FavoriteSectionHeader extends StatelessWidget {
+  const _FavoriteSectionHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(8, 8, 8, 4),
+      child: Row(
+        children: [
+          Icon(Icons.star, size: 14, color: Colors.amber),
+          SizedBox(width: 6),
+          Text(
+            '즐겨찾기',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FavoriteItem extends ConsumerWidget {
+  final Folder folder;
+  final List<Folder> allFolders;
+  final List<Note> allNotes;
+
+  const _FavoriteItem({
+    required this.folder,
+    required this.allFolders,
+    required this.allNotes,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () {
+        // 원본 폴더 선택
+        ref.read(selectedFolderProvider.notifier).select(folder);
+      },
+      onSecondaryTapUp: (details) =>
+          _showContextMenu(context, ref, details.globalPosition),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        child: Row(
+          children: [
+            const Icon(Icons.folder, size: 14, color: Color(0xFF4A90E2)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                folder.name,
+                style: const TextStyle(fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.star, size: 10, color: Colors.amber),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showContextMenu(
+    BuildContext context,
+    WidgetRef ref,
+    Offset position,
+  ) async {
+    final result = await showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx,
+        position.dy,
+      ),
+      items: const [PopupMenuItem(value: 'unfavorite', child: Text('즐겨찾기 해제'))],
+    );
+    if (result == 'unfavorite') {
+      ref.read(folderListProvider.notifier).toggleFavorite(folder.id!, false);
+    }
+  }
+}
+
+class _FavoriteNoteItem extends ConsumerWidget {
+  final Note note;
+
+  const _FavoriteNoteItem({required this.note});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedNote = ref.watch(selectedNoteProvider);
+    final isSelected = selectedNote?.id == note.id;
+
+    return GestureDetector(
+      onTap: () => ref.read(selectedNoteProvider.notifier).select(note),
+      onSecondaryTapUp: (details) =>
+          _showContextMenu(context, ref, details.globalPosition),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
+        child: Row(
+          children: [
+            const Icon(Icons.note, size: 14, color: Colors.grey),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                note.title.isEmpty ? '제목 없음' : note.title,
+                style: const TextStyle(fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.star, size: 10, color: Colors.amber),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showContextMenu(
+    BuildContext context,
+    WidgetRef ref,
+    Offset position,
+  ) async {
+    final result = await showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx,
+        position.dy,
+      ),
+      items: const [PopupMenuItem(value: 'unfavorite', child: Text('즐겨찾기 해제'))],
+    );
+    if (result == 'unfavorite') {
+      ref.read(noteListProvider.notifier).toggleFavorite(note.id!, false);
+    }
+  }
 }

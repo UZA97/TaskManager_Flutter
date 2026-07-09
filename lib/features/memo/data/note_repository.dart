@@ -19,6 +19,37 @@ class NoteRepository {
       folderId: row.folderId,
       sortOrder: row.sortOrder,
       deletedAt: row.deletedAt,
+      isPinned: row.isPinned,
+      isImportant: row.isImportant,
+      isFavorite: row.isFavorite,
+      favoriteSortOrder: row.favoriteSortOrder,
+    );
+  }
+
+  Future<void> toggleFavorite(int id, bool isFavorite, double sortOrder) async {
+    await (_db.update(_db.noteTable)..where((t) => t.id.equals(id))).write(
+      NoteTableCompanion(
+        isFavorite: Value(isFavorite),
+        favoriteSortOrder: Value(sortOrder),
+      ),
+    );
+  }
+
+  Future<void> updateFavoriteSortOrder(int id, double sortOrder) async {
+    await (_db.update(_db.noteTable)..where((t) => t.id.equals(id))).write(
+      NoteTableCompanion(favoriteSortOrder: Value(sortOrder)),
+    );
+  }
+
+  Future<void> togglePin(int id, bool isPinned) async {
+    await (_db.update(_db.noteTable)..where((t) => t.id.equals(id))).write(
+      NoteTableCompanion(isPinned: Value(isPinned)),
+    );
+  }
+
+  Future<void> toggleImportant(int id, bool isImportant) async {
+    await (_db.update(_db.noteTable)..where((t) => t.id.equals(id))).write(
+      NoteTableCompanion(isImportant: Value(isImportant)),
     );
   }
 
