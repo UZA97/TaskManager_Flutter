@@ -1,11 +1,8 @@
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
-import '../models/note.dart';
-import 'dart:convert';
-import 'dart:typed_data';
+import 'package:appflowy_editor/appflowy_editor.dart';
 
 class PdfExportService {
   Future<pw.Font> _loadSystemFont({bool bold = false}) async {
@@ -16,126 +13,162 @@ class PdfExportService {
     );
     if (fontFile.existsSync()) {
       final bytes = await fontFile.readAsBytes();
-      final byteData = ByteData.sublistView(bytes);
-      return pw.Font.ttf(byteData);
+      return pw.Font.ttf(bytes.buffer.asByteData());
     }
-
     return bold ? pw.Font.helveticaBold() : pw.Font.helvetica();
   }
 
-  Future<String> exportToPdf(Note note) async {
+  Future<void> exportToPdf({
+    required EditorState editorState,
+    required String title,
+    required List<String> tags,
+  }) async {
     final font = await _loadSystemFont();
     final boldFont = await _loadSystemFont(bold: true);
 
     final pdf = pw.Document();
     final theme = pw.ThemeData.withFont(base: font, bold: boldFont);
 
-    // JSON 파싱
-    final blocks = _parseBlocks(note.content);
+    final List<pw.Widget> pdfWidgets = [];
+
+    // 제목
+    pdfWidgets.add(
+      pw.Text(
+        title.isEmpty ? '제목 없음' : title,
+        style: pw.TextStyle(font: boldFont, fontSize: 24),
+      ),
+    );
+    pdfWidgets.add(pw.SizedBox(height: 8));
+
+    // 태그
+    if (tags.isNotEmpty) {
+      pdfWidgets.add(
+        pw.Wrap(
+          spacing: 6,
+          children: tags.map((tag) {
+            return pw.Container(
+              padding: const pw.EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 2,
+              ),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.blue50,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(12)),
+              ),
+              child: pw.Text(
+                '#$tag',
+                style: pw.TextStyle(
+                  font: font,
+                  fontSize: 10,
+                  color: PdfColors.blue,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+      pdfWidgets.add(pw.SizedBox(height: 8));
+    }
+
+    pdfWidgets.add(pw.Divider());
+    pdfWidgets.add(pw.SizedBox(height: 8));
+
+    // 블록 순회
+    await _processNodes(
+      editorState.document.root.children.toList(),
+      pdfWidgets,
+      font,
+      boldFont,
+    );
 
     pdf.addPage(
       pw.MultiPage(
         theme: theme,
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(40),
-        build: (context) => [
-          // 제목
-          pw.Text(
-            note.title.isEmpty ? '제목 없음' : note.title,
-            style: pw.TextStyle(font: boldFont, fontSize: 24),
-          ),
-          pw.SizedBox(height: 8),
-          // 태그
-          if (note.tags.isNotEmpty)
-            pw.Wrap(
-              spacing: 6,
-              children: note.tags.map((tag) {
-                return pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.blue50,
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(12),
-                    ),
-                  ),
-                  child: pw.Text(
-                    '#$tag',
-                    style: pw.TextStyle(
-                      font: font,
-                      fontSize: 10,
-                      color: PdfColors.blue,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          pw.SizedBox(height: 4),
-          pw.Divider(),
-          pw.SizedBox(height: 8),
-          // 본문
-          ...blocks,
-        ],
+        build: (context) => pdfWidgets,
       ),
     );
 
-    // 저장
-    final dir = await getApplicationSupportDirectory();
-    final fileName =
-        '${note.title.isEmpty ? '제목없음' : note.title}_${DateTime.now().millisecondsSinceEpoch}.pdf';
-    final file = File(p.join(dir.path, 'exports', fileName));
-    await file.parent.create(recursive: true);
-    await file.writeAsBytes(await pdf.save());
+    // 저장 위치 선택
+    final outputPath = await FilePicker.platform.saveFile(
+      dialogTitle: 'PDF 저장',
+      fileName: '${title.isEmpty ? '제목없음' : title}.pdf',
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
 
-    return file.path;
+    if (outputPath == null) return;
+
+    final file = File(outputPath);
+    await file.writeAsBytes(await pdf.save());
   }
 
-  List<pw.Widget> _parseBlocks(String content) {
-    if (content.isEmpty) return [];
+  Future<void> _processNodes(
+    List<Node> nodes,
+    List<pw.Widget> pdfWidgets,
+    pw.Font font,
+    pw.Font boldFont, {
+    int depth = 0,
+  }) async {
+    for (final node in nodes) {
+      final widget = await _nodeToWidget(node, font, boldFont, depth: depth);
+      if (widget != null) pdfWidgets.add(widget);
 
-    try {
-      final json = jsonDecode(content);
-      final document = json['document'] as Map<String, dynamic>?;
-      if (document == null) return [];
-
-      final children = document['children'] as List<dynamic>? ?? [];
-      return children.map((block) => _blockToWidget(block)).toList();
-    } catch (e) {
-      return [pw.Text(content)];
+      if (node.children.isNotEmpty) {
+        await _processNodes(
+          node.children.toList(),
+          pdfWidgets,
+          font,
+          boldFont,
+          depth: depth + 1,
+        );
+      }
     }
   }
 
-  pw.Widget _blockToWidget(Map<String, dynamic> block) {
-    final type = block['type'] as String? ?? 'paragraph';
-    final attrs = block['attributes'] as Map<String, dynamic>? ?? {};
-    final children = block['delta'] as List<dynamic>? ?? [];
+  Future<pw.Widget?> _nodeToWidget(
+    Node node,
+    pw.Font font,
+    pw.Font boldFont, {
+    int depth = 0,
+  }) async {
+    final type = node.type;
+    final attrs = node.attributes;
+    final indent = depth * 12.0;
 
     switch (type) {
+      case 'paragraph':
+        final text = node.delta?.toPlainText() ?? '';
+        if (text.isEmpty) return pw.SizedBox(height: 8);
+        return pw.Padding(
+          padding: pw.EdgeInsets.only(bottom: 4, left: indent),
+          child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 11)),
+        );
+
       case 'heading':
         final level = attrs['level'] as int? ?? 1;
-        final text = _deltaToText(children);
+        final text = node.delta?.toPlainText() ?? '';
         return pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 8),
+          padding: const pw.EdgeInsets.only(bottom: 8, top: 8),
           child: pw.Text(
             text,
             style: pw.TextStyle(
+              font: boldFont,
               fontSize: level == 1
                   ? 20
                   : level == 2
                   ? 16
                   : 14,
-              fontWeight: pw.FontWeight.bold,
             ),
           ),
         );
 
       case 'todo_list':
         final checked = attrs['checked'] as bool? ?? false;
-        final text = _deltaToText(children);
+        final text = node.delta?.toPlainText() ?? '';
         return pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 4),
+          padding: pw.EdgeInsets.only(bottom: 4, left: indent),
           child: pw.Row(
             children: [
               pw.Container(
@@ -147,45 +180,68 @@ class PdfExportService {
                 ),
                 child: checked
                     ? pw.Center(
-                        child: pw.Text(
-                          '✓',
-                          style: const pw.TextStyle(
-                            fontSize: 8,
-                            color: PdfColors.white,
-                          ),
+                        child: pw.CustomPaint(
+                          size: const PdfPoint(10, 10),
+                          painter: (canvas, size) {
+                            canvas
+                              ..setStrokeColor(PdfColors.white)
+                              ..setLineWidth(1.5)
+                              ..moveTo(2, 5)
+                              ..lineTo(4.5, 7.5)
+                              ..lineTo(8, 3)
+                              ..strokePath();
+                          },
                         ),
                       )
                     : null,
               ),
               pw.SizedBox(width: 6),
-              pw.Text(text),
+              pw.Expanded(
+                child: pw.Text(
+                  text,
+                  style: pw.TextStyle(
+                    font: font,
+                    fontSize: 11,
+                    decoration: checked ? pw.TextDecoration.lineThrough : null,
+                  ),
+                ),
+              ),
             ],
           ),
         );
 
       case 'bulleted_list':
-        final text = _deltaToText(children);
+        final text = node.delta?.toPlainText() ?? '';
         return pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 4, left: 12),
+          padding: pw.EdgeInsets.only(bottom: 4, left: 12 + indent),
           child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('• '),
-              pw.Expanded(child: pw.Text(text)),
+              pw.Text(
+                depth == 0 ? '• ' : '◦ ',
+                style: pw.TextStyle(font: font),
+              ),
+              pw.Expanded(
+                child: pw.Text(
+                  text,
+                  style: pw.TextStyle(font: font, fontSize: 11),
+                ),
+              ),
             ],
           ),
         );
 
       case 'numbered_list':
-        final text = _deltaToText(children);
+        final text = node.delta?.toPlainText() ?? '';
         return pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 4, left: 12),
-          child: pw.Text(text),
+          padding: pw.EdgeInsets.only(bottom: 4, left: 12 + indent),
+          child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 11)),
         );
 
       case 'quote':
-        final text = _deltaToText(children);
+        final text = node.delta?.toPlainText() ?? '';
         return pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 8, left: 12),
+          padding: pw.EdgeInsets.only(bottom: 8, left: 12 + indent),
           child: pw.Container(
             decoration: const pw.BoxDecoration(
               border: pw.Border(
@@ -195,56 +251,19 @@ class PdfExportService {
             padding: const pw.EdgeInsets.only(left: 8),
             child: pw.Text(
               text,
-              style: const pw.TextStyle(color: PdfColors.grey600),
+              style: pw.TextStyle(
+                font: font,
+                fontSize: 11,
+                color: PdfColors.grey600,
+              ),
             ),
-          ),
-        );
-
-      case 'code':
-        final text = _deltaToText(children);
-        return pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 8),
-          child: pw.Container(
-            padding: const pw.EdgeInsets.all(8),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.grey100,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-            ),
-            child: pw.Text(
-              text,
-              style: pw.TextStyle(font: pw.Font.courier(), fontSize: 11),
-            ),
-          ),
-        );
-
-      case 'local_image':
-        final src = attrs['src'] as String? ?? '';
-        final file = File(src);
-        if (file.existsSync()) {
-          try {
-            final imageBytes = file.readAsBytesSync();
-            final image = pw.MemoryImage(imageBytes);
-            return pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 8),
-              child: pw.Image(image, width: 300),
-            );
-          } catch (_) {}
-        }
-        return pw.Text('[이미지: $src]');
-
-      case 'local_location':
-        final name = attrs['name'] as String? ?? '';
-        final lat = (attrs['lat'] as num?)?.toDouble() ?? 0.0;
-        final lng = (attrs['lng'] as num?)?.toDouble() ?? 0.0;
-        return pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 8),
-          child: pw.Row(
-            children: [pw.Text('📍 '), pw.Text('$name ($lat, $lng)')],
           ),
         );
 
       case 'local_code':
-        final code = attrs['code'] as String? ?? '';
+      case 'code':
+        final code =
+            attrs['code'] as String? ?? node.delta?.toPlainText() ?? '';
         final language = attrs['language'] as String? ?? '';
         return pw.Padding(
           padding: const pw.EdgeInsets.only(bottom: 8),
@@ -257,37 +276,87 @@ class PdfExportService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(
-                  language,
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey),
-                ),
-                pw.SizedBox(height: 4),
+                if (language.isNotEmpty)
+                  pw.Text(
+                    language,
+                    style: const pw.TextStyle(
+                      fontSize: 9,
+                      color: PdfColors.grey,
+                    ),
+                  ),
                 pw.Text(
                   code,
-                  style: pw.TextStyle(font: pw.Font.courier(), fontSize: 11),
+                  style: pw.TextStyle(font: pw.Font.courier(), fontSize: 10),
                 ),
               ],
             ),
           ),
         );
 
+      case 'local_image':
+        final src = attrs['src'] as String? ?? attrs['url'] as String? ?? '';
+        if (src.isEmpty) return null;
+        try {
+          final file = File(src);
+          if (await file.exists()) {
+            final bytes = await file.readAsBytes();
+            final image = pw.MemoryImage(bytes);
+            return pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 8),
+              child: pw.Image(image, height: 300, fit: pw.BoxFit.contain),
+            );
+          }
+        } catch (e) {
+          return pw.Text(
+            '[이미지를 불러올 수 없습니다]',
+            style: const pw.TextStyle(color: PdfColors.red),
+          );
+        }
+        return null;
+
       case 'local_file':
-        final fileName = attrs['fileName'] as String? ?? '';
+        final fileName = attrs['fileName'] as String? ?? '첨부파일';
         return pw.Padding(
           padding: const pw.EdgeInsets.only(bottom: 4),
-          child: pw.Text('📎 $fileName'),
+          child: pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey200,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Text(
+              '📎 $fileName',
+              style: pw.TextStyle(font: font, fontSize: 10),
+            ),
+          ),
+        );
+
+      case 'local_location':
+        final name = attrs['name'] as String? ?? '';
+        final lat = (attrs['lat'] as num?)?.toDouble() ?? 0.0;
+        final lng = (attrs['lng'] as num?)?.toDouble() ?? 0.0;
+        return pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 8),
+          child: pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Text(
+              '📍 $name ($lat, $lng)',
+              style: pw.TextStyle(font: font, fontSize: 10),
+            ),
+          ),
         );
 
       default:
-        final text = _deltaToText(children);
+        final text = node.delta?.toPlainText() ?? '';
+        if (text.isEmpty) return null;
         return pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 4),
-          child: pw.Text(text),
+          padding: pw.EdgeInsets.only(bottom: 4, left: indent),
+          child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 11)),
         );
     }
-  }
-
-  String _deltaToText(List<dynamic> delta) {
-    return delta.map((op) => op['insert'] as String? ?? '').join();
   }
 }

@@ -206,21 +206,21 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   }
 
   Future<void> _exportToPdf() async {
-    if (_currentNote == null) return;
+    if (_currentNote == null || _editorState == null) return;
+
+    for (final node in _editorState!.document.root.children) {
+      print('block type: ${node.type}, attrs: ${node.attributes}');
+    }
 
     try {
+      final tags = await ref
+          .read(noteRepositoryProvider)
+          .getNoteTags(_currentNote!.id!);
       final service = PdfExportService();
-      final filePath = await service.exportToPdf(_currentNote!);
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('PDF 저장됨: $filePath'),
-          action: SnackBarAction(
-            label: '열기',
-            onPressed: () => Process.run('explorer', [filePath]),
-          ),
-        ),
+      await service.exportToPdf(
+        editorState: _editorState!,
+        title: _currentNote!.title,
+        tags: tags,
       );
     } catch (e) {
       if (!mounted) return;
