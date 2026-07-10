@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   local_notifier
   pasteboard
+  printing
   screen_retriever_linux
   sqlite3_flutter_libs
   tray_manager

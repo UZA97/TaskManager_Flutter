@@ -18,6 +18,8 @@ import '../../map/services/vworld_service.dart';
 import '../../map/model/search_type.dart';
 import '../../map/widgets/location_search_dialog.dart';
 import 'package:pasteboard/pasteboard.dart';
+import '../data/note_repository.dart';
+import '../services/pdf_export_service.dart';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -203,6 +205,49 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
   }
 
+  Future<void> _exportToPdf() async {
+    if (_currentNote == null) return;
+
+    try {
+      final service = PdfExportService();
+      final filePath = await service.exportToPdf(_currentNote!);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PDF 저장됨: $filePath'),
+          action: SnackBarAction(
+            label: '열기',
+            onPressed: () => Process.run('explorer', [filePath]),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('PDF 내보내기 실패: $e')));
+    }
+  }
+
+  Future<void> _showTagDialog() async {
+    if (_currentNote == null) return;
+
+    final repo = ref.read(noteRepositoryProvider);
+    final currentTags = await repo.getNoteTags(_currentNote!.id!);
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (context) =>
+          _TagDialog(noteId: _currentNote!.id!, initialTags: currentTags),
+    );
+
+    // 다이얼로그 닫힌 후 메모 갱신
+    ref.read(noteListProvider.notifier).refresh();
+  }
+
   Future<void> _handleDrop(DropDoneDetails details) async {
     for (final file in details.files) {
       await _processFile(file.path);
@@ -367,7 +412,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     getDescription: () => 'Align left',
     command: 'ctrl+shift+l',
     handler: (editorState) {
-      print('align left 실행됨'); // ← 추가
       _setTextAlign('left');
       return KeyEventResult.handled;
     },
@@ -378,7 +422,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     getDescription: () => 'Align center',
     command: 'ctrl+shift+c',
     handler: (editorState) {
-      print('align center 실행됨'); // ← 추가
       _setTextAlign('center');
       return KeyEventResult.handled;
     },
@@ -545,15 +588,21 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   @override
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
+    final notes = ref.watch(noteListProvider).value ?? [];
 
+    // 항상 최신 상태로 동기화
     if (selectedNote != null) {
-      if (selectedNote.id != _currentNote?.id) {
-        _currentNote = selectedNote;
+      final freshNote = notes.firstWhere(
+        (n) => n.id == selectedNote.id,
+        orElse: () => selectedNote,
+      );
+      if (freshNote.id != _currentNote?.id) {
+        _currentNote = freshNote;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _initEditor(selectedNote);
+          _initEditor(freshNote);
         });
       } else {
-        _currentNote = selectedNote; // 같은 메모도 상태 동기화
+        _currentNote = freshNote;
       }
     }
 
@@ -666,13 +715,55 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                   ],
                 ),
               ),
+              if (_currentNote != null)
+                FutureBuilder<List<String>>(
+                  future: ref
+                      .read(noteRepositoryProvider)
+                      .getNoteTags(_currentNote!.id!),
+                  builder: (context, snapshot) {
+                    final tags = snapshot.data ?? [];
+                    if (tags.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: tags.map((tag) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F0FE),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '#$tag',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF4A90E2),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               const Divider(height: 1, color: Color(0xFFDDDDDD)),
+              const SizedBox(height: 24), // 제목 <-> 내용 간격
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: AppFlowyEditor(
                     editorState: _editorState!,
-                    editorStyle: const EditorStyle.desktop(),
+                    editorStyle: const EditorStyle.desktop(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                    ),
                     blockComponentBuilders: _blockBuilders,
                     commandShortcutEvents: shortcutEvents,
                     characterShortcutEvents: [
@@ -701,10 +792,25 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                 ),
                 child: Row(
                   children: [
+                    // 태그 버튼 (가장 왼쪽)
+                    IconButton(
+                      icon: const Icon(Icons.label_outline, size: 18),
+                      tooltip: '태그',
+                      onPressed: () => _showTagDialog(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.attach_file, size: 18),
                       tooltip: '파일 첨부',
                       onPressed: _pickFile,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.picture_as_pdf, size: 18),
+                      tooltip: 'PDF 내보내기',
+                      onPressed: _exportToPdf,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
                     const SizedBox(width: 16),
                     IconButton(
@@ -950,6 +1056,150 @@ class _LocationSearchDialogState extends State<LocationSearchDialog> {
                 onPressed: () => Navigator.pop(context),
                 child: const Text('취소'),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TagDialog extends ConsumerStatefulWidget {
+  final int noteId;
+  final List<String> initialTags;
+
+  const _TagDialog({required this.noteId, required this.initialTags});
+
+  @override
+  ConsumerState<_TagDialog> createState() => _TagDialogState();
+}
+
+class _TagDialogState extends ConsumerState<_TagDialog> {
+  late List<String> _tags;
+  final _controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _tags = List.from(widget.initialTags);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _addTag() {
+    final tag = _controller.text.trim();
+    if (tag.isEmpty || _tags.contains(tag)) return;
+    setState(() => _tags.add(tag));
+    _controller.clear();
+  }
+
+  void _removeTag(String tag) {
+    setState(() => _tags.remove(tag));
+  }
+
+  Future<void> _save() async {
+    final repo = ref.read(noteRepositoryProvider);
+    await repo.saveNoteTags(widget.noteId, _tags);
+
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: 360,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '태그 관리',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            // 태그 입력
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: '태그 입력',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      isDense: true,
+                      prefixText: '# ',
+                    ),
+                    onSubmitted: (_) => _addTag(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _addTag,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: const Text('추가'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 태그 칩 목록
+            if (_tags.isNotEmpty)
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _tags.map((tag) {
+                  return Chip(
+                    label: Text('#$tag', style: const TextStyle(fontSize: 12)),
+                    deleteIcon: const Icon(Icons.close, size: 14),
+                    onDeleted: () => _removeTag(tag),
+                    backgroundColor: const Color(0xFFE8F0FE),
+                    side: BorderSide.none,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  );
+                }).toList(),
+              )
+            else
+              const Text(
+                '태그가 없어요',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('취소'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4A90E2),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('저장'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

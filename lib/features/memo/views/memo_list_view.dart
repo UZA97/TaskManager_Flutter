@@ -252,7 +252,11 @@ class _FolderTree extends ConsumerWidget {
         // 즐겨찾기 섹션 (항상 표시)
         const _FavoriteSectionHeader(),
         ...favWidgets,
-        const Divider(height: 1, color: Color(0xFFDDDDDD)),
+        const Divider(
+          height: 1,
+          thickness: 1.5,
+          color: Color.fromARGB(255, 180, 180, 180),
+        ),
         // 일반 트리
         ...normalWidgets,
       ],
@@ -419,11 +423,15 @@ class _FolderTree extends ConsumerWidget {
 
   Widget _buildSearchResult(String searchQuery) {
     // 검색된 메모만
+    // 태그 검색 포함 - provider에서 이미 검색된 결과 그대로 사용
     final matchedNotes = notes
         .where(
           (n) =>
               n.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              n.content.toLowerCase().contains(searchQuery.toLowerCase()),
+              n.content.toLowerCase().contains(searchQuery.toLowerCase()) ||
+              n.tags.any(
+                (tag) => tag.toLowerCase().contains(searchQuery.toLowerCase()),
+              ), // 추가
         )
         .toList();
 
@@ -527,9 +535,6 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
     final childNotes = widget.allNotes
         .where((n) => n.folderId == widget.folder.id)
         .toList();
-    final hasChildren = childFolders.isNotEmpty || childNotes.isNotEmpty;
-    final selectedFolder = ref.watch(selectedFolderProvider);
-    final isSelected = selectedFolder?.id == widget.folder.id;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,6 +687,7 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
       onTap: () {
         setState(() => _isExpanded = !_isExpanded);
         ref.read(selectedFolderProvider.notifier).select(widget.folder);
+        ref.read(selectedNoteProvider.notifier).select(null); // 추가
       },
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, details.globalPosition),
@@ -774,21 +780,21 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
         const PopupMenuItem(value: 'new_note', child: Text('메모 만들기')),
         const PopupMenuItem(value: 'rename', child: Text('이름 변경')),
         const PopupMenuItem(value: 'delete', child: Text('삭제')),
-        PopupMenuItem(
-          value: 'pin',
-          child: Row(
-            children: [
-              Icon(
-                widget.folder.isPinned
-                    ? Icons.push_pin_outlined
-                    : Icons.push_pin,
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Text(widget.folder.isPinned ? '고정 해제' : '상단 고정'),
-            ],
-          ),
-        ),
+        // PopupMenuItem(
+        //   value: 'pin',
+        //   child: Row(
+        //     children: [
+        //       Icon(
+        //         widget.folder.isPinned
+        //             ? Icons.push_pin_outlined
+        //             : Icons.push_pin,
+        //         size: 16,
+        //       ),
+        //       const SizedBox(width: 8),
+        //       Text(widget.folder.isPinned ? '고정 해제' : '상단 고정'),
+        //     ],
+        //   ),
+        // ),
       ],
     );
 
@@ -921,7 +927,10 @@ class _NoteNode extends ConsumerWidget {
     final isSelected = selectedNote?.id == note.id;
 
     final noteRow = GestureDetector(
-      onTap: () => ref.read(selectedNoteProvider.notifier).select(note),
+      onTap: () {
+        ref.read(selectedNoteProvider.notifier).select(note);
+        ref.read(selectedFolderProvider.notifier).select(null); // 추가
+      },
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
       child: Container(
@@ -1200,28 +1209,55 @@ class _TreeItem {
       favoriteSortOrder = n.favoriteSortOrder;
 }
 
-class _FavoriteSectionHeader extends StatelessWidget {
+class _FavoriteSectionHeader extends ConsumerWidget {
   const _FavoriteSectionHeader();
 
   @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(8, 8, 8, 4),
-      child: Row(
-        children: [
-          Icon(Icons.star, size: 14, color: Colors.amber),
-          SizedBox(width: 6),
-          Text(
-            '즐겨찾기',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-              letterSpacing: 0.8,
-            ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DragTarget<TreeDragData>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (details) {
+        if (!details.data.isFavoriteItem) {
+          if (details.data.isFolder) {
+            ref
+                .read(folderListProvider.notifier)
+                .toggleFavorite(details.data.id, true);
+          } else {
+            ref
+                .read(noteListProvider.notifier)
+                .toggleFavorite(details.data.id, true);
+          }
+        }
+      },
+      builder: (context, candidateData, _) {
+        final isHovered = candidateData.isNotEmpty;
+        return Container(
+          height: 32,
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+          color: isHovered ? Colors.amber.withOpacity(0.1) : Colors.transparent,
+          child: Row(
+            children: [
+              const Icon(Icons.star, size: 14, color: Colors.amber),
+              const SizedBox(width: 6),
+              Text(
+                '즐겨찾기',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isHovered
+                      ? Colors.amber
+                      : const Color.fromARGB(255, 0, 0, 0),
+                  letterSpacing: 0.8,
+                ),
+              ),
+              if (isHovered) ...[
+                const Spacer(),
+                const Icon(Icons.add, size: 12, color: Colors.amber),
+              ],
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1239,16 +1275,12 @@ class _FavoriteItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedFolder = ref.watch(selectedFolderProvider);
-    final isSelected = selectedFolder?.id == folder.id;
-
     final child = GestureDetector(
       onTap: () => ref.read(selectedFolderProvider.notifier).select(folder),
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-        color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
+        padding: const EdgeInsets.fromLTRB(30, 4, 8, 4),
         child: Row(
           children: [
             const Icon(Icons.folder, size: 14, color: Color(0xFF4A90E2)),
@@ -1260,7 +1292,7 @@ class _FavoriteItem extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Icon(Icons.star, size: 10, color: Colors.amber),
+            // const Icon(Icons.star, size: 10, color: Colors.amber),
           ],
         ),
       ),
@@ -1323,16 +1355,12 @@ class _FavoriteNoteItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedNote = ref.watch(selectedNoteProvider);
-    final isSelected = selectedNote?.id == note.id;
-
     final child = GestureDetector(
       onTap: () => ref.read(selectedNoteProvider.notifier).select(note),
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
-        color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
+        padding: const EdgeInsets.fromLTRB(30, 4, 8, 4),
         child: Row(
           children: [
             const Icon(Icons.note, size: 14, color: Colors.grey),
@@ -1344,7 +1372,7 @@ class _FavoriteNoteItem extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Icon(Icons.star, size: 10, color: Colors.amber),
+            // const Icon(Icons.star, size: 10, color: Colors.amber),
           ],
         ),
       ),

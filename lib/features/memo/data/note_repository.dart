@@ -81,33 +81,24 @@ class NoteRepository {
     // 제목/내용으로 검색
     final rows =
         await (_db.select(_db.noteTable)..where(
-              (t) => t.title.contains(keyword) | t.content.contains(keyword),
+              (t) =>
+                  t.deletedAt.isNull() & // 추가
+                  (t.title.contains(keyword) | t.content.contains(keyword)),
             ))
             .get();
 
-    // 합치기 (중복 제거)
+    // 합치기 (중복 제거, 삭제된 메모 제외)
     final allIds = {...rows.map((r) => r.id), ...tagNoteIds};
 
-    // 전체 노트 중 해당 id만 필터
     final allRows =
         await (_db.select(_db.noteTable)
-              ..where((t) => t.id.isIn(allIds))
+              ..where((t) => t.id.isIn(allIds) & t.deletedAt.isNull()) // 추가
               ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
             .get();
-
     return Future.wait(
       allRows.map((row) async {
         final tags = await getNoteTags(row.id);
-        return Note(
-          id: row.id,
-          title: row.title,
-          content: row.content,
-          tags: tags,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-          folderId: row.folderId, // 추가
-          sortOrder: row.sortOrder, // 추가
-        );
+        return _rowToNote(row, tags);
       }),
     );
   }
@@ -220,12 +211,21 @@ class NoteRepository {
     )..where((t) => t.noteId.equals(noteId))).go();
 
     for (final tag in tags) {
-      await _db
-          .into(_db.tagTable)
-          .insertOnConflictUpdate(TagTableCompanion.insert(name: tag));
-      final tagRow = await (_db.select(
+      // 태그 이미 있는지 확인
+      var tagRow = await (_db.select(
         _db.tagTable,
-      )..where((t) => t.name.equals(tag))).getSingle();
+      )..where((t) => t.name.equals(tag))).getSingleOrNull();
+
+      // 없으면 새로 삽입
+      if (tagRow == null) {
+        final id = await _db
+            .into(_db.tagTable)
+            .insert(TagTableCompanion.insert(name: tag));
+        tagRow = await (_db.select(
+          _db.tagTable,
+        )..where((t) => t.id.equals(id))).getSingle();
+      }
+
       await _db
           .into(_db.noteTagTable)
           .insertOnConflictUpdate(
