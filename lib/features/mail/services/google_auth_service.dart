@@ -45,7 +45,6 @@ class GoogleAuthService {
         email: email,
       );
     } catch (e) {
-      print('signIn error: $e');
       return null;
     }
   }
@@ -70,7 +69,6 @@ class GoogleAuthService {
         email: email,
       );
     } catch (e) {
-      print('signInForCalendar error: $e');
       return null;
     }
   }
@@ -96,7 +94,6 @@ class GoogleAuthService {
       Uri.parse('https://www.googleapis.com/oauth2/v2/userinfo'),
       headers: {'Authorization': 'Bearer $accessToken'},
     );
-    print(response.body);
     if (response.statusCode != 200) return '';
     final json = jsonDecode(response.body);
     return json['email'] as String? ?? '';

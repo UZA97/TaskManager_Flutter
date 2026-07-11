@@ -39,13 +39,9 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     int? folderId,
     double newSortOrder,
   ) async {
-    print(
-      'moveNoteWithOrder: noteId=$noteId folderId=$folderId newSortOrder=$newSortOrder',
-    );
     final repo = ref.read(noteRepositoryProvider);
     await repo.moveNote(noteId, folderId);
     await repo.updateNoteSortOrder(noteId, newSortOrder);
-    print('moveNoteWithOrder 완료');
     ref.invalidateSelf();
   }
 
@@ -77,9 +73,6 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
         : currentNotes
               .map((n) => n.sortOrder ?? 0.0)
               .reduce((a, b) => a > b ? a : b);
-    print(
-      'createNote: folderId=${selectedFolder?.id} currentNotes=${currentNotes.length} maxSortOrder=$maxSortOrder sortOrder=${maxSortOrder + 1.0}',
-    );
 
     final note = await repo.createNote(
       folderId: selectedFolder?.id,

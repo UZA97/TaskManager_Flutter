@@ -81,9 +81,7 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
 
   Future<void> _syncGoogleCalendar(int year, int month) async {
     try {
-      print('_syncGoogleCalendar 시작: $year-$month');
       final accessToken = await _getAccessToken();
-      print('accessToken null?: ${accessToken == null}');
       if (accessToken == null) return;
 
       final repo = ref.read(eventRepositoryProvider);
@@ -92,14 +90,12 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
         year,
         month,
       );
-      print('googleEvents count: ${googleEvents.length}');
 
       for (final event in googleEvents) {
-        print('event: ${event.title} - ${event.eventDate}');
         await repo.upsertGoogleEvent(event);
       }
     } catch (e) {
-      print('_syncGoogleCalendar error: $e');
+      // Google Calendar 동기화 오류는 사용자 인터페이스에 영향을 주지 않도록 로그 없이 무시
     }
   }
 

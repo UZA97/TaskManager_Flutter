@@ -25,18 +25,21 @@ class AttachmentRepository {
   AttachmentRepository(this._db);
 
   Future<List<Attachment>> getAttachments(int noteId) async {
-    final rows = await (_db.select(_db.attachmentTable)
-          ..where((t) => t.noteId.equals(noteId))
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
-        .get();
+    final rows =
+        await (_db.select(_db.attachmentTable)
+              ..where((t) => t.noteId.equals(noteId))
+              ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+            .get();
     return rows
-        .map((row) => Attachment(
-              id: row.id,
-              noteId: row.noteId,
-              fileName: row.fileName,
-              filePath: row.filePath,
-              createdAt: row.createdAt,
-            ))
+        .map(
+          (row) => Attachment(
+            id: row.id,
+            noteId: row.noteId,
+            fileName: row.fileName,
+            filePath: row.filePath,
+            createdAt: row.createdAt,
+          ),
+        )
         .toList();
   }
 
@@ -46,7 +49,9 @@ class AttachmentRepository {
     required String filePath,
   }) async {
     final now = DateTime.now().toIso8601String();
-    final id = await _db.into(_db.attachmentTable).insert(
+    final id = await _db
+        .into(_db.attachmentTable)
+        .insert(
           AttachmentTableCompanion.insert(
             noteId: noteId,
             fileName: fileName,

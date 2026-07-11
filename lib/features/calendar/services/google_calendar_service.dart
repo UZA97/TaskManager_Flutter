@@ -29,7 +29,6 @@ class GoogleCalendarService {
     );
 
     if (response.statusCode != 200) {
-      print('getEvents error: ${response.body}');
       return [];
     }
 

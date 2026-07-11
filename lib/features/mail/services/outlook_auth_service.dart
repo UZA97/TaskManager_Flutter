@@ -89,7 +89,6 @@ class OutlookAuthService {
       },
     );
 
-    print('outlook token response: ${response.statusCode} ${response.body}');
     if (response.statusCode != 200) return null;
 
     final data = jsonDecode(response.body);

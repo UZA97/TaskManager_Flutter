@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/notification/notification_service.dart';
 import 'core/tray/tray_service.dart';
-import '../core/settings/settings_provider.dart';
-import '../core/settings/app_settings.dart';
+import 'core/settings/settings_provider.dart';
+import 'core/settings/app_settings.dart';
 import 'features/lock/views/lock_screen.dart';
 import 'features/memo/views/memo_list_view.dart';
 import 'features/memo/views/memo_editor_view.dart';
@@ -21,6 +21,7 @@ import 'features/settings/views/settings_detail_view.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 윈도우 앱의 표시/종료 동작을 제어하기 위해 window_manager 초기화
   await windowManager.ensureInitialized();
   await windowManager.setPreventClose(true);
   await windowManager.waitUntilReadyToShow(
@@ -140,10 +141,9 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     });
   }
 
-  @override
   Future<void> _initTray() async {
     await _trayService.init(
-      onShow: _showWindow, // 기존 람다 대신 _showWindow 사용
+      onShow: _showWindow, // 트레이 클릭 시 창을 보이고 잠금 상태를 체크합니다.
       onExit: () async {
         await windowManager.destroy();
       },
@@ -160,6 +160,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     return Scaffold(
       body: Row(
         children: [
+          // 왼쪽 네비게이션 패널
           NavigationRail(
             backgroundColor: const Color(0xFF2C2C2C),
             selectedIndex: ref.watch(navigationProvider),

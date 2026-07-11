@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
+// GitHub 릴리즈 정보를 기반으로 자동 업데이트를 확인하는 서비스 클래스
 class UpdateService {
   static const _owner = 'UZA97';
   static const _repo = 'TaskManager_Flutter';
@@ -16,7 +17,6 @@ class UpdateService {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version; // 예: "1.0.0"
-      print('현재 버전: $currentVersion'); // 추가
       final response = await http.get(
         Uri.parse(_apiUrl),
         headers: {
@@ -25,8 +25,6 @@ class UpdateService {
           'User-Agent': 'Flutter-Update-Service-$_owner-$_repo',
         },
       );
-      print('GitHub 응답: ${response.statusCode}'); // 추가
-      print('GitHub body: ${response.body}'); // 추가
       if (response.statusCode != 200) {
         return UpdateCheckResult(
           hasUpdate: false,

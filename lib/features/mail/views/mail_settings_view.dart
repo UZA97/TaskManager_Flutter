@@ -35,9 +35,6 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
       ? 'imap.gmail.com'
       : 'imap-mail.outlook.com';
 
-  String get _platformName =>
-      _selectedPlatform == MailPlatform.gmail ? 'Gmail' : 'Outlook';
-
   String get _emailHint => _selectedPlatform == MailPlatform.gmail
       ? 'example@gmail.com'
       : 'example@outlook.com';
@@ -75,7 +72,6 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
 
     try {
       final result = await _authService.signIn();
-      print('result: $result'); // 추가
 
       if (result == null) {
         setState(() => _isSaving = false);
@@ -95,7 +91,6 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
       await ref.read(mailAccountProvider.notifier).saveAccount(account);
       setState(() => _isSaving = false);
     } catch (e) {
-      print('_signInWithGoogle error: $e'); // 추가
       setState(() => _isSaving = false);
     }
   }

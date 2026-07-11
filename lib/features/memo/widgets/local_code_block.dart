@@ -1,7 +1,6 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart' as provider;
-import 'package:flutter/services.dart';
 import 'package:highlight/highlight.dart' hide Node;
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/github.dart';
@@ -162,7 +161,6 @@ class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget>
 
     if (code.isNotEmpty) {
       final result = highlight.parse(code, autoDetection: true);
-      print(result.relevance);
       detectedLang = result.language ?? 'text';
     }
 
