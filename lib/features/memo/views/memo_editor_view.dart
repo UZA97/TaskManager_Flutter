@@ -280,6 +280,73 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     );
   }
 
+  /// Alt+0~9 / Alt+Shift+0~9 단축키로 텍스트 색상과 하이라이트를 적용합니다.
+  List<CommandShortcutEvent> _buildColorShortcutEvents() {
+    final textColors = [
+      const Color(0xFFE53935),
+      const Color(0xFFFF9800),
+      const Color(0xFFFFEB3B),
+      const Color(0xFF4CAF50),
+      const Color(0xFF2196F3),
+      const Color(0xFF3F51B5),
+      const Color(0xFF9C27B0),
+      const Color(0xFF9E9E9E),
+      const Color(0xFF009688),
+      Colors.black,
+    ];
+
+    final highlightColors = [
+      const Color(0xFFE53935),
+      const Color(0xFFFF9800),
+      const Color(0xFFFFEB3B),
+      const Color(0xFF4CAF50),
+      const Color(0xFF2196F3),
+      const Color(0xFF3F51B5),
+      const Color(0xFF9C27B0),
+      const Color(0xFF9E9E9E),
+      const Color(0xFF009688),
+      Colors.transparent,
+    ];
+
+    final textColorEvents = List.generate(10, (index) {
+      final color = textColors[index];
+      return CommandShortcutEvent(
+        key: 'apply text color ${index.toString()}',
+        getDescription: () => 'Apply text color ${index.toString()}',
+        command: 'alt+${index.toString()}',
+        handler: (editorState) {
+          final selection = editorState.selection;
+          if (selection == null || selection.isCollapsed) {
+            return KeyEventResult.ignored;
+          }
+          _lastSelection = selection;
+          _applyColor('color', color);
+          return KeyEventResult.handled;
+        },
+      );
+    });
+
+    final highlightEvents = List.generate(10, (index) {
+      final color = highlightColors[index];
+      return CommandShortcutEvent(
+        key: 'apply highlight ${index.toString()}',
+        getDescription: () => 'Apply highlight ${index.toString()}',
+        command: 'alt+shift+${index.toString()}',
+        handler: (editorState) {
+          final selection = editorState.selection;
+          if (selection == null || selection.isCollapsed) {
+            return KeyEventResult.ignored;
+          }
+          _lastSelection = selection;
+          _applyColor('backgroundColor', color);
+          return KeyEventResult.handled;
+        },
+      );
+    });
+
+    return [...textColorEvents, ...highlightEvents];
+  }
+
   @override
   void dispose() {
     _saveTimer?.cancel();
@@ -869,6 +936,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         .toList();
 
     final shortcutEvents = [
+      ..._buildColorShortcutEvents(),
       _pasteHandler,
       _backspaceHandler,
       _deleteHandler,
@@ -1236,6 +1304,16 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final colorHex =
         '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
 
+    final attributeKey = attribute == 'color'
+        ? AppFlowyRichTextKeys.textColor
+        : AppFlowyRichTextKeys.backgroundColor;
+
+    // 메뉴 상호작용 중에 에디터의 현재 선택 영역이 풀릴 수 있으므로,
+    // 저장한 선택 영역을 다시 설정합니다.
+    if (editorState.selection != selection) {
+      editorState.selection = selection;
+    }
+
     final nodes = editorState.getNodesInSelection(selection);
     final transaction = editorState.transaction;
 
@@ -1251,7 +1329,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
           : delta.length;
 
       transaction.formatText(node, startIndex, endIndex - startIndex, {
-        attribute: colorHex,
+        attributeKey: colorHex,
       });
     }
     editorState.apply(transaction);

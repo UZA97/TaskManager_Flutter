@@ -45,6 +45,7 @@ void main() async {
 class TaskManagerApp extends ConsumerWidget {
   const TaskManagerApp({super.key});
 
+  /// 앱 설정에 따라 사용할 기본 글자 크기를 계산합니다.
   double _fontSizeBase(AppFontSize size) => switch (size) {
     AppFontSize.small => 12.0,
     AppFontSize.medium => 14.0,
@@ -98,13 +99,62 @@ class TaskManagerApp extends ConsumerWidget {
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
+  /// 메인 앱의 좌측 네비게이션과 우측 콘텐츠 영역을 구성하는 상태 위젯입니다.
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
 }
 
 class _MainShellState extends ConsumerState<MainShell> with WindowListener {
+  /// 앱 실행 중 트레이 동작과 창 표시/종료를 담당하는 서비스입니다.
   final _trayService = TrayService();
   bool _isLocked = false;
+
+  /// 메인 화면 좌측 네비게이션에 표시할 항목 목록입니다.
+  static const List<NavigationRailDestination> _navigationDestinations = [
+    NavigationRailDestination(
+      icon: Icon(Icons.note, color: Colors.white),
+      selectedIcon: Icon(Icons.note, color: Color(0xFF4A90E2)),
+      label: Text('메모'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.calendar_month, color: Colors.white),
+      selectedIcon: Icon(Icons.calendar_month, color: Color(0xFF4A90E2)),
+      label: Text('캘린더'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.mail, color: Colors.white),
+      selectedIcon: Icon(Icons.mail, color: Color(0xFF4A90E2)),
+      label: Text('메일'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.map, color: Colors.white),
+      selectedIcon: Icon(Icons.map, color: Color(0xFF4A90E2)),
+      label: Text('지도'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.settings, color: Colors.white),
+      selectedIcon: Icon(Icons.settings, color: Color(0xFF4A90E2)),
+      label: Text('설정'),
+    ),
+  ];
+
+  /// 메인 화면 좌측 패널에 보여줄 사이드바 콘텐츠 목록입니다.
+  static const List<Widget> _sidePanels = [
+    MemoListView(),
+    CalendarView(),
+    MailListView(),
+    MapSidebarView(),
+    SettingsView(),
+  ];
+
+  /// 메인 화면 우측 콘텐츠 영역에 보여줄 상세 뷰 목록입니다.
+  static const List<Widget> _detailPanels = [
+    MemoEditorView(),
+    CalendarEditorView(),
+    MailDetailView(),
+    MapView(),
+    SettingsDetailView(),
+  ];
 
   @override
   void onWindowClose() async {
@@ -168,62 +218,21 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
               ref.read(navigationProvider.notifier).navigateTo(index);
             },
             labelType: NavigationRailLabelType.none,
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.note, color: Colors.white),
-                selectedIcon: Icon(Icons.note, color: Color(0xFF4A90E2)),
-                label: Text('메모'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.calendar_month, color: Colors.white),
-                selectedIcon: Icon(
-                  Icons.calendar_month,
-                  color: Color(0xFF4A90E2),
-                ),
-                label: Text('캘린더'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.mail, color: Colors.white),
-                selectedIcon: Icon(Icons.mail, color: Color(0xFF4A90E2)),
-                label: Text('메일'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.map, color: Colors.white),
-                selectedIcon: Icon(Icons.map, color: Color(0xFF4A90E2)),
-                label: Text('지도'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.settings, color: Colors.white),
-                selectedIcon: Icon(Icons.settings, color: Color(0xFF4A90E2)),
-                label: Text('설정'),
-              ),
-            ],
+            destinations: _navigationDestinations,
           ),
           Container(
             width: 250,
             color: Theme.of(context).colorScheme.surfaceContainerLow,
             child: IndexedStack(
               index: ref.watch(navigationProvider),
-              children: const [
-                MemoListView(), // 0: 메모
-                CalendarView(), // 1: 캘린더
-                MailListView(), // 2: 메일
-                MapSidebarView(), // 3: 지도 (새로 만들 거)
-                SettingsView(), // 4: 설정
-              ],
+              children: _sidePanels,
             ),
           ),
           const VerticalDivider(width: 1, color: Color(0xFFDDDDDD)),
           Expanded(
             child: IndexedStack(
               index: ref.watch(navigationProvider),
-              children: const [
-                MemoEditorView(), // 0: 메모
-                CalendarEditorView(), // 1: 캘린더
-                MailDetailView(), // 2: 메일
-                MapView(), // 3: 지도 (새로 만들 거)
-                SettingsDetailView(), // 4: 설정
-              ],
+              children: _detailPanels,
             ),
           ),
         ],

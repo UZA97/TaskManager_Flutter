@@ -211,6 +211,7 @@ class MemoEditorColorDropdown extends StatelessWidget {
   final VoidCallback? onOpen;
 
   static const _colors = [
+    (Color.fromARGB(255, 0, 0, 0), '검정'),
     (Color(0xFFE53935), '빨강'),
     (Color(0xFFFF9800), '주황'),
     (Color(0xFFFFEB3B), '노랑'),
@@ -219,7 +220,7 @@ class MemoEditorColorDropdown extends StatelessWidget {
     (Color(0xFF3F51B5), '남색'),
     (Color(0xFF9C27B0), '보라'),
     (Color(0xFF9E9E9E), '회색'),
-    (Color(0xFF009688), '에메랄드'),
+    (Color.fromARGB(255, 255, 255, 255), '흰색'),
   ];
 
   const MemoEditorColorDropdown({
