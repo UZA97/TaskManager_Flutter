@@ -7,7 +7,6 @@ import '../data/mail_repository.dart';
 import '../models/mail_account.dart';
 import '../models/mail_message.dart';
 import 'google_auth_service.dart';
-import 'outlook_auth_service.dart';
 
 class MailCheckService {
   Timer? _timer;
@@ -53,10 +52,9 @@ class MailCheckService {
       final messages = json['messages'] as List<dynamic>? ?? [];
       if (messages.isNotEmpty) {
         _lastMessageId = messages.first['id'] as String;
-        print('초기 lastMessageId: $_lastMessageId');
       }
     } catch (e) {
-      print('_initLastMessageId error: $e');
+      // 초기 메일 ID 조회 중 오류 발생 시 무시
     }
   }
 
@@ -105,7 +103,7 @@ class MailCheckService {
 
       _lastMessageId = latestId;
     } catch (e) {
-      print('_checkNewMail error: $e');
+      // 새 메일 확인 중 오류 발생 시 무시
     }
   }
 
@@ -224,13 +222,12 @@ class MailCheckService {
       );
 
       if (response.statusCode != 200) {
-        print('outlook fetchMessages error: ${response.body}');
         return [];
       }
 
       final data = jsonDecode(response.body);
       final messages = data['value'] as List<dynamic>? ?? [];
-      _nextPageToken = data['\@odata.nextLink'] as String?;
+      _nextPageToken = data['@odata.nextLink'] as String?;
 
       return messages.map((msg) {
         final from = msg['from']?['emailAddress']?['address'] as String? ?? '';
@@ -252,7 +249,6 @@ class MailCheckService {
         );
       }).toList();
     } catch (e) {
-      print('_fetchOutlookMessages error: $e');
       return [];
     }
   }
@@ -290,7 +286,6 @@ class MailCheckService {
 
       return messages;
     } catch (e) {
-      print('_fetchGmailMessages error: $e');
       return [];
     }
   }

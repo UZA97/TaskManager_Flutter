@@ -120,7 +120,8 @@ class AppDatabase extends _$AppDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
-      await m.createAllTables();
+      // 새 데이터베이스 생성 시 모든 Drift 테이블을 초기화합니다.
+      await m.createAll();
       final now = DateTime.now().toIso8601String();
       final defaultFolderId = await into(
         folderTable,
@@ -130,6 +131,7 @@ class AppDatabase extends _$AppDatabase {
       );
     },
     onUpgrade: (m, from, to) async {
+      // 기존 데이터베이스 버전에 따라 필요한 마이그레이션을 순차적으로 적용합니다.
       if (from < 2) {
         await m.createTable(eventTable);
       }

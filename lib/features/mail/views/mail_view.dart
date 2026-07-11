@@ -93,8 +93,10 @@ class _MailViewState extends ConsumerState<MailView> {
             children: [
               // 헤더
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: Color(0xFFDDDDDD))),
                 ),
@@ -102,8 +104,10 @@ class _MailViewState extends ConsumerState<MailView> {
                   children: [
                     const Text(
                       '받은편지함',
-                      style:
-                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
@@ -129,17 +133,23 @@ class _MailViewState extends ConsumerState<MailView> {
                       children: [
                         const Icon(Icons.error_outline, color: Colors.grey),
                         const SizedBox(height: 8),
-                        Text('$e',
-                            style: const TextStyle(
-                                color: Colors.grey, fontSize: 12)),
+                        Text(
+                          '$e',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   data: (messages) {
                     if (messages.isEmpty) {
                       return const Center(
-                        child: Text('메일이 없어요',
-                            style: TextStyle(color: Colors.grey)),
+                        child: Text(
+                          '메일이 없어요',
+                          style: TextStyle(color: Colors.grey),
+                        ),
                       );
                     }
                     return ListView.builder(
@@ -198,9 +208,7 @@ class _MailListItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
-          border: const Border(
-            bottom: BorderSide(color: Color(0xFFEEEEEE)),
-          ),
+          border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,8 +231,9 @@ class _MailListItem extends StatelessWidget {
                     message.from,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight:
-                          message.isRead ? FontWeight.normal : FontWeight.bold,
+                      fontWeight: message.isRead
+                          ? FontWeight.normal
+                          : FontWeight.bold,
                       color: Colors.black87,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -241,8 +250,9 @@ class _MailListItem extends StatelessWidget {
               message.subject,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight:
-                    message.isRead ? FontWeight.normal : FontWeight.w600,
+                fontWeight: message.isRead
+                    ? FontWeight.normal
+                    : FontWeight.w600,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -302,8 +312,11 @@ class _MailDetailView extends StatelessWidget {
                   color: const Color(0xFF4A90E2).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(Icons.person,
-                    color: Color(0xFF4A90E2), size: 18),
+                child: const Icon(
+                  Icons.person,
+                  color: Color(0xFF4A90E2),
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -313,7 +326,9 @@ class _MailDetailView extends StatelessWidget {
                     Text(
                       message.from,
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w500),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Text(
                       '${message.date.year}.${message.date.month}.${message.date.day} '

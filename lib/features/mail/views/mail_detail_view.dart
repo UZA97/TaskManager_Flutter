@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
-import '../widgets/mail_login_dialog.dart';
 
 class MailDetailView extends ConsumerWidget {
   const MailDetailView({super.key});

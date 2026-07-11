@@ -9,6 +9,7 @@ import 'dart:convert';
 class SettingsNotifier extends AsyncNotifier<AppSettings> {
   @override
   Future<AppSettings> build() async {
+    // 앱 설정을 데이터베이스에서 읽어 초기 상태를 구성합니다.
     final db = ref.watch(databaseProvider);
     final rows = await db.select(db.settingTable).get();
     final map = {for (final r in rows) r.key: r.value};
@@ -48,7 +49,8 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
             value: enabled.toString(),
           ),
         );
-    state = AsyncData(state.value!.copyWith(lockEnabled: enabled));
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(lockEnabled: enabled));
   }
 
   Future<void> setPassword(String password) async {
@@ -79,7 +81,8 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
         .insertOnConflictUpdate(
           SettingTableCompanion.insert(key: 'date_format', value: format.name),
         );
-    state = AsyncData(state.value!.copyWith(dateFormat: format));
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(dateFormat: format));
   }
 
   Future<void> setTimeFormat(AppTimeFormat format) async {
@@ -89,7 +92,8 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
         .insertOnConflictUpdate(
           SettingTableCompanion.insert(key: 'time_format', value: format.name),
         );
-    state = AsyncData(state.value!.copyWith(timeFormat: format));
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(timeFormat: format));
   }
 
   // 알림모드 설정
@@ -103,7 +107,8 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
             value: enabled.toString(),
           ),
         );
-    state = AsyncData(state.value!.copyWith(notificationEnabled: enabled));
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(notificationEnabled: enabled));
   }
 
   // 트레이 모드 설정
@@ -117,7 +122,8 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
             value: enabled.toString(),
           ),
         );
-    state = AsyncData(state.value!.copyWith(trayModeEnabled: enabled));
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(trayModeEnabled: enabled));
   }
 
   // 글꼴 크기
@@ -128,7 +134,8 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
         .insertOnConflictUpdate(
           SettingTableCompanion.insert(key: 'font_size', value: size.name),
         );
-    state = AsyncData(state.value!.copyWith(fontSize: size));
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(fontSize: size));
   }
 
   // 테마 모드 설정
@@ -142,10 +149,12 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
             value: mode == ThemeMode.dark ? 'dark' : 'light',
           ),
         );
-    state = AsyncData(state.value!.copyWith(themeMode: mode));
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(themeMode: mode));
   }
 
   // 테마 색상 설정
+  // 테마 색상을 저장하고 즉시 상태에 반영합니다.
   Future<void> setThemeColor(Color color) async {
     final db = ref.read(databaseProvider);
     await db
@@ -156,7 +165,8 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
             value: color.value.toString(),
           ),
         );
-    state = AsyncData(state.value!.copyWith(themeColor: color));
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(themeColor: color));
   }
 
   Future<bool> hasPassword() async {

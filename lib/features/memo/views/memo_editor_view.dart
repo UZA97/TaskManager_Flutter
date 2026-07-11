@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:appflowy_editor/appflowy_editor.dart';
@@ -15,11 +16,11 @@ import '../widgets/local_file_block.dart';
 import '../widgets/local_location_block.dart';
 import '../widgets/local_code_block.dart';
 import '../../map/services/vworld_service.dart';
-import '../../map/model/search_type.dart';
 import '../../map/widgets/location_search_dialog.dart';
 import 'package:pasteboard/pasteboard.dart';
 import '../data/note_repository.dart';
 import '../services/pdf_export_service.dart';
+import 'memo_editor_widgets.dart';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -35,6 +36,9 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   bool _isDragging = false;
   bool _isToolbarExpanded = true;
   Selection? _lastSelection;
+  Timer? _saveTimer;
+  StreamSubscription<void>? _transactionSubscription;
+  VoidCallback? _selectionListener;
 
   SelectionMenuItem get _locationMenuItem => SelectionMenuItem(
     getName: () => 'Location',
@@ -52,7 +56,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     icon: (editorState, isSelected, style) =>
         const Icon(Icons.code, size: 18, color: Colors.grey),
     keywords: ['코드', 'code', '코드블록'],
-    handler: (editorState, _, __) {
+    handler: (editorState, menuService, context) {
       insertNodeAfterSelection(editorState, localCodeNode());
     },
   );
@@ -104,12 +108,25 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
   @override
   void dispose() {
+    _saveTimer?.cancel();
+    _transactionSubscription?.cancel();
+    if (_editorState != null && _selectionListener != null) {
+      _editorState!.selectionNotifier.removeListener(_selectionListener!);
+    }
     _titleController.dispose();
     super.dispose();
   }
 
+  /// 선택된 메모 내용을 에디터 상태로 초기화합니다.
   void _initEditor(Note note) {
     _titleController.text = note.title;
+
+    // 이전 에디터 상태의 리스너 해제
+    _transactionSubscription?.cancel();
+    if (_editorState != null && _selectionListener != null) {
+      _editorState!.selectionNotifier.removeListener(_selectionListener!);
+      _selectionListener = null;
+    }
 
     EditorState editorState;
     if (note.content.isNotEmpty) {
@@ -135,44 +152,57 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _fileMenuItem,
     ];
 
-    editorState.transactionStream.listen((_) => _onContentChanged());
+    _transactionSubscription = editorState.transactionStream.listen((_) {
+      _onContentChanged();
+    });
 
-    setState(() => _editorState = editorState);
-
-    editorState.selectionNotifier.addListener(() {
+    _selectionListener = () {
       final sel = editorState.selection;
       if (sel != null && !sel.isCollapsed) {
         _lastSelection = sel;
       }
-    });
+    };
+    editorState.selectionNotifier.addListener(_selectionListener!);
+
+    setState(() => _editorState = editorState);
   }
 
+  /// 에디터 변경 내용을 일정 시간 동안 모아서 저장합니다.
+  ///
+  /// 너무 자주 저장하지 않도록 디바운스를 적용합니다.
   void _onContentChanged() {
     if (_currentNote == null || _editorState == null) return;
 
-    final content = jsonEncode(_editorState!.document.toJson());
-    final updated = _currentNote!.copyWith(
-      title: _titleController.text,
-      content: content,
-    );
-    ref.read(noteListProvider.notifier).saveNote(updated);
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 500), () {
+      if (_currentNote == null || _editorState == null) return;
+      final content = jsonEncode(_editorState!.document.toJson());
+      final updated = _currentNote!.copyWith(
+        title: _titleController.text,
+        content: content,
+      );
+      ref.read(noteListProvider.notifier).saveNote(updated);
+    });
   }
 
+  /// 첨부 파일을 앱 지원 디렉토리로 복사합니다.
   Future<String> _copyToAppDir(String srcPath) async {
     final appDir = await getApplicationSupportDirectory();
     final attachDir = Directory(
-      '${appDir.path}\\Attachments\\${_currentNote!.id}',
+      path.join(appDir.path, 'Attachments', _currentNote!.id.toString()),
     );
     await attachDir.create(recursive: true);
 
     final fileName = path.basename(srcPath);
-    String destPath = '${attachDir.path}\\$fileName';
+    var destPath = path.join(attachDir.path, fileName);
 
     if (File(destPath).existsSync()) {
       final ext = path.extension(fileName);
       final name = path.basenameWithoutExtension(fileName);
-      destPath =
-          '${attachDir.path}\\${name}_${DateTime.now().millisecondsSinceEpoch}$ext';
+      destPath = path.join(
+        attachDir.path,
+        '${name}_${DateTime.now().millisecondsSinceEpoch}$ext',
+      );
     }
 
     await File(srcPath).copy(destPath);
@@ -234,10 +264,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   Future<void> _exportToPdf() async {
     if (_currentNote == null || _editorState == null) return;
 
-    for (final node in _editorState!.document.root.children) {
-      print('block type: ${node.type}, attrs: ${node.attributes}');
-    }
-
     try {
       final tags = await ref
           .read(noteRepositoryProvider)
@@ -266,8 +292,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
     await showDialog(
       context: context,
-      builder: (context) =>
-          _TagDialog(noteId: _currentNote!.id!, initialTags: currentTags),
+      builder: (context) => MemoEditorTagDialog(
+        noteId: _currentNote!.id!,
+        initialTags: currentTags,
+      ),
     );
 
     // 다이얼로그 닫힌 후 메모 갱신
@@ -846,7 +874,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       ),
                       const SizedBox(width: 8),
                       // 정렬 드롭다운
-                      _AlignDropdown(onAlign: _setTextAlign),
+                      MemoEditorAlignDropdown(onAlign: _setTextAlign),
                       const SizedBox(width: 8),
                       // Bold
                       _buildFormatButton(
@@ -877,7 +905,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       ),
                       const SizedBox(width: 8),
                       // 텍스트 색상
-                      _ColorDropdown(
+                      MemoEditorColorDropdown(
                         tooltip: '글자색',
                         icon: Icons.format_color_text,
                         onOpen: () => _lastSelection = _editorState?.selection,
@@ -885,7 +913,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       ),
                       const SizedBox(width: 4),
                       // 하이라이트
-                      _ColorDropdown(
+                      MemoEditorColorDropdown(
                         tooltip: '하이라이트',
                         icon: Icons.highlight,
                         onOpen: () => _lastSelection = _editorState?.selection,
@@ -945,7 +973,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
           if (_isDragging)
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF4A90E2).withOpacity(0.1),
+                color: const Color.fromRGBO(74, 144, 226, 0.1),
                 border: Border.all(color: const Color(0xFF4A90E2), width: 2),
               ),
               child: const Center(
@@ -1015,7 +1043,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     if (selection == null || selection.isCollapsed) return;
 
     final colorHex =
-        '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+        '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
 
     final nodes = editorState.getNodesInSelection(selection);
     final transaction = editorState.transaction;
@@ -1085,7 +1113,14 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         child: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: isActive ? activeColor.withOpacity(0.1) : Colors.transparent,
+            color: isActive
+                ? Color.fromRGBO(
+                    (activeColor.r * 255).round(),
+                    (activeColor.g * 255).round(),
+                    (activeColor.b * 255).round(),
+                    0.1,
+                  )
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
@@ -1095,423 +1130,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _LocationSearchDialogState extends State<LocationSearchDialog> {
-  final _searchController = TextEditingController();
-  List<VworldSearchResult> _results = [];
-  bool _isLoading = false;
-  String? _error;
-  SearchType _searchType = SearchType.place;
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _search() async {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) return;
-
-    setState(() {
-      _isLoading = true;
-      _error = null;
-      _results = [];
-    });
-
-    try {
-      final service = VworldService();
-      final results = _searchType == SearchType.place
-          ? await service.search(query)
-          : await service.searchAddress(query);
-      setState(() {
-        _results = results;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = '검색 실패: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SizedBox(
-        width: 400,
-        height: 500,
-        child: Column(
-          children: [
-            // 헤더
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                '위치 검색',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-
-            // 검색창
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: '장소 또는 주소 검색',
-                  prefixIcon: const Icon(Icons.search, size: 18),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.arrow_forward, size: 18),
-                    onPressed: _search,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                  isDense: true,
-                ),
-                onSubmitted: (_) => _search(),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // 토글
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SegmentedButton<SearchType>(
-                segments: const [
-                  ButtonSegment(
-                    value: SearchType.place,
-                    label: Text('장소', style: TextStyle(fontSize: 12)),
-                    icon: Icon(Icons.place, size: 14),
-                  ),
-                  ButtonSegment(
-                    value: SearchType.address,
-                    label: Text('주소', style: TextStyle(fontSize: 12)),
-                    icon: Icon(Icons.home, size: 14),
-                  ),
-                ],
-                selected: {_searchType},
-                onSelectionChanged: (value) {
-                  setState(() {
-                    _searchType = value.first;
-                    _results = [];
-                  });
-                },
-                style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // 결과 목록
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                  ? Center(
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : _results.isEmpty
-                  ? const Center(
-                      child: Text(
-                        '장소를 검색하세요',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _results.length,
-                      itemBuilder: (context, index) {
-                        final result = _results[index];
-                        return ListTile(
-                          dense: true,
-                          leading: const Icon(
-                            Icons.place,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                          title: Text(
-                            result.name,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                          subtitle: Text(
-                            result.address,
-                            style: const TextStyle(fontSize: 11),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () => Navigator.pop(context, result),
-                        );
-                      },
-                    ),
-            ),
-
-            // 취소 버튼
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('취소'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TagDialog extends ConsumerStatefulWidget {
-  final int noteId;
-  final List<String> initialTags;
-
-  const _TagDialog({required this.noteId, required this.initialTags});
-
-  @override
-  ConsumerState<_TagDialog> createState() => _TagDialogState();
-}
-
-class _TagDialogState extends ConsumerState<_TagDialog> {
-  late List<String> _tags;
-  final _controller = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _tags = List.from(widget.initialTags);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _addTag() {
-    final tag = _controller.text.trim();
-    if (tag.isEmpty || _tags.contains(tag)) return;
-    setState(() => _tags.add(tag));
-    _controller.clear();
-  }
-
-  void _removeTag(String tag) {
-    setState(() => _tags.remove(tag));
-  }
-
-  Future<void> _save() async {
-    final repo = ref.read(noteRepositoryProvider);
-    await repo.saveNoteTags(widget.noteId, _tags);
-
-    if (mounted) Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        width: 360,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '태그 관리',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            // 태그 입력
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: '태그 입력',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      isDense: true,
-                      prefixText: '# ',
-                    ),
-                    onSubmitted: (_) => _addTag(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _addTag,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
-                    ),
-                  ),
-                  child: const Text('추가'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // 태그 칩 목록
-            if (_tags.isNotEmpty)
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: _tags.map((tag) {
-                  return Chip(
-                    label: Text('#$tag', style: const TextStyle(fontSize: 12)),
-                    deleteIcon: const Icon(Icons.close, size: 14),
-                    onDeleted: () => _removeTag(tag),
-                    backgroundColor: const Color(0xFFE8F0FE),
-                    side: BorderSide.none,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                  );
-                }).toList(),
-              )
-            else
-              const Text(
-                '태그가 없어요',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('취소'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A90E2),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('저장'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AlignDropdown extends StatelessWidget {
-  final void Function(String align) onAlign;
-
-  const _AlignDropdown({required this.onAlign});
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: '정렬',
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(),
-      icon: const Icon(Icons.format_align_left, size: 18),
-      onSelected: onAlign,
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'left',
-          child: Row(
-            children: [
-              Icon(Icons.format_align_left, size: 16),
-              SizedBox(width: 8),
-              Text('왼쪽 정렬'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'center',
-          child: Row(
-            children: [
-              Icon(Icons.format_align_center, size: 16),
-              SizedBox(width: 8),
-              Text('가운데 정렬'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'right',
-          child: Row(
-            children: [
-              Icon(Icons.format_align_right, size: 16),
-              SizedBox(width: 8),
-              Text('오른쪽 정렬'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ColorDropdown extends StatelessWidget {
-  final String tooltip;
-  final IconData icon;
-  final void Function(Color color) onColorSelected;
-  final VoidCallback? onOpen;
-
-  static const _colors = [
-    (Color(0xFFE53935), '빨강'),
-    (Color(0xFFFF9800), '주황'),
-    (Color(0xFFFFEB3B), '노랑'),
-    (Color(0xFF4CAF50), '초록'),
-    (Color(0xFF2196F3), '파랑'),
-    (Color(0xFF3F51B5), '남색'),
-    (Color(0xFF9C27B0), '보라'),
-    (Color(0xFF9E9E9E), '회색'),
-    (Color(0xFF009688), '에메랄드'),
-  ];
-
-  const _ColorDropdown({
-    required this.tooltip,
-    required this.icon,
-    required this.onColorSelected,
-    required this.onOpen,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<Color>(
-      tooltip: tooltip,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(),
-      icon: Icon(icon, size: 18),
-      onOpened: onOpen,
-      onSelected: onColorSelected,
-      itemBuilder: (context) => _colors.map((item) {
-        final (color, label) = item;
-        return PopupMenuItem(
-          value: color,
-          child: Row(
-            children: [
-              Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 8),
-              Text(label),
-            ],
-          ),
-        );
-      }).toList(),
     );
   }
 }

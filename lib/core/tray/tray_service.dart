@@ -24,19 +24,15 @@ class TrayService with TrayListener {
   }
 
   Future<void> _setContextMenu() async {
-    await trayManager.setContextMenu(Menu(
-      items: [
-        MenuItem(
-          key: 'show',
-          label: '열기',
-        ),
-        MenuItem.separator(),
-        MenuItem(
-          key: 'exit',
-          label: '종료',
-        ),
-      ],
-    ));
+    await trayManager.setContextMenu(
+      Menu(
+        items: [
+          MenuItem(key: 'show', label: '열기'),
+          MenuItem.separator(),
+          MenuItem(key: 'exit', label: '종료'),
+        ],
+      ),
+    );
   }
 
   void destroy() {

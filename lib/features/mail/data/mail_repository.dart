@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database.dart';
 import '../../../core/database/database_provider.dart';
 import '../models/mail_account.dart';
-import 'package:drift/drift.dart';
 
 class MailRepository {
   final AppDatabase _db;
