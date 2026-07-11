@@ -22,6 +22,176 @@ import '../data/note_repository.dart';
 import '../services/pdf_export_service.dart';
 import 'memo_editor_widgets.dart';
 
+const String _toggleListType = 'toggle_list';
+
+class ToggleListBlockComponentBuilder extends BlockComponentBuilder {
+  ToggleListBlockComponentBuilder({
+    super.configuration = const BlockComponentConfiguration(),
+  });
+
+  @override
+  BlockComponentWidget build(BlockComponentContext blockComponentContext) {
+    final node = blockComponentContext.node;
+    return ToggleListBlockComponentWidget(
+      key: node.key,
+      node: node,
+      configuration: configuration,
+      showActions: showActions(node),
+      actionBuilder: (context, state) =>
+          actionBuilder(blockComponentContext, state),
+      actionTrailingBuilder: (context, state) =>
+          actionTrailingBuilder(blockComponentContext, state),
+    );
+  }
+
+  @override
+  BlockComponentValidate get validate =>
+      (node) => node.delta != null;
+}
+
+class ToggleListBlockComponentWidget extends BlockComponentStatefulWidget {
+  const ToggleListBlockComponentWidget({
+    super.key,
+    required super.node,
+    required super.configuration,
+    super.showActions,
+    super.actionBuilder,
+    super.actionTrailingBuilder,
+  });
+
+  @override
+  State<ToggleListBlockComponentWidget> createState() =>
+      _ToggleListBlockComponentWidgetState();
+}
+
+class _ToggleListBlockComponentWidgetState
+    extends State<ToggleListBlockComponentWidget>
+    with
+        SelectableMixin,
+        DefaultSelectableMixin,
+        BlockComponentConfigurable,
+        BlockComponentBackgroundColorMixin,
+        NestedBlockComponentStatefulWidgetMixin,
+        BlockComponentTextDirectionMixin,
+        BlockComponentAlignMixin {
+  @override
+  final forwardKey = GlobalKey<State<StatefulWidget>>();
+
+  @override
+  GlobalKey<State<StatefulWidget>> get containerKey => widget.node.key;
+
+  @override
+  GlobalKey<State<StatefulWidget>> blockComponentKey = GlobalKey(
+    debugLabel: _toggleListType,
+  );
+
+  @override
+  BlockComponentConfiguration get configuration => widget.configuration;
+
+  @override
+  Node get node => widget.node;
+
+  void _toggleCollapsed() {
+    final collapsed = widget.node.attributes['collapsed'] as bool? ?? false;
+    final transaction = editorState.transaction;
+    transaction.updateNode(widget.node, {
+      ...widget.node.attributes,
+      'collapsed': !collapsed,
+    });
+    editorState.apply(transaction);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final collapsed = widget.node.attributes['collapsed'] as bool? ?? false;
+    return collapsed
+        ? buildComponent(context)
+        : buildComponentWithChildren(context);
+  }
+
+  @override
+  Widget buildComponent(
+    BuildContext context, {
+    bool withBackgroundColor = true,
+  }) {
+    final collapsed = widget.node.attributes['collapsed'] as bool? ?? false;
+    final textDirection = calculateTextDirection(
+      layoutDirection: Directionality.maybeOf(context),
+    );
+
+    Widget child = Container(
+      width: double.infinity,
+      alignment: alignment,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        textDirection: textDirection,
+        children: [
+          GestureDetector(
+            onTap: _toggleCollapsed,
+            child: Icon(
+              collapsed ? Icons.expand_more : Icons.expand_less,
+              size: 18,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: AppFlowyRichText(
+              key: forwardKey,
+              delegate: this,
+              node: widget.node,
+              editorState: editorState,
+              textAlign: alignment?.toTextAlign ?? textAlign,
+              placeholderText: placeholderText,
+              textSpanDecorator: (textSpan) => textSpan.updateTextStyle(
+                textStyleWithTextSpan(textSpan: textSpan),
+              ),
+              placeholderTextSpanDecorator: (textSpan) =>
+                  textSpan.updateTextStyle(
+                    placeholderTextStyleWithTextSpan(textSpan: textSpan),
+                  ),
+              textDirection: textDirection,
+              cursorColor: editorState.editorStyle.cursorColor,
+              selectionColor: editorState.editorStyle.selectionColor,
+              cursorWidth: editorState.editorStyle.cursorWidth,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    child = Container(
+      decoration: withBackgroundColor ? decoration : null,
+      key: blockComponentKey,
+      padding: padding,
+      child: child,
+    );
+
+    child = BlockSelectionContainer(
+      node: node,
+      delegate: this,
+      listenable: editorState.selectionNotifier,
+      remoteSelection: editorState.remoteSelections,
+      blockColor: editorState.editorStyle.selectionColor,
+      supportTypes: const [BlockSelectionType.block],
+      child: child,
+    );
+
+    if (widget.showActions && widget.actionBuilder != null) {
+      child = BlockComponentActionWrapper(
+        node: node,
+        actionBuilder: widget.actionBuilder!,
+        actionTrailingBuilder: widget.actionTrailingBuilder,
+        child: child,
+      );
+    }
+
+    return child;
+  }
+}
+
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
 
@@ -72,6 +242,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     },
   );
 
+  /// 위치 검색 다이얼로그를 열고 결과를 에디터에 삽입합니다.
   Future<void> _showLocationSearchDialog(EditorState editorState) async {
     final result = await showDialog<VworldSearchResult>(
       context: context,
@@ -87,8 +258,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
   static const _imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
+  /// 파일 경로의 확장자가 이미지인지 판단합니다.
   bool _isImage(String filePath) =>
       _imageExts.contains(path.extension(filePath).toLowerCase());
+
+  /// 툴바에 표시할 단추 스타일을 생성합니다.
   Widget _buildFormatButton({
     required IconData icon,
     required String tooltip,
@@ -186,6 +360,9 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   }
 
   /// 첨부 파일을 앱 지원 디렉토리로 복사합니다.
+  /// 첨부 파일을 앱 지원 디렉토리로 복사합니다.
+  ///
+  /// 동일 파일명이 존재할 경우 충돌을 피하기 위해 이름을 변경합니다.
   Future<String> _copyToAppDir(String srcPath) async {
     final appDir = await getApplicationSupportDirectory();
     final attachDir = Directory(
@@ -209,6 +386,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     return destPath;
   }
 
+  /// 선택된 문단의 텍스트 정렬 속성을 변경합니다.
   void _setTextAlign(String align) {
     final editorState = _editorState;
     if (editorState == null) return;
@@ -227,6 +405,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     editorState.apply(transaction);
   }
 
+  /// 현재 커서 위치 바로 다음에 새 노드를 삽입합니다.
   void _insertAtCursor(Node node) {
     final editorState = _editorState;
     if (editorState == null) return;
@@ -241,6 +420,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     editorState.apply(transaction);
   }
 
+  /// 파일을 앱 디렉토리로 복사하고 해당 파일 또는 이미지를 에디터에 삽입합니다.
   Future<void> _processFile(String srcPath) async {
     if (_currentNote == null) return;
     final destPath = await _copyToAppDir(srcPath);
@@ -253,6 +433,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
   }
 
+  /// 사용자가 선택한 파일을 첨부하고 에디터에 삽입합니다.
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result == null) return;
@@ -261,6 +442,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
   }
 
+  /// 현재 메모를 PDF로 내보냅니다.
   Future<void> _exportToPdf() async {
     if (_currentNote == null || _editorState == null) return;
 
@@ -282,6 +464,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
   }
 
+  /// 태그 편집 다이얼로그를 열고 메모 태그를 갱신합니다.
   Future<void> _showTagDialog() async {
     if (_currentNote == null) return;
 
@@ -302,6 +485,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     ref.read(noteListProvider.notifier).refresh();
   }
 
+  /// 드래그 앤 드롭으로 들어온 파일을 처리합니다.
   Future<void> _handleDrop(DropDoneDetails details) async {
     for (final file in details.files) {
       await _processFile(file.path);
@@ -514,6 +698,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     },
   );
 
+  /// 이미지 또는 파일 블록 삭제 여부를 사용자에게 확인합니다.
   Future<void> _showDeleteDialog(EditorState editorState, Node node) async {
     final isImage = node.type == localImageType;
     final label = isImage
@@ -547,6 +732,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
   late final Map<String, BlockComponentBuilder> _blockBuilders;
 
+  /// 블록 액션 바에 보이는 추가 / 드래그 핸들 버튼을 만듭니다.
   Widget _buildBlockAction(
     BlockComponentContext blockComponentContext,
     BlockComponentActionState state,
@@ -636,6 +822,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       localFileType: applyAction(LocalFileBlockComponentBuilder()),
       localLocationType: applyAction(LocalLocationBlockComponentBuilder()),
       localCodeType: applyAction(LocalCodeBlockComponentBuilder()),
+      _toggleListType: applyAction(ToggleListBlockComponentBuilder()),
     };
   }
 
@@ -999,6 +1186,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     );
   }
 
+  /// 접을 수 있는 섹션 토글 블록을 에디터에 삽입합니다.
   void _insertCollapsibleSection() {
     final editorState = _editorState;
     if (editorState == null) return;
@@ -1034,6 +1222,9 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     editorState.apply(transaction);
   }
 
+  /// 선택 영역 텍스트에 컬러 속성을 적용합니다.
+  ///
+  /// [attribute]는 'color' 또는 'backgroundColor'를 전달합니다.
   void _applyColor(String attribute, Color color) {
     final editorState = _editorState;
     if (editorState == null) return;
@@ -1066,6 +1257,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     editorState.apply(transaction);
   }
 
+  /// 선택 영역의 텍스트 서식을 토글합니다.
   void _toggleFormat(String format) {
     final editorState = _editorState;
     if (editorState == null) return;
@@ -1099,6 +1291,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     editorState.apply(transaction);
   }
 
+  /// 텍스트 편집기 상단 상태 토글 버튼을 생성합니다.
   Widget _buildToggleButton({
     required IconData icon,
     required Color activeColor,
