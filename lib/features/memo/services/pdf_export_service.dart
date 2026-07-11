@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'dart:typed_data';
 
 class PdfExportService {
   Future<pw.Font> _loadSystemFont({bool bold = false}) async {
@@ -13,7 +14,8 @@ class PdfExportService {
     );
     if (fontFile.existsSync()) {
       final bytes = await fontFile.readAsBytes();
-      return pw.Font.ttf(bytes.buffer.asByteData());
+      final byteData = ByteData.view(bytes.buffer);
+      return pw.Font.ttf(byteData);
     }
     return bold ? pw.Font.helveticaBold() : pw.Font.helvetica();
   }
@@ -218,8 +220,8 @@ class PdfExportService {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                depth == 0 ? '• ' : '◦ ',
-                style: pw.TextStyle(font: font),
+                depth == 0 ? '- ' : '  - ', // • 대신 - 사용
+                style: pw.TextStyle(font: font, fontSize: 11),
               ),
               pw.Expanded(
                 child: pw.Text(
@@ -235,7 +237,21 @@ class PdfExportService {
         final text = node.delta?.toPlainText() ?? '';
         return pw.Padding(
           padding: pw.EdgeInsets.only(bottom: 4, left: 12 + indent),
-          child: pw.Text(text, style: pw.TextStyle(font: font, fontSize: 11)),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                '${depth + 1}. ',
+                style: pw.TextStyle(font: font, fontSize: 11),
+              ),
+              pw.Expanded(
+                child: pw.Text(
+                  text,
+                  style: pw.TextStyle(font: font, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
         );
 
       case 'quote':
@@ -325,7 +341,7 @@ class PdfExportService {
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
             ),
             child: pw.Text(
-              '📎 $fileName',
+              '[첨부파일] $fileName',
               style: pw.TextStyle(font: font, fontSize: 10),
             ),
           ),
@@ -344,7 +360,7 @@ class PdfExportService {
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
             ),
             child: pw.Text(
-              '📍 $name ($lat, $lng)',
+              '[위치] $name ($lat, $lng)',
               style: pw.TextStyle(font: font, fontSize: 10),
             ),
           ),
