@@ -33,6 +33,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   Note? _currentNote;
   final _titleController = TextEditingController();
   bool _isDragging = false;
+  bool _isToolbarExpanded = true;
   Selection? _lastSelection;
 
   SelectionMenuItem get _locationMenuItem => SelectionMenuItem(
@@ -84,6 +85,22 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
   bool _isImage(String filePath) =>
       _imageExts.contains(path.extension(filePath).toLowerCase());
+  Widget _buildFormatButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 18, color: Colors.grey[700]),
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -117,8 +134,17 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _codeMenuItem,
       _fileMenuItem,
     ];
+
     editorState.transactionStream.listen((_) => _onContentChanged());
+
     setState(() => _editorState = editorState);
+
+    editorState.selectionNotifier.addListener(() {
+      final sel = editorState.selection;
+      if (sel != null && !sel.isCollapsed) {
+        _lastSelection = sel;
+      }
+    });
   }
 
   void _onContentChanged() {
@@ -782,9 +808,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                   ),
                 ),
               ),
+              // 하단 툴바
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
+                  horizontal: 16,
                   vertical: 8,
                 ),
                 decoration: const BoxDecoration(
@@ -792,42 +819,119 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                 ),
                 child: Row(
                   children: [
-                    // 태그 버튼 (가장 왼쪽)
+                    // 툴바 토글 버튼
                     IconButton(
-                      icon: const Icon(Icons.label_outline, size: 18),
-                      tooltip: '태그',
-                      onPressed: () => _showTagDialog(),
+                      icon: Icon(
+                        _isToolbarExpanded
+                            ? Icons.expand_more
+                            : Icons.expand_less,
+                        size: 18,
+                      ),
+                      tooltip: _isToolbarExpanded ? '툴바 접기' : '툴바 펼치기',
+                      onPressed: () => setState(
+                        () => _isToolbarExpanded = !_isToolbarExpanded,
+                      ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.attach_file, size: 18),
-                      tooltip: '파일 첨부',
-                      onPressed: _pickFile,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.picture_as_pdf, size: 18),
-                      tooltip: 'PDF 내보내기',
-                      onPressed: _exportToPdf,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton(
-                      icon: const Icon(Icons.format_align_left, size: 18),
-                      tooltip: '왼쪽 정렬',
-                      onPressed: () => _setTextAlign('left'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.format_align_center, size: 18),
-                      tooltip: '가운데 정렬',
-                      onPressed: () => _setTextAlign('center'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.format_align_right, size: 18),
-                      tooltip: '우측 정렬',
-                      onPressed: () => _setTextAlign('right'),
-                    ),
+                    if (_isToolbarExpanded) ...[
+                      const SizedBox(width: 8),
+                      // 파일 첨부
+                      IconButton(
+                        icon: const Icon(Icons.attach_file, size: 18),
+                        tooltip: '파일 첨부',
+                        onPressed: _pickFile,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 8),
+                      // 정렬 드롭다운
+                      _AlignDropdown(onAlign: _setTextAlign),
+                      const SizedBox(width: 8),
+                      // Bold
+                      _buildFormatButton(
+                        icon: Icons.format_bold,
+                        tooltip: '굵게',
+                        onTap: () => _toggleFormat('bold'),
+                      ),
+                      const SizedBox(width: 4),
+                      // Italic
+                      _buildFormatButton(
+                        icon: Icons.format_italic,
+                        tooltip: '기울임',
+                        onTap: () => _toggleFormat('italic'),
+                      ),
+                      const SizedBox(width: 4),
+                      // Underline
+                      _buildFormatButton(
+                        icon: Icons.format_underline,
+                        tooltip: '밑줄',
+                        onTap: () => _toggleFormat('underline'),
+                      ),
+                      const SizedBox(width: 4),
+                      // Strikethrough
+                      _buildFormatButton(
+                        icon: Icons.format_strikethrough,
+                        tooltip: '취소선',
+                        onTap: () => _toggleFormat('strikethrough'),
+                      ),
+                      const SizedBox(width: 8),
+                      // 텍스트 색상
+                      _ColorDropdown(
+                        tooltip: '글자색',
+                        icon: Icons.format_color_text,
+                        onOpen: () => _lastSelection = _editorState?.selection,
+                        onColorSelected: (color) => _applyColor('color', color),
+                      ),
+                      const SizedBox(width: 4),
+                      // 하이라이트
+                      _ColorDropdown(
+                        tooltip: '하이라이트',
+                        icon: Icons.highlight,
+                        onOpen: () => _lastSelection = _editorState?.selection,
+                        onColorSelected: (color) =>
+                            _applyColor('backgroundColor', color),
+                      ),
+                      const SizedBox(width: 8),
+                      // 위첨자
+                      _buildFormatButton(
+                        icon: Icons.superscript,
+                        tooltip: '위첨자',
+                        onTap: () => _toggleFormat('sup'),
+                      ),
+                      const SizedBox(width: 4),
+                      // 아래첨자
+                      _buildFormatButton(
+                        icon: Icons.subscript,
+                        tooltip: '아래첨자',
+                        onTap: () => _toggleFormat('subScript'),
+                      ),
+                      const SizedBox(width: 8),
+                      // 접을 수 있는 섹션
+                      _buildFormatButton(
+                        icon: Icons.unfold_less,
+                        tooltip: '접기 섹션',
+                        onTap: _insertCollapsibleSection,
+                      ),
+                      const SizedBox(width: 8),
+                      // 태그
+                      IconButton(
+                        icon: const Icon(Icons.label_outline, size: 18),
+                        tooltip: '태그',
+                        onPressed: () => _showTagDialog(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 4),
+                      // PDF
+                      IconButton(
+                        icon: const Icon(Icons.picture_as_pdf, size: 18),
+                        tooltip: 'PDF 내보내기',
+                        onPressed: _exportToPdf,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                     const Spacer(),
                     const Text(
                       '저장됨',
@@ -865,6 +969,106 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         ],
       ),
     );
+  }
+
+  void _insertCollapsibleSection() {
+    final editorState = _editorState;
+    if (editorState == null) return;
+
+    final selection = editorState.selection;
+    final insertPath = selection != null
+        ? selection.end.path.next
+        : [editorState.document.root.children.length];
+
+    final transaction = editorState.transaction;
+    transaction.insertNode(
+      insertPath,
+      Node(
+        type: 'toggle_list',
+        attributes: {
+          'collapsed': false,
+          'delta': [
+            {'insert': '섹션 제목'},
+          ],
+        },
+        children: [
+          Node(
+            type: 'paragraph',
+            attributes: {
+              'delta': [
+                {'insert': ''},
+              ],
+            },
+          ),
+        ],
+      ),
+    );
+    editorState.apply(transaction);
+  }
+
+  void _applyColor(String attribute, Color color) {
+    final editorState = _editorState;
+    if (editorState == null) return;
+
+    // 저장된 selection 사용
+    final selection = _lastSelection ?? editorState.selection;
+    if (selection == null || selection.isCollapsed) return;
+
+    final colorHex =
+        '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+
+    final nodes = editorState.getNodesInSelection(selection);
+    final transaction = editorState.transaction;
+
+    for (final node in nodes) {
+      final delta = node.delta;
+      if (delta == null) continue;
+
+      final startIndex = node.path == selection.start.path
+          ? selection.start.offset
+          : 0;
+      final endIndex = node.path == selection.end.path
+          ? selection.end.offset
+          : delta.length;
+
+      transaction.formatText(node, startIndex, endIndex - startIndex, {
+        attribute: colorHex,
+      });
+    }
+    editorState.apply(transaction);
+  }
+
+  void _toggleFormat(String format) {
+    final editorState = _editorState;
+    if (editorState == null) return;
+
+    final selection = editorState.selection;
+    if (selection == null || selection.isCollapsed) return;
+
+    final nodes = editorState.getNodesInSelection(selection);
+    final isFormatted = nodes.every((node) {
+      final delta = node.delta;
+      if (delta == null) return false;
+      return delta.everyAttributes((attrs) => attrs[format] == true);
+    });
+
+    final transaction = editorState.transaction;
+    for (final node in nodes) {
+      final delta = node.delta;
+      if (delta == null) continue;
+
+      final startIndex = node.path == selection.start.path
+          ? selection.start.offset
+          : 0;
+      final endIndex = node.path == selection.end.path
+          ? selection.end.offset
+          : delta.length;
+
+      transaction.formatText(node, startIndex, endIndex - startIndex, {
+        format: !isFormatted,
+      });
+    }
+    editorState.apply(transaction);
   }
 
   Widget _buildToggleButton({
@@ -1204,6 +1408,110 @@ class _TagDialogState extends ConsumerState<_TagDialog> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AlignDropdown extends StatelessWidget {
+  final void Function(String align) onAlign;
+
+  const _AlignDropdown({required this.onAlign});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: '정렬',
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+      icon: const Icon(Icons.format_align_left, size: 18),
+      onSelected: onAlign,
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'left',
+          child: Row(
+            children: [
+              Icon(Icons.format_align_left, size: 16),
+              SizedBox(width: 8),
+              Text('왼쪽 정렬'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'center',
+          child: Row(
+            children: [
+              Icon(Icons.format_align_center, size: 16),
+              SizedBox(width: 8),
+              Text('가운데 정렬'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'right',
+          child: Row(
+            children: [
+              Icon(Icons.format_align_right, size: 16),
+              SizedBox(width: 8),
+              Text('오른쪽 정렬'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ColorDropdown extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final void Function(Color color) onColorSelected;
+  final VoidCallback? onOpen;
+
+  static const _colors = [
+    (Color(0xFFE53935), '빨강'),
+    (Color(0xFFFF9800), '주황'),
+    (Color(0xFFFFEB3B), '노랑'),
+    (Color(0xFF4CAF50), '초록'),
+    (Color(0xFF2196F3), '파랑'),
+    (Color(0xFF3F51B5), '남색'),
+    (Color(0xFF9C27B0), '보라'),
+    (Color(0xFF9E9E9E), '회색'),
+    (Color(0xFF009688), '에메랄드'),
+  ];
+
+  const _ColorDropdown({
+    required this.tooltip,
+    required this.icon,
+    required this.onColorSelected,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<Color>(
+      tooltip: tooltip,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+      icon: Icon(icon, size: 18),
+      onOpened: onOpen,
+      onSelected: onColorSelected,
+      itemBuilder: (context) => _colors.map((item) {
+        final (color, label) = item;
+        return PopupMenuItem(
+          value: color,
+          child: Row(
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Text(label),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }
