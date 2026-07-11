@@ -117,34 +117,35 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 7;
 
+  /// 신규 설치와 기존 데이터베이스 업그레이드 모두에서 공통으로 쓰이는
+  /// 기본 폴더를 생성하고, 폴더가 비어 있는 메모에 자동으로 연결합니다.
+  Future<int> _ensureDefaultFolder() async {
+    final now = DateTime.now().toIso8601String();
+    final defaultFolderId = await into(
+      folderTable,
+    ).insert(FolderTableCompanion.insert(name: '기본 폴더', createdAt: now));
+    await (update(noteTable)..where((t) => t.folderId.isNull())).write(
+      NoteTableCompanion(folderId: Value(defaultFolderId)),
+    );
+    return defaultFolderId;
+  }
+
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
-      // 새 데이터베이스 생성 시 모든 Drift 테이블을 초기화합니다.
+      // 새 데이터베이스 생성 시 모든 테이블을 만든 뒤 기본 폴더를 초기화합니다.
       await m.createAll();
-      final now = DateTime.now().toIso8601String();
-      final defaultFolderId = await into(
-        folderTable,
-      ).insert(FolderTableCompanion.insert(name: '기본 폴더', createdAt: now));
-      await (update(noteTable)..where((t) => t.folderId.isNull())).write(
-        NoteTableCompanion(folderId: Value(defaultFolderId)),
-      );
+      await _ensureDefaultFolder();
     },
     onUpgrade: (m, from, to) async {
-      // 기존 데이터베이스 버전에 따라 필요한 마이그레이션을 순차적으로 적용합니다.
+      // 기존 데이터베이스에 구조 변경이 필요할 때 단계별로 마이그레이션합니다.
       if (from < 2) {
         await m.createTable(eventTable);
       }
       if (from < 3) {
         await m.createTable(folderTable);
         await m.addColumn(noteTable, noteTable.folderId as GeneratedColumn);
-        final now = DateTime.now().toIso8601String();
-        final defaultFolderId = await into(
-          folderTable,
-        ).insert(FolderTableCompanion.insert(name: '기본 폴더', createdAt: now));
-        await (update(noteTable)..where((t) => t.folderId.isNull())).write(
-          NoteTableCompanion(folderId: Value(defaultFolderId)),
-        );
+        await _ensureDefaultFolder();
       }
       if (from < 4) {
         await m.addColumn(

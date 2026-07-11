@@ -15,71 +15,24 @@ class MemoListView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final foldersAsync = ref.watch(folderListProvider);
     final notesAsync = ref.watch(noteListProvider);
-    final selectedFolder = ref.watch(selectedFolderProvider);
 
     return Column(
       children: [
-        // 상단 버튼 바
+        // 상단 액션 바: 폴더와 메모 생성 버튼을 한눈에 보여줍니다.
         Padding(
           padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              // + 폴더
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showCreateFolderDialog(context, ref, null),
-                  icon: const Icon(Icons.create_new_folder, size: 14),
-                  label: const Text('폴더', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    side: const BorderSide(color: Color(0xFFDDDDDD)),
-                    foregroundColor: Colors.grey[700],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              // + 메모
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () =>
-                      ref.read(noteListProvider.notifier).createNote(),
-                  icon: const Icon(Icons.note_add, size: 14),
-                  label: const Text('메모', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    backgroundColor: const Color(0xFF4A90E2),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          child: _buildActionBar(context, ref),
         ),
 
-        // 검색창
+        // 검색창: 현재 메모 목록을 빠르게 필터링합니다.
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: '검색',
-              prefixIcon: const Icon(Icons.search, size: 18),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 8),
-              isDense: true,
-            ),
-            onChanged: (value) {
-              ref.read(searchQueryProvider.notifier).update(value);
-              ref.read(noteListProvider.notifier).refresh();
-            },
-          ),
+          child: _buildSearchField(ref),
         ),
 
         const SizedBox(height: 8),
 
-        // 트리
+        // 트리 형태의 폴더/메모 구조를 렌더링합니다.
         Expanded(
           child: foldersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -95,6 +48,60 @@ class MemoListView extends ConsumerWidget {
     );
   }
 
+  /// 메모 목록 상단의 폴더/메모 생성 버튼을 구성합니다.
+  Widget _buildActionBar(BuildContext context, WidgetRef ref) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _showCreateFolderDialog(context, ref, null),
+            icon: const Icon(Icons.create_new_folder, size: 14),
+            label: const Text('폴더', style: TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              side: const BorderSide(color: Color(0xFFDDDDDD)),
+              foregroundColor: Colors.grey[700],
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => ref.read(noteListProvider.notifier).createNote(),
+            icon: const Icon(Icons.note_add, size: 14),
+            label: const Text('메모', style: TextStyle(fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              backgroundColor: const Color(0xFF4A90E2),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 메모 목록 검색 입력창을 구성합니다.
+  Widget _buildSearchField(WidgetRef ref) {
+    return TextField(
+      decoration: InputDecoration(
+        hintText: '검색',
+        prefixIcon: const Icon(Icons.search, size: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        isDense: true,
+      ),
+      onChanged: (value) {
+        ref.read(searchQueryProvider.notifier).update(value);
+        ref.read(noteListProvider.notifier).refresh();
+      },
+    );
+  }
+
+  /// 새 폴더를 생성하기 위한 다이얼로그를 표시합니다.
   void _showCreateFolderDialog(
     BuildContext context,
     WidgetRef ref,
@@ -263,164 +270,7 @@ class _FolderTree extends ConsumerWidget {
     );
   }
 
-  List<Widget> _buildFavoriteItems(
-    BuildContext context,
-    WidgetRef ref,
-    List<Folder> favFolders,
-    List<Note> favNotes,
-  ) {
-    final allItems = [
-      ...favFolders.map((f) => _TreeItem.folder(f)),
-      ...favNotes.map((n) => _TreeItem.note(n)),
-    ]..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
-
-    return allItems.map((item) {
-      if (item.isFolder) {
-        return _FavoriteItem(
-          folder: item.folder!,
-          allFolders: folders,
-          allNotes: notes,
-        );
-      } else {
-        return _FavoriteNoteItem(note: item.note!);
-      }
-    }).toList();
-  }
-
-  List<Widget> _buildNormalTree(
-    BuildContext context,
-    WidgetRef ref,
-    List<Folder> rootFolders,
-    List<Note> rootNotes,
-  ) {
-    final allItems = [
-      ...rootFolders.map((f) => _TreeItem.folder(f)),
-      ...rootNotes.map((n) => _TreeItem.note(n)),
-    ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-
-    final items = <Widget>[];
-    items.add(
-      _DropIndicator(
-        parentId: null,
-        beforeSortOrder: allItems.isEmpty
-            ? 0.0
-            : allItems.first.sortOrder - 1.0,
-        afterSortOrder: allItems.isEmpty ? 1.0 : allItems.first.sortOrder,
-      ),
-    );
-
-    for (int i = 0; i < allItems.length; i++) {
-      final item = allItems[i];
-      if (item.isFolder) {
-        items.add(
-          _FolderNode(
-            folder: item.folder!,
-            allFolders: folders,
-            allNotes: notes,
-            depth: 0,
-          ),
-        );
-      } else {
-        items.add(_NoteNode(note: item.note!, depth: 0));
-      }
-
-      final after = i < allItems.length - 1
-          ? allItems[i + 1].sortOrder
-          : allItems[i].sortOrder + 1.0;
-
-      items.add(
-        _DropIndicator(
-          parentId: null,
-          beforeSortOrder: allItems[i].sortOrder,
-          afterSortOrder: after,
-        ),
-      );
-    }
-
-    return items;
-  }
-
-  /*
-  // @override
-  // Widget build(BuildContext context, WidgetRef ref) {
-  //   final searchQuery = ref.watch(searchQueryProvider);
-
-  //   if (searchQuery.isNotEmpty) {
-  //     return _buildSearchResult(searchQuery);
-  //   }
-  //   // 즐겨찾기 항목
-  //   final favFolders = folders.where((f) => f.isFavorite).toList()
-  //     ..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
-  //   final favNotes = notes.where((n) => n.isFavorite).toList()
-  //     ..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
-
-  //   final rootFolders = folders.where((f) => f.parentId == null).toList()
-  //     ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-
-  //   final rootNotes = notes.where((n) => n.folderId == null).toList()
-  //     ..sort((a, b) => (a.sortOrder ?? 0.0).compareTo(b.sortOrder ?? 0.0));
-
-  //   if (rootFolders.isEmpty && rootNotes.isEmpty) {
-  //     return const Center(
-  //       child: Text('폴더가 없어요', style: TextStyle(color: Colors.grey)),
-  //     );
-  //   }
-
-  //   // 폴더랑 메모를 sortOrder 기준으로 합쳐서 렌더링
-  //   final allItems =
-  //       [
-  //         ...rootFolders.map((f) => _TreeItem.folder(f)),
-  //         ...rootNotes.map((n) => _TreeItem.note(n)),
-  //       ]..sort((a, b) {
-  //         // 핀된 항목 상단
-  //         if (a.isPinned && !b.isPinned) return -1;
-  //         if (!a.isPinned && b.isPinned) return 1;
-  //         return a.sortOrder.compareTo(b.sortOrder);
-  //       });
-
-  //   final items = <Widget>[];
-
-  //   items.add(
-  //     _DropIndicator(
-  //       parentId: null,
-  //       beforeSortOrder: allItems.isEmpty
-  //           ? 0.0
-  //           : allItems.first.sortOrder - 1.0,
-  //       afterSortOrder: allItems.isEmpty ? 1.0 : allItems.first.sortOrder,
-  //     ),
-  //   );
-
-  //   for (int i = 0; i < allItems.length; i++) {
-  //     final item = allItems[i];
-  //     if (item.isFolder) {
-  //       items.add(
-  //         _FolderNode(
-  //           folder: item.folder!,
-  //           allFolders: folders,
-  //           allNotes: notes,
-  //           depth: 0,
-  //         ),
-  //       );
-  //     } else {
-  //       items.add(_NoteNode(note: item.note!, depth: 0));
-  //     }
-
-  //     final after = i < allItems.length - 1
-  //         ? allItems[i + 1].sortOrder
-  //         : allItems[i].sortOrder + 1.0;
-
-  //     items.add(
-  //       _DropIndicator(
-  //         parentId: null,
-  //         beforeSortOrder: allItems[i].sortOrder,
-  //         afterSortOrder: after,
-  //       ),
-  //     );
-  //   }
-
-  //   return ListView(children: items);
-  // }*/
-
+  /// 검색어와 일치하는 메모와 그 조상 폴더를 보여줍니다.
   Widget _buildSearchResult(String searchQuery) {
     // 검색된 메모만
     // 태그 검색 포함 - provider에서 이미 검색된 결과 그대로 사용
@@ -512,6 +362,14 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
   bool _isExpanded = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.forceExpanded) {
+      _isExpanded = true;
+    }
+  }
+
+  @override
   void didUpdateWidget(_FolderNode oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.forceExpanded && !_isExpanded) {
@@ -523,12 +381,6 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
 
   @override
   Widget build(BuildContext context) {
-    @override
-    void initState() {
-      super.initState();
-      if (widget.forceExpanded) _isExpanded = true;
-    }
-
     final childFolders = widget.allFolders
         .where((f) => f.parentId == widget.folder.id)
         .toList();
@@ -1234,7 +1086,9 @@ class _FavoriteSectionHeader extends ConsumerWidget {
         return Container(
           height: 32,
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          color: isHovered ? Colors.amber.withOpacity(0.1) : Colors.transparent,
+          color: isHovered
+              ? Colors.amber.withValues(alpha: 0.1)
+              : Colors.transparent,
           child: Row(
             children: [
               const Icon(Icons.star, size: 14, color: Colors.amber),

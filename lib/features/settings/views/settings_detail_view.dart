@@ -349,7 +349,7 @@ class _ThemeColorPicker extends ConsumerWidget {
       runSpacing: 12,
       children: _colors.map((item) {
         final (color, label) = item;
-        final isSelected = settings?.themeColor.value == color.value;
+        final isSelected = settings?.themeColor.toARGB32() == color.toARGB32();
 
         return GestureDetector(
           onTap: () => ref.read(settingsProvider.notifier).setThemeColor(color),
@@ -371,7 +371,7 @@ class _ThemeColorPicker extends ConsumerWidget {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: color.withOpacity(0.5),
+                            color: color.withValues(alpha: 0.5),
                             blurRadius: 8,
                           ),
                         ]
