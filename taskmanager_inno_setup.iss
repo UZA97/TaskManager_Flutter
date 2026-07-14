@@ -1,5 +1,5 @@
 ﻿#define MyAppName "TaskManager"
-#define MyAppVersion "0.0.3"
+#define MyAppVersion "0.0.4"
 #define MyAppPublisher "JH"
 #define MyAppExeName "taskmanager.exe"
 #define MyAppId "{{052817F2-E157-48D0-BF2A-AFBBC5A06B65}"
