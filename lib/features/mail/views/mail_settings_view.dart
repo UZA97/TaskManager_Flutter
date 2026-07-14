@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/mail_account.dart';
 import '../providers/mail_provider.dart';
-import '../services/mail_check_service.dart';
 import '../services/google_auth_service.dart';
 
 enum MailPlatform { gmail, outlook }
@@ -21,7 +20,6 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
   MailPlatform _selectedPlatform = MailPlatform.gmail;
   bool _showPassword = false;
   int _pollInterval = 5;
-  bool _isTesting = false;
   bool _isSaving = false;
 
   @override
@@ -31,40 +29,9 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
     super.dispose();
   }
 
-  String get _imapServer => _selectedPlatform == MailPlatform.gmail
-      ? 'imap.gmail.com'
-      : 'imap-mail.outlook.com';
-
   String get _emailHint => _selectedPlatform == MailPlatform.gmail
       ? 'example@gmail.com'
       : 'example@outlook.com';
-
-  Future<void> _testConnection() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showSnackBar('이메일과 비밀번호를 입력하세요', isError: true);
-      return;
-    }
-
-    setState(() => _isTesting = true);
-
-    final account = TaskMailAccount(
-      email: _emailController.text.trim(),
-      imapServer: _imapServer,
-      imapPort: 993,
-      pollIntervalMinutes: _pollInterval,
-    );
-
-    final service = ref.read(mailCheckServiceProvider);
-    final success = await service.testConnection(account);
-
-    setState(() => _isTesting = false);
-
-    if (success) {
-      _showSnackBar('연결 성공!');
-    } else {
-      _showSnackBar('연결 실패. 이메일/비밀번호를 확인하세요', isError: true);
-    }
-  }
 
   final _authService = GoogleAuthService();
   Future<void> _signInWithGoogle() async {

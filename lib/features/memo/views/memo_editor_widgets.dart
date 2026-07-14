@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:highlight/highlight_core.dart';
 import '../data/note_repository.dart';
 
 /// 메모 에디터에서 사용하는 태그 관리 다이얼로그입니다.
