@@ -462,23 +462,22 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   );
 
   late final List<CommandShortcutEvent> _textColorHandlers = List.generate(
-    10,
+    8,
     (index) => CommandShortcutEvent(
-      key: 'text color $index',
-      getDescription: () => 'Text color $index',
-      command: 'alt+digit ${index.toString()}',
-      macOSCommand: 'option+$index',
+      key: 'text color ${index + 1}',
+      getDescription: () => 'Text color ${index + 1}',
+      command: 'alt+digit ${index + 1}',
       handler: (editorState) {
         final selection = editorState.selection;
         if (selection == null || selection.isCollapsed) {
           return KeyEventResult.ignored;
         }
-
+        _lastSelection = selection;
         _applyColorToSelection(
           editorState,
           selection,
           AppFlowyRichTextKeys.textColor,
-          _colorForIndex(index),
+          _colorForIndex(index + 1),
         );
         return KeyEventResult.handled;
       },
@@ -486,23 +485,22 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   );
 
   late final List<CommandShortcutEvent> _highlightHandlers = List.generate(
-    10,
+    8,
     (index) => CommandShortcutEvent(
-      key: 'highlight $index',
-      getDescription: () => 'Highlight $index',
-      command: 'alt+shift+digit ${index.toString()}',
-      macOSCommand: 'option+shift+$index',
+      key: 'highlight ${index + 1}',
+      getDescription: () => 'Highlight ${index + 1}',
+      command: 'alt+shift+digit ${index + 1}',
       handler: (editorState) {
         final selection = editorState.selection;
         if (selection == null || selection.isCollapsed) {
           return KeyEventResult.ignored;
         }
-
+        _lastSelection = selection;
         _applyColorToSelection(
           editorState,
           selection,
           AppFlowyRichTextKeys.backgroundColor,
-          _highlightColorForIndex(index),
+          _highlightColorForIndex(index + 1),
         );
         return KeyEventResult.handled;
       },
@@ -960,16 +958,42 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                         tooltip: '글자색',
                         icon: Icons.format_color_text,
                         onOpen: () => _lastSelection = _editorState?.selection,
-                        onColorSelected: (color) => _applyColor('color', color),
+                        isHighlight: false,
+                        onColorSelected: (color) {
+                          final editorState = _editorState;
+                          if (editorState == null) return;
+                          final selection =
+                              _lastSelection ?? editorState.selection;
+                          if (selection == null || selection.isCollapsed)
+                            return;
+                          _applyColorToSelection(
+                            editorState,
+                            selection,
+                            AppFlowyRichTextKeys.textColor,
+                            color,
+                          );
+                        },
                       ),
-                      const SizedBox(width: 4),
                       // 하이라이트
                       MemoEditorColorDropdown(
                         tooltip: '하이라이트',
                         icon: Icons.highlight,
+                        isHighlight: true,
                         onOpen: () => _lastSelection = _editorState?.selection,
-                        onColorSelected: (color) =>
-                            _applyColor('backgroundColor', color),
+                        onColorSelected: (color) {
+                          final editorState = _editorState;
+                          if (editorState == null) return;
+                          final selection =
+                              _lastSelection ?? editorState.selection;
+                          if (selection == null || selection.isCollapsed)
+                            return;
+                          _applyColorToSelection(
+                            editorState,
+                            selection,
+                            AppFlowyRichTextKeys.backgroundColor,
+                            color,
+                          );
+                        },
                       ),
                       const SizedBox(width: 8),
                       // 위첨자
@@ -1086,35 +1110,33 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   }
 
   Color _colorForIndex(int index) {
-    final colors = [
-      const Color(0xFFE53935),
-      const Color(0xFFFF9800),
-      const Color(0xFFFFEB3B),
-      const Color(0xFF4CAF50),
-      const Color(0xFF2196F3),
-      const Color(0xFF3F51B5),
-      const Color(0xFF9C27B0),
-      const Color(0xFF9E9E9E),
-      const Color(0xFF009688),
-      const Color(0xFF000000),
+    const colors = [
+      Color(0xFFE53935), // 1: 빨강
+      Color(0xFFFF9800), // 2: 주황
+      Color(0xFFFFEB3B), // 3: 노랑
+      Color(0xFF4CAF50), // 4: 초록
+      Color(0xFF2196F3), // 5: 파랑
+      Color(0xFF3F51B5), // 6: 남색
+      Color(0xFF9C27B0), // 7: 보라
+      Color(0xFF9E9E9E), // 8: 회색
     ];
-    return colors[index % colors.length];
+    if (index < 1 || index > 8) return const Color(0xFF000000);
+    return colors[index - 1];
   }
 
   Color _highlightColorForIndex(int index) {
-    final colors = [
-      const Color(0xFFFFCDD2),
-      const Color(0xFFFFE0B2),
-      const Color(0xFFFFF9C4),
-      const Color(0xFFC8E6C9),
-      const Color(0xFFBBDEFB),
-      const Color(0xFFC5CAE9),
-      const Color(0xFFE1BEE7),
-      const Color(0xFFF5F5F5),
-      const Color(0xFFB2DFDB),
-      const Color(0xFFE0E0E0),
+    const colors = [
+      Color(0xFFFFCDD2), // 0: 빨강
+      Color(0xFFFFE0B2), // 1: 주황
+      Color(0xFFFFF9C4), // 2: 노랑
+      Color(0xFFC8E6C9), // 3: 초록
+      Color(0xFFBBDEFB), // 4: 파랑
+      Color(0xFFC5CAE9), // 5: 남색
+      Color(0xFFE1BEE7), // 6: 보라
+      Color(0xFFF5F5F5), // 7: 회색
     ];
-    return colors[index % colors.length];
+    if (index < 1 || index > 8) return const Color(0xFFFFFFFF);
+    return colors[index - 1];
   }
 
   String _toColorHex(Color color) {
@@ -1127,22 +1149,21 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     String attributeKey,
     Color color,
   ) {
-    editorState.formatDelta(selection, {attributeKey: _toColorHex(color)});
-  }
+    // 현재 선택 영역의 색상 확인
+    final nodes = editorState.getNodesInSelection(selection);
+    final currentColorHex =
+        nodes.firstOrNull?.delta
+                ?.slice(selection.start.offset, selection.end.offset)
+                .firstOrNull
+                ?.attributes?[attributeKey]
+            as String?;
 
-  void _applyColor(String attribute, Color color) {
-    final editorState = _editorState;
-    if (editorState == null) return;
+    final newColorHex = _toColorHex(color);
 
-    // 저장된 selection 사용
-    final selection = _lastSelection ?? editorState.selection;
-    if (selection == null || selection.isCollapsed) return;
+    // 같은 색이면 해제, 다르면 적용
+    final applyValue = currentColorHex == newColorHex ? null : newColorHex;
 
-    final attributeKey = attribute == 'color'
-        ? AppFlowyRichTextKeys.textColor
-        : AppFlowyRichTextKeys.backgroundColor;
-
-    _applyColorToSelection(editorState, selection, attributeKey, color);
+    editorState.formatDelta(selection, {attributeKey: applyValue});
   }
 
   void _toggleFormat(String format) {

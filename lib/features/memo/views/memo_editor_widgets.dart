@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:highlight/highlight_core.dart';
 import '../data/note_repository.dart';
 
 /// 메모 에디터에서 사용하는 태그 관리 다이얼로그입니다.
@@ -155,7 +156,6 @@ class _MemoEditorTagDialogState extends ConsumerState<MemoEditorTagDialog> {
 /// 에디터 정렬 드롭다운 메뉴 위젯입니다.
 class MemoEditorAlignDropdown extends StatelessWidget {
   final void Function(String align) onAlign;
-
   const MemoEditorAlignDropdown({required this.onAlign, super.key});
 
   /// 드롭다운으로 문단 정렬 방식을 선택합니다.
@@ -209,9 +209,9 @@ class MemoEditorColorDropdown extends StatelessWidget {
   final IconData icon;
   final void Function(Color color) onColorSelected;
   final VoidCallback? onOpen;
+  final bool isHighlight;
 
-  static const _colors = [
-    (Color.fromARGB(255, 0, 0, 0), '검정'),
+  static const _textColors = [
     (Color(0xFFE53935), '빨강'),
     (Color(0xFFFF9800), '주황'),
     (Color(0xFFFFEB3B), '노랑'),
@@ -220,8 +220,17 @@ class MemoEditorColorDropdown extends StatelessWidget {
     (Color(0xFF3F51B5), '남색'),
     (Color(0xFF9C27B0), '보라'),
     (Color(0xFF9E9E9E), '회색'),
-    (Color(0xFF009688), '에메랄드'),
-    (Color.fromARGB(255, 255, 255, 255), '흰색'),
+  ];
+
+  static const _highlightColors = [
+    (Color(0xFFFFCDD2), '빨강'),
+    (Color(0xFFFFE0B2), '주황'),
+    (Color(0xFFFFF9C4), '노랑'),
+    (Color(0xFFC8E6C9), '초록'),
+    (Color(0xFFBBDEFB), '파랑'),
+    (Color(0xFFC5CAE9), '남색'),
+    (Color(0xFFE1BEE7), '보라'),
+    (Color(0xFFF5F5F5), '회색'),
   ];
 
   const MemoEditorColorDropdown({
@@ -229,12 +238,14 @@ class MemoEditorColorDropdown extends StatelessWidget {
     required this.icon,
     required this.onColorSelected,
     required this.onOpen,
+    required this.isHighlight,
     super.key,
   });
 
   /// 색상을 선택할 수 있는 메뉴를 열고 선택 결과를 전달합니다.
   @override
   Widget build(BuildContext context) {
+    final colors = isHighlight ? _highlightColors : _textColors;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTapDown: (_) => onOpen?.call(),
@@ -244,12 +255,11 @@ class MemoEditorColorDropdown extends StatelessWidget {
         constraints: const BoxConstraints(),
         icon: Icon(icon, size: 18),
         onPressed: () async {
-          // 버튼 클릭 시 텍스트 선택이 해제될 수 있으므로
-          // 먼저 선택 영역을 저장한 후 메뉴를 보여줍니다.
           final renderBox = context.findRenderObject() as RenderBox?;
           if (renderBox == null) return;
 
           final offset = renderBox.localToGlobal(Offset.zero);
+          print(offset);
           final selected = await showMenu<Color>(
             context: context,
             position: RelativeRect.fromLTRB(
@@ -258,7 +268,7 @@ class MemoEditorColorDropdown extends StatelessWidget {
               offset.dx + renderBox.size.width,
               offset.dy,
             ),
-            items: _colors.map((item) {
+            items: colors.map((item) {
               final (color, label) = item;
               return PopupMenuItem<Color>(
                 value: color,
