@@ -1,4 +1,4 @@
-﻿name: taskmanager
+name: taskmanager
 description: "Task Manager - 메모, 캘린더, 메일 통합 앱"
 version: 0.0.4+1
 
@@ -62,6 +62,7 @@ dependencies:
   flutter_highlight: ^0.7.0
   highlight: ^0.7.0
   package_info_plus: ^9.0.1
+  uuid: ^4.6.0
   
 dev_dependencies:
   flutter_test:

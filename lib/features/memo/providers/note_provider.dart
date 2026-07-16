@@ -60,12 +60,14 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     return repo.searchNotes(query);
   }
 
-  Future<void> createNote() async {
+  Future<void> createNote({int? folderId}) async {
     final repo = ref.read(noteRepositoryProvider);
-    final selectedFolder = ref.read(selectedFolderProvider);
+    // folderId 파라미터가 명시적으로 넘어오면 그것 사용
+    // 없으면 현재 선택된 폴더 사용
+    final targetFolderId = folderId ?? ref.read(selectedFolderProvider)?.id;
 
     final currentNotes = (state.value ?? [])
-        .where((n) => n.folderId == selectedFolder?.id)
+        .where((n) => n.folderId == targetFolderId)
         .toList();
     final maxSortOrder = currentNotes.isEmpty
         ? 0.0
@@ -74,7 +76,7 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
               .reduce((a, b) => a > b ? a : b);
 
     final note = await repo.createNote(
-      folderId: selectedFolder?.id,
+      folderId: targetFolderId,
       sortOrder: maxSortOrder + 1.0,
     );
     final current = state.value ?? [];

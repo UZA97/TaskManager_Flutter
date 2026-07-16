@@ -662,8 +662,9 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
         _showCreateFolderDialog(context, widget.folder.id);
         break;
       case 'new_note':
-        ref.read(selectedFolderProvider.notifier).select(widget.folder);
-        ref.read(noteListProvider.notifier).createNote();
+        ref
+            .read(noteListProvider.notifier)
+            .createNote(folderId: widget.folder.id);
         break;
       case 'rename':
         _showRenameDialog(context);
