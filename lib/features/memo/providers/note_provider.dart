@@ -64,7 +64,6 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     final repo = ref.read(noteRepositoryProvider);
     final selectedFolder = ref.read(selectedFolderProvider);
 
-    // 현재 폴더의 메모 중 가장 큰 sortOrder + 1
     final currentNotes = (state.value ?? [])
         .where((n) => n.folderId == selectedFolder?.id)
         .toList();
@@ -95,6 +94,11 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     await repo.deleteNote(id);
     final current = state.value ?? [];
     state = AsyncData(current.where((n) => n.id != id).toList());
+    // 삭제된 메모가 선택 중이면 선택 해제
+    final selected = ref.read(selectedNoteProvider);
+    if (selected?.id == id) {
+      ref.read(selectedNoteProvider.notifier).select(null);
+    }
   }
 
   Future<void> refresh() async {

@@ -5,16 +5,39 @@
 #include "flutter_window.h"
 #include "utils.h"
 
+static constexpr const wchar_t kMutexName[] =
+    L"TaskManager_SingleInstance_{052817F2-E157-48D0-BF2A-AFBBC5A06B65}";
+
+static constexpr const wchar_t kWindowClassName[] =
+    L"FLUTTER_RUNNER_WIN32_WINDOW";
+
+static constexpr const wchar_t kWindowTitle[] = L"taskmanager";
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
-                      _In_ wchar_t *command_line, _In_ int show_command) {
-  // Attach to console when present (e.g., 'flutter run') or create a
-  // new console when running with a debugger.
-  if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
+                      _In_ wchar_t *command_line, _In_ int show_command)
+{
+  HANDLE hMutex = ::CreateMutexW(nullptr, TRUE, kMutexName);
+  if (hMutex != nullptr && ::GetLastError() == ERROR_ALREADY_EXISTS)
+  {
+    HWND hWnd = ::FindWindowW(kWindowClassName, nullptr);
+    if (hWnd != nullptr)
+    {
+      ::ShowWindow(hWnd, SW_SHOW);
+      if (::IsIconic(hWnd))
+      {
+        ::ShowWindow(hWnd, SW_RESTORE);
+      }
+      ::SetForegroundWindow(hWnd);
+    }
+    ::CloseHandle(hMutex);
+    return EXIT_SUCCESS;
+  }
+
+  if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent())
+  {
     CreateAndAttachConsole();
   }
 
-  // Initialize COM, so that it is available for use in the library and/or
-  // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
   flutter::DartProject project(L"data");
@@ -27,17 +50,21 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"taskmanager", origin, size)) {
+  if (!window.Create(kWindowTitle, origin, size))
+  {
+    ::CloseHandle(hMutex);
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
 
   ::MSG msg;
-  while (::GetMessage(&msg, nullptr, 0, 0)) {
+  while (::GetMessage(&msg, nullptr, 0, 0))
+  {
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);
   }
 
+  ::CloseHandle(hMutex);
   ::CoUninitialize();
   return EXIT_SUCCESS;
 }

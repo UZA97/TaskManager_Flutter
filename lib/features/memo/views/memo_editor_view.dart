@@ -928,21 +928,21 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       // Bold
                       _buildFormatButton(
                         icon: Icons.format_bold,
-                        tooltip: '굵게',
+                        tooltip: '굵게 [Ctrl+B]',
                         onTap: () => _toggleFormat('bold'),
                       ),
                       const SizedBox(width: 4),
                       // Italic
                       _buildFormatButton(
                         icon: Icons.format_italic,
-                        tooltip: '기울임',
+                        tooltip: '기울임 [Ctrl+I]',
                         onTap: () => _toggleFormat('italic'),
                       ),
                       const SizedBox(width: 4),
                       // Underline
                       _buildFormatButton(
                         icon: Icons.format_underline,
-                        tooltip: '밑줄',
+                        tooltip: '밑줄 [Ctrl+U]',
                         onTap: () => _toggleFormat('underline'),
                       ),
                       const SizedBox(width: 4),
@@ -955,7 +955,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       const SizedBox(width: 8),
                       // 텍스트 색상
                       MemoEditorColorDropdown(
-                        tooltip: '글자색',
+                        tooltip: '글자색 [Alt+1~8]',
                         icon: Icons.format_color_text,
                         onOpen: () => _lastSelection = _editorState?.selection,
                         isHighlight: false,
@@ -976,7 +976,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       ),
                       // 하이라이트
                       MemoEditorColorDropdown(
-                        tooltip: '하이라이트',
+                        tooltip: '하이라이트 [Alt+↑+1~8]',
                         icon: Icons.highlight,
                         isHighlight: true,
                         onOpen: () => _lastSelection = _editorState?.selection,
