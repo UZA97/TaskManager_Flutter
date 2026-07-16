@@ -289,29 +289,6 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget>
     editorState.apply(transaction);
   }
 
-  void _pasteImage() async {
-    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    if (clipboardData?.text == null) return;
-
-    final imagePath = clipboardData!.text!;
-    final file = File(imagePath);
-    if (!file.existsSync()) return;
-
-    final editorState = Provider.of<EditorState>(context, listen: false);
-    final selection = editorState.selection;
-    if (selection == null) return;
-
-    final insertPath = selection.end.path.next;
-    final newNode = Node(
-      type: localImageType,
-      attributes: {'src': imagePath, 'width': 300},
-    );
-
-    final transaction = editorState.transaction;
-    transaction.insertNode(insertPath, newNode);
-    editorState.apply(transaction);
-  }
-
   @override
   Widget build(BuildContext context) {
     final src = _imageSrc;
