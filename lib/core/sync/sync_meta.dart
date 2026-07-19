@@ -1,14 +1,14 @@
 import 'dart:convert';
 
 class AttachmentMeta {
-  final String relativePath; // e.g. "Attachments/1/image.png"
-  final String checksum; // sha256
+  final String relativePath;
+  final String checksum;
 
   const AttachmentMeta({required this.relativePath, required this.checksum});
 
   factory AttachmentMeta.fromJson(Map<String, dynamic> json) => AttachmentMeta(
-    relativePath: json['relativePath'] as String,
-    checksum: json['checksum'] as String,
+    relativePath: json['relativePath'] as String? ?? '',
+    checksum: json['checksum'] as String? ?? '',
   );
 
   Map<String, dynamic> toJson() => {
@@ -31,10 +31,12 @@ class SyncMeta {
   });
 
   factory SyncMeta.fromJson(Map<String, dynamic> json) => SyncMeta(
-    lastSync: DateTime.parse(json['last_sync'] as String),
-    deviceId: json['device_id'] as String,
-    dbChecksum: json['db_checksum'] as String,
-    attachments: (json['attachments'] as List<dynamic>)
+    lastSync: DateTime.parse(
+      json['last_sync'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    deviceId: json['device_id'] as String? ?? '',
+    dbChecksum: json['db_checksum'] as String? ?? '',
+    attachments: (json['attachments'] as List<dynamic>? ?? [])
         .map((e) => AttachmentMeta.fromJson(e as Map<String, dynamic>))
         .toList(),
   );
@@ -47,7 +49,6 @@ class SyncMeta {
   };
 
   String encode() => jsonEncode(toJson());
-
   static SyncMeta decode(String json) =>
       SyncMeta.fromJson(jsonDecode(json) as Map<String, dynamic>);
 }

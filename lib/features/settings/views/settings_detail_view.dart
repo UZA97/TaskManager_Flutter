@@ -7,6 +7,9 @@ import '../../../core/update/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/settings/app_settings.dart';
 import '../../memo/providers/note_provider.dart';
+import '../../../core/database/database_provider.dart';
+import '../views/google_drive_sync_service.dart';
+import '../../../features/mail/services/google_auth_service.dart';
 
 class SettingsDetailView extends ConsumerWidget {
   const SettingsDetailView({super.key});
@@ -21,9 +24,131 @@ class SettingsDetailView extends ConsumerWidget {
       SettingsCategory.notification => _NotificationSettings(),
       SettingsCategory.productivity => _PlaceholderSettings(label: '생산성'),
       SettingsCategory.security => _SecuritySettings(),
-      SettingsCategory.advanced => _PlaceholderSettings(label: '고급'),
+      SettingsCategory.advanced => _AdvancedSettings(),
       SettingsCategory.info => _InfoSettings(),
     };
+  }
+}
+
+class _AdvancedSettings extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_AdvancedSettings> createState() => _AdvancedSettingsState();
+}
+
+class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
+  bool _isSyncing = false;
+  String? _statusMessage;
+  String? _accessToken;
+  String? _email;
+
+  Future<void> _signIn() async {
+    final result = await GoogleAuthService().signIn();
+    if (result == null) return;
+    setState(() {
+      _accessToken = result.accessToken;
+      _email = result.email;
+    });
+  }
+
+  Future<void> _sync() async {
+    if (_accessToken == null) {
+      await _signIn();
+      if (_accessToken == null) return;
+    }
+
+    setState(() {
+      _isSyncing = true;
+      _statusMessage = '동기화 준비 중...';
+    });
+
+    try {
+      final db = ref.read(databaseProvider);
+      final service = GoogleDriveSyncService(accessToken: _accessToken!);
+
+      setState(() => _statusMessage = 'direction 확인 중...');
+      final direction = await service.decideSyncDirection(db);
+      setState(() => _statusMessage = 'direction: $direction');
+
+      if (direction == 'none') {
+        setState(() {
+          _isSyncing = false;
+          _statusMessage = '이미 최신 상태입니다';
+        });
+        return;
+      }
+
+      if (direction == 'upload') {
+        await service.upload(
+          db,
+          onStatus: (s) => setState(() => _statusMessage = s),
+        );
+      } else {
+        await service.download(
+          db,
+          onStatus: (s) => setState(() => _statusMessage = s),
+        );
+      }
+    } catch (e, stack) {
+      print('동기화 에러: $e');
+      print('스택: $stack');
+      setState(() => _statusMessage = '오류: $e');
+    } finally {
+      setState(() => _isSyncing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const _SectionHeader(title: 'Google Drive 동기화'),
+        if (_email != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '계정: $_email',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
+        if (_statusMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              _statusMessage!,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
+        if (_isSyncing)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: LinearProgressIndicator(),
+          ),
+        Row(
+          children: [
+            ElevatedButton.icon(
+              onPressed: _isSyncing ? null : _sync,
+              icon: const Icon(Icons.sync, size: 16),
+              label: const Text('지금 동기화'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4A90E2),
+                foregroundColor: Colors.white,
+              ),
+            ),
+            if (_email != null) ...[
+              const SizedBox(width: 12),
+              OutlinedButton(
+                onPressed: () => setState(() {
+                  _accessToken = null;
+                  _email = null;
+                }),
+                child: const Text('로그아웃'),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
   }
 }
 
