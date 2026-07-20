@@ -116,7 +116,6 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
   }
 
   // 로그인 후 화면
-  // Client ID : 435117565109-c9n6m213r1l3u6fkpd2hario4fds9sfe.apps.googleusercontent.com
   Widget _buildLoggedInView(TaskMailAccount account) {
     final isGmail = account.imapServer == 'imap.gmail.com';
 

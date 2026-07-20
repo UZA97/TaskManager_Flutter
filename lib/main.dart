@@ -17,6 +17,7 @@ import 'features/map/views/map_view.dart';
 import 'features/map/views/map_sidebar_view.dart';
 import 'core/providers/navigation_provider.dart';
 import 'features/settings/views/settings_detail_view.dart';
+import 'package:appflowy_editor/appflowy_editor.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +62,7 @@ class TaskManagerApp extends ConsumerWidget {
     return MaterialApp(
       title: 'TaskManager',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [AppFlowyEditorLocalizations.delegate],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: settings?.themeColor ?? const Color(0xFF4A90E2),

@@ -21,10 +21,11 @@ import 'package:pasteboard/pasteboard.dart';
 import '../data/note_repository.dart';
 import '../services/pdf_export_service.dart';
 import 'memo_editor_widgets.dart';
+import '../../../core/providers/navigation_provider.dart';
+import 'package:appflowy_editor/src/editor/find_replace_menu/find_menu_service.dart';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
-
   @override
   ConsumerState<MemoEditorView> createState() => _MemoEditorViewState();
 }
@@ -100,6 +101,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(4),
+          constraints: const BoxConstraints(),
           child: Icon(icon, size: 18, color: Colors.grey[700]),
         ),
       ),
@@ -306,6 +308,129 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     for (final file in details.files) {
       await _processFile(file.path);
     }
+  }
+
+  FindReplaceService? _findReplaceService;
+
+  late final _findHandler = CommandShortcutEvent(
+    key: 'show the find dialog',
+    getDescription: () => 'Find',
+    command: 'ctrl+f',
+    handler: (editorState) {
+      _findReplaceService = FindReplaceMenu(
+        context: context,
+        editorState: editorState,
+        showReplaceMenu: false,
+        localizations: FindReplaceLocalizations(
+          find: '찾기',
+          previousMatch: '이전',
+          nextMatch: '다음',
+          close: '닫기',
+          replace: '바꾸기',
+          replaceAll: '모두 바꾸기',
+          noResult: '결과 없음',
+        ),
+        style: FindReplaceStyle(),
+      );
+      _findReplaceService?.show();
+      return KeyEventResult.handled;
+    },
+  );
+
+  late final _replaceHandler = CommandShortcutEvent(
+    key: 'show the find and replace dialog',
+    getDescription: () => 'Find and Replace',
+    command: 'ctrl+h',
+    handler: (editorState) {
+      _findReplaceService = FindReplaceMenu(
+        context: context,
+        editorState: editorState,
+        showReplaceMenu: true,
+        style: FindReplaceStyle(),
+      );
+      _findReplaceService?.show();
+      return KeyEventResult.handled;
+    },
+  );
+  late final _bulletedListHandler = CommandShortcutEvent(
+    key: 'bulleted list',
+    getDescription: () => 'Bulleted List',
+    command: 'ctrl+digit 1',
+    handler: (editorState) {
+      _toggleBlockType(BulletedListBlockKeys.type, () => bulletedListNode());
+      return KeyEventResult.handled;
+    },
+  );
+
+  late final _numberedListHandler = CommandShortcutEvent(
+    key: 'numbered list',
+    getDescription: () => 'Numbered List',
+    command: 'ctrl+digit 2',
+    handler: (editorState) {
+      _toggleBlockType(NumberedListBlockKeys.type, () => numberedListNode());
+      return KeyEventResult.handled;
+    },
+  );
+
+  late final _checkboxHandler = CommandShortcutEvent(
+    key: 'checkbox',
+    getDescription: () => 'Checkbox',
+    command: 'ctrl+digit 3',
+    handler: (editorState) {
+      _toggleBlockType(
+        TodoListBlockKeys.type,
+        () => todoListNode(checked: false),
+      );
+      return KeyEventResult.handled;
+    },
+  );
+
+  late final _dividerHandler = CommandShortcutEvent(
+    key: 'divider',
+    getDescription: () => 'Divider',
+    command: 'ctrl+shift+h',
+    handler: (editorState) {
+      insertNodeAfterSelection(editorState, dividerNode());
+      return KeyEventResult.handled;
+    },
+  );
+  void _toggleBlockType(String blockType, Node Function() nodeBuilder) {
+    final editorState = _editorState;
+    if (editorState == null) return;
+
+    final selection = editorState.selection;
+    if (selection == null) return;
+
+    final nodes = editorState.getNodesInSelection(selection);
+    if (nodes.isEmpty) return;
+
+    // 전체가 이미 해당 타입이면 비활성화, 아니면 활성화
+    final allSameType = nodes.every((n) => n.type == blockType);
+
+    final transaction = editorState.transaction;
+    for (final node in nodes) {
+      if (allSameType) {
+        transaction.insertNode(
+          node.path,
+          paragraphNode(delta: node.delta ?? Delta()),
+        );
+        transaction.deleteNode(node);
+      } else {
+        final newNode = nodeBuilder();
+        transaction.insertNode(
+          node.path,
+          Node(
+            type: newNode.type,
+            attributes: {
+              ...newNode.attributes,
+              'delta': node.delta?.toJson() ?? [],
+            },
+          ),
+        );
+        transaction.deleteNode(node);
+      }
+    }
+    editorState.apply(transaction);
   }
 
   late final _moveUpHandler = CommandShortcutEvent(
@@ -690,6 +815,13 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final selectedNote = ref.watch(selectedNoteProvider);
     final notes = ref.watch(noteListProvider).value ?? [];
 
+    ref.listen(navigationProvider, (prev, next) {
+      if (prev == 0 && next != 0) {
+        _findReplaceService?.dismiss();
+        _findReplaceService = null;
+      }
+    });
+
     // 항상 최신 상태로 동기화
     if (selectedNote != null) {
       final freshNote = notes.firstWhere(
@@ -728,11 +860,17 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         .toList();
 
     final shortcutEvents = [
+      _findHandler,
+      _replaceHandler,
       _pasteHandler,
       _backspaceHandler,
       _deleteHandler,
       _moveUpHandler,
       _moveDownHandler,
+      _numberedListHandler,
+      _bulletedListHandler,
+      _dividerHandler,
+      _checkboxHandler,
       ...standardPaste,
       pasteCommand, // 표준 붙여넣기 다시 추가
       pasteTextWithoutFormattingCommand,
@@ -813,6 +951,18 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                               !_currentNote!.isImportant,
                             ),
                       ),
+                      _buildToggleButton(
+                        icon: Icons.search,
+                        activeColor: const Color(0xFF4A90E2),
+                        isActive: false,
+                        tooltip: '찾기/바꾸기 [Ctrl+F]',
+                        onTap: () {
+                          openFindDialog(
+                            context: context,
+                            style: FindReplaceStyle(),
+                          ).handler.call(_editorState!);
+                        },
+                      ),
                     ],
                   ],
                 ),
@@ -857,6 +1007,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                   },
                 ),
               const Divider(height: 1, color: Color(0xFFDDDDDD)),
+
               const SizedBox(height: 24), // 제목 <-> 내용 간격
               Expanded(
                 child: Padding(
@@ -912,7 +1063,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       constraints: const BoxConstraints(),
                     ),
                     if (_isToolbarExpanded) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       // 파일 첨부
                       IconButton(
                         icon: const Icon(Icons.attach_file, size: 18),
@@ -921,38 +1072,45 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       // 정렬 드롭다운
                       MemoEditorAlignDropdown(onAlign: _setTextAlign),
-                      const SizedBox(width: 8),
                       // Bold
-                      _buildFormatButton(
-                        icon: Icons.format_bold,
+                      IconButton(
+                        icon: const Icon(Icons.format_bold),
                         tooltip: '굵게 [Ctrl+B]',
-                        onTap: () => _toggleFormat('bold'),
+                        onPressed: () => _toggleFormat('bold'),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
                       // Italic
-                      _buildFormatButton(
-                        icon: Icons.format_italic,
+                      IconButton(
+                        icon: const Icon(Icons.format_italic),
                         tooltip: '기울임 [Ctrl+I]',
-                        onTap: () => _toggleFormat('italic'),
+                        onPressed: () => _toggleFormat('italic'),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
                       // Underline
-                      _buildFormatButton(
-                        icon: Icons.format_underline,
+                      IconButton(
+                        icon: const Icon(Icons.format_underline),
                         tooltip: '밑줄 [Ctrl+U]',
-                        onTap: () => _toggleFormat('underline'),
+                        onPressed: () => _toggleFormat('underline'),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
                       // Strikethrough
-                      _buildFormatButton(
-                        icon: Icons.format_strikethrough,
+                      IconButton(
+                        icon: const Icon(Icons.format_strikethrough),
                         tooltip: '취소선',
-                        onTap: () => _toggleFormat('strikethrough'),
+                        onPressed: () => _toggleFormat('strikethrough'),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       // 텍스트 색상
                       MemoEditorColorDropdown(
                         tooltip: '글자색 [Alt+1~8]',
@@ -974,6 +1132,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                           );
                         },
                       ),
+                      const SizedBox(width: 4),
                       // 하이라이트
                       MemoEditorColorDropdown(
                         tooltip: '하이라이트 [Alt+↑+1~8]',
@@ -995,45 +1154,100 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                           );
                         },
                       ),
-                      const SizedBox(width: 8),
-                      // 위첨자
-                      _buildFormatButton(
-                        icon: Icons.superscript,
-                        tooltip: '위첨자',
-                        onTap: () => _toggleFormat('sup'),
+                      const SizedBox(width: 4),
+
+                      IconButton(
+                        icon: const Icon(Icons.format_list_bulleted),
+                        tooltip: '불릿 목록 [Ctrl+1]',
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _toggleBlockType(
+                          BulletedListBlockKeys.type,
+                          () => bulletedListNode(),
+                        ),
+                        constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
-                      // 아래첨자
-                      _buildFormatButton(
-                        icon: Icons.subscript,
-                        tooltip: '아래첨자',
-                        onTap: () => _toggleFormat('subScript'),
+
+                      IconButton(
+                        icon: const Icon(Icons.format_list_numbered),
+                        tooltip: '번호 목록 [Ctrl+2]',
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _toggleBlockType(
+                          NumberedListBlockKeys.type,
+                          () => numberedListNode(),
+                        ),
+                        constraints: const BoxConstraints(),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
+
+                      IconButton(
+                        icon: const Icon(Icons.check_box_outline_blank),
+                        tooltip: '체크박스 [Ctrl+3]',
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _toggleBlockType(
+                          TodoListBlockKeys.type,
+                          () => todoListNode(checked: false),
+                        ),
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 4),
+
+                      IconButton(
+                        icon: const Icon(Icons.horizontal_rule),
+                        tooltip: '구분선 [Ctrl+Shift+H]',
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _toggleBlockType(
+                          DividerBlockKeys.type,
+                          () => dividerNode(),
+                        ),
+                        constraints: const BoxConstraints(),
+                      ),
+                      // 위첨자
+                      // IconButton(
+                      //   icon: const Icon(Icons.superscript),
+                      //   tooltip: '위첨자',
+                      //   padding: EdgeInsets.zero,
+                      //   onPressed: () => _toggleFormat('sup'),
+                      //   constraints: const BoxConstraints(),
+                      // ),
+                      // const SizedBox(width: 4),
+                      // // 아래첨자
+                      // IconButton(
+                      //   icon: const Icon(Icons.subscript),
+                      //   tooltip: '위첨자',
+                      //   padding: EdgeInsets.zero,
+                      //   onPressed: () => _toggleFormat('subScript'),
+                      //   constraints: const BoxConstraints(),
+                      // ),
+                      const SizedBox(width: 4),
+
                       // 접을 수 있는 섹션
-                      _buildFormatButton(
-                        icon: Icons.unfold_less,
+                      IconButton(
+                        icon: const Icon(Icons.unfold_less),
                         tooltip: '접기 섹션',
-                        onTap: _insertCollapsibleSection,
+                        padding: EdgeInsets.zero,
+                        onPressed: _insertCollapsibleSection,
+                        constraints: const BoxConstraints(),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       // 태그
                       IconButton(
-                        icon: const Icon(Icons.label_outline, size: 18),
+                        icon: const Icon(Icons.label_outline),
                         tooltip: '태그',
-                        onPressed: () => _showTagDialog(),
                         padding: EdgeInsets.zero,
+                        onPressed: () => _showTagDialog(),
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 8),
+                      // PDF
+                      IconButton(
+                        icon: const Icon(Icons.picture_as_pdf),
+                        tooltip: 'PDF 내보내기',
+                        padding: EdgeInsets.zero,
+                        onPressed: _exportToPdf,
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
-                      // PDF
-                      IconButton(
-                        icon: const Icon(Icons.picture_as_pdf, size: 18),
-                        tooltip: 'PDF 내보내기',
-                        onPressed: _exportToPdf,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
                     ],
                     const Spacer(),
                     const Text(
@@ -1170,33 +1384,26 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final editorState = _editorState;
     if (editorState == null) return;
 
-    final selection = editorState.selection;
+    final selection = _lastSelection ?? editorState.selection;
     if (selection == null || selection.isCollapsed) return;
+
+    editorState.selection = selection;
 
     final nodes = editorState.getNodesInSelection(selection);
     final isFormatted = nodes.every((node) {
       final delta = node.delta;
       if (delta == null) return false;
-      return delta.everyAttributes((attrs) => attrs[format] == true);
-    });
-
-    final transaction = editorState.transaction;
-    for (final node in nodes) {
-      final delta = node.delta;
-      if (delta == null) continue;
-
-      final startIndex = node.path == selection.start.path
+      final startIndex = node.path.equals(selection.start.path)
           ? selection.start.offset
           : 0;
-      final endIndex = node.path == selection.end.path
+      final endIndex = node.path.equals(selection.end.path)
           ? selection.end.offset
           : delta.length;
+      final sliced = delta.slice(startIndex, endIndex);
+      return sliced.everyAttributes((attrs) => attrs[format] == true);
+    });
 
-      transaction.formatText(node, startIndex, endIndex - startIndex, {
-        format: !isFormatted,
-      });
-    }
-    editorState.apply(transaction);
+    editorState.formatDelta(selection, {format: !isFormatted});
   }
 
   Widget _buildToggleButton({
@@ -1231,5 +1438,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         ),
       ),
     );
+  }
+
+  //  탭 변경 감지
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
   }
 }
