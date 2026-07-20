@@ -15,6 +15,7 @@ import '../widgets/local_image_block.dart';
 import '../widgets/local_file_block.dart';
 import '../widgets/local_location_block.dart';
 import '../widgets/local_code_block.dart';
+import '../widgets/collapsible_section_block.dart';
 import '../../map/services/vworld_service.dart';
 import '../../map/widgets/location_search_dialog.dart';
 import 'package:pasteboard/pasteboard.dart';
@@ -90,23 +91,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
   bool _isImage(String filePath) =>
       _imageExts.contains(path.extension(filePath).toLowerCase());
-  Widget _buildFormatButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(4),
-          constraints: const BoxConstraints(),
-          child: Icon(icon, size: 18, color: Colors.grey[700]),
-        ),
-      ),
-    );
-  }
 
   @override
   void dispose() {
@@ -311,7 +295,35 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   }
 
   FindReplaceService? _findReplaceService;
+  late final _h1Handler = CommandShortcutEvent(
+    key: 'heading 1',
+    getDescription: () => 'Heading 1',
+    command: 'ctrl+digit 1',
+    handler: (editorState) {
+      _toggleBlockType('heading', () => headingNode(level: 1));
+      return KeyEventResult.handled;
+    },
+  );
 
+  late final _h2Handler = CommandShortcutEvent(
+    key: 'heading 2',
+    getDescription: () => 'Heading 2',
+    command: 'ctrl+digit 2',
+    handler: (editorState) {
+      _toggleBlockType('heading', () => headingNode(level: 2));
+      return KeyEventResult.handled;
+    },
+  );
+
+  late final _h3Handler = CommandShortcutEvent(
+    key: 'heading 3',
+    getDescription: () => 'Heading 3',
+    command: 'ctrl+digit 3',
+    handler: (editorState) {
+      _toggleBlockType('heading', () => headingNode(level: 3));
+      return KeyEventResult.handled;
+    },
+  );
   late final _findHandler = CommandShortcutEvent(
     key: 'show the find dialog',
     getDescription: () => 'Find',
@@ -355,17 +367,34 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   late final _bulletedListHandler = CommandShortcutEvent(
     key: 'bulleted list',
     getDescription: () => 'Bulleted List',
-    command: 'ctrl+digit 1',
+    command: 'ctrl+digit 4',
     handler: (editorState) {
       _toggleBlockType(BulletedListBlockKeys.type, () => bulletedListNode());
       return KeyEventResult.handled;
     },
   );
-
+  late final _strikethroughHandler = CommandShortcutEvent(
+    key: 'strikethrough',
+    getDescription: () => 'Strikethrough',
+    command: 'ctrl+shift+x',
+    handler: (editorState) {
+      _toggleFormat('strikethrough');
+      return KeyEventResult.handled;
+    },
+  );
+  late final _codeBlockHandler = CommandShortcutEvent(
+    key: 'code block',
+    getDescription: () => 'Code Block',
+    command: 'ctrl+shift+c',
+    handler: (editorState) {
+      insertNodeAfterSelection(editorState, localCodeNode());
+      return KeyEventResult.handled;
+    },
+  );
   late final _numberedListHandler = CommandShortcutEvent(
     key: 'numbered list',
     getDescription: () => 'Numbered List',
-    command: 'ctrl+digit 2',
+    command: 'ctrl+digit 5',
     handler: (editorState) {
       _toggleBlockType(NumberedListBlockKeys.type, () => numberedListNode());
       return KeyEventResult.handled;
@@ -375,7 +404,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   late final _checkboxHandler = CommandShortcutEvent(
     key: 'checkbox',
     getDescription: () => 'Checkbox',
-    command: 'ctrl+digit 3',
+    command: 'ctrl+digit 6',
     handler: (editorState) {
       _toggleBlockType(
         TodoListBlockKeys.type,
@@ -394,7 +423,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       return KeyEventResult.handled;
     },
   );
-  void _toggleBlockType(String blockType, Node Function() nodeBuilder) {
+  void _toggleBlockType(
+    String blockType,
+    Node Function() nodeBuilder, {
+    int? headingLevel,
+  }) {
     final editorState = _editorState;
     if (editorState == null) return;
 
@@ -404,8 +437,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     final nodes = editorState.getNodesInSelection(selection);
     if (nodes.isEmpty) return;
 
-    // 전체가 이미 해당 타입이면 비활성화, 아니면 활성화
-    final allSameType = nodes.every((n) => n.type == blockType);
+    final allSameType = nodes.every(
+      (n) =>
+          n.type == blockType &&
+          (headingLevel == null || n.attributes['level'] == headingLevel),
+    );
 
     final transaction = editorState.transaction;
     for (final node in nodes) {
@@ -431,6 +467,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       }
     }
     editorState.apply(transaction);
+
+    // selection 복원
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      editorState.selection = selection;
+    });
   }
 
   late final _moveUpHandler = CommandShortcutEvent(
@@ -803,6 +844,9 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       ...standardBlockComponentBuilderMap.map(
         (key, value) => MapEntry(key, applyAction(value)),
       ),
+      collapsibleSectionType: applyAction(
+        CollapsibleSectionBlockComponentBuilder(),
+      ),
       localImageType: applyAction(LocalImageBlockComponentBuilder()),
       localFileType: applyAction(LocalFileBlockComponentBuilder()),
       localLocationType: applyAction(LocalLocationBlockComponentBuilder()),
@@ -855,13 +899,21 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         .where(
           (e) =>
               e.key != 'paste the content' &&
-              e.key != 'paste the content as plain text',
+              e.key != 'paste the content as plain text' &&
+              e.key != 'format the text to h1' &&
+              e.key != 'format the text to h2' &&
+              e.key != 'format the text to h3',
         )
         .toList();
 
     final shortcutEvents = [
       _findHandler,
       _replaceHandler,
+      _strikethroughHandler,
+      _h1Handler,
+      _h2Handler,
+      _h3Handler,
+      _codeBlockHandler,
       _pasteHandler,
       _backspaceHandler,
       _deleteHandler,
@@ -1158,7 +1210,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
                       IconButton(
                         icon: const Icon(Icons.format_list_bulleted),
-                        tooltip: '불릿 목록 [Ctrl+1]',
+                        tooltip: '불릿 목록 [Ctrl+4]',
                         padding: EdgeInsets.zero,
                         onPressed: () => _toggleBlockType(
                           BulletedListBlockKeys.type,
@@ -1170,7 +1222,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
                       IconButton(
                         icon: const Icon(Icons.format_list_numbered),
-                        tooltip: '번호 목록 [Ctrl+2]',
+                        tooltip: '번호 목록 [Ctrl+5]',
                         padding: EdgeInsets.zero,
                         onPressed: () => _toggleBlockType(
                           NumberedListBlockKeys.type,
@@ -1182,7 +1234,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
 
                       IconButton(
                         icon: const Icon(Icons.check_box_outline_blank),
-                        tooltip: '체크박스 [Ctrl+3]',
+                        tooltip: '체크박스 [Ctrl+6]',
                         padding: EdgeInsets.zero,
                         onPressed: () => _toggleBlockType(
                           TodoListBlockKeys.type,
@@ -1219,6 +1271,20 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       //   onPressed: () => _toggleFormat('subScript'),
                       //   constraints: const BoxConstraints(),
                       // ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(Icons.code),
+                        tooltip: '코드 블록 [Ctrl+Shift+C]',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => {
+                          if (_editorState != null)
+                            insertNodeAfterSelection(
+                              _editorState!,
+                              localCodeNode(),
+                            ),
+                        },
+                      ),
                       const SizedBox(width: 4),
 
                       // 접을 수 있는 섹션
@@ -1298,28 +1364,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         : [editorState.document.root.children.length];
 
     final transaction = editorState.transaction;
-    transaction.insertNode(
-      insertPath,
-      Node(
-        type: 'toggle_list',
-        attributes: {
-          'collapsed': false,
-          'delta': [
-            {'insert': '섹션 제목'},
-          ],
-        },
-        children: [
-          Node(
-            type: 'paragraph',
-            attributes: {
-              'delta': [
-                {'insert': ''},
-              ],
-            },
-          ),
-        ],
-      ),
-    );
+    transaction.insertNode(insertPath, collapsibleSectionNode());
     editorState.apply(transaction);
   }
 
