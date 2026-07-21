@@ -50,7 +50,7 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
     });
   }
 
-  Future<void> _sync() async {
+  Future<void> _upload() async {
     if (_accessToken == null) {
       await _signIn();
       if (_accessToken == null) return;
@@ -58,39 +58,42 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
 
     setState(() {
       _isSyncing = true;
-      _statusMessage = '동기화 준비 중...';
+      _statusMessage = '업로드 준비 중...';
     });
 
     try {
       final db = ref.read(databaseProvider);
       final service = GoogleDriveSyncService(accessToken: _accessToken!);
+      await service.upload(
+        db,
+        onStatus: (s) => setState(() => _statusMessage = s),
+      );
+    } catch (e) {
+      setState(() => _statusMessage = '오류: $e');
+    } finally {
+      setState(() => _isSyncing = false);
+    }
+  }
 
-      setState(() => _statusMessage = 'direction 확인 중...');
-      final direction = await service.decideSyncDirection(db);
-      setState(() => _statusMessage = 'direction: $direction');
+  Future<void> _download() async {
+    if (_accessToken == null) {
+      await _signIn();
+      if (_accessToken == null) return;
+    }
 
-      if (direction == 'none') {
-        setState(() {
-          _isSyncing = false;
-          _statusMessage = '이미 최신 상태입니다';
-        });
-        return;
-      }
+    setState(() {
+      _isSyncing = true;
+      _statusMessage = '다운로드 준비 중...';
+    });
 
-      if (direction == 'upload') {
-        await service.upload(
-          db,
-          onStatus: (s) => setState(() => _statusMessage = s),
-        );
-      } else {
-        await service.download(
-          db,
-          onStatus: (s) => setState(() => _statusMessage = s),
-        );
-      }
-    } catch (e, stack) {
-      print('동기화 에러: $e');
-      print('스택: $stack');
+    try {
+      final db = ref.read(databaseProvider);
+      final service = GoogleDriveSyncService(accessToken: _accessToken!);
+      await service.download(
+        db,
+        onStatus: (s) => setState(() => _statusMessage = s),
+      );
+    } catch (e) {
       setState(() => _statusMessage = '오류: $e');
     } finally {
       setState(() => _isSyncing = false);
@@ -127,24 +130,24 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
         Row(
           children: [
             ElevatedButton.icon(
-              onPressed: _isSyncing ? null : _sync,
-              icon: const Icon(Icons.sync, size: 16),
-              label: const Text('지금 동기화'),
+              onPressed: _isSyncing ? null : _upload,
+              icon: const Icon(Icons.cloud_upload, size: 16),
+              label: const Text('업로드'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4A90E2),
                 foregroundColor: Colors.white,
               ),
             ),
-            if (_email != null) ...[
-              const SizedBox(width: 12),
-              OutlinedButton(
-                onPressed: () => setState(() {
-                  _accessToken = null;
-                  _email = null;
-                }),
-                child: const Text('로그아웃'),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _isSyncing ? null : _download,
+              icon: const Icon(Icons.cloud_download, size: 16),
+              label: const Text('다운로드'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
               ),
-            ],
+            ),
           ],
         ),
       ],

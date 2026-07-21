@@ -6,6 +6,26 @@ import 'dart:io';
 
 part 'database.g.dart';
 
+class EventTagTable extends Table {
+  @override
+  String get tableName => 'event_tags';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  TextColumn get color => text().withDefault(const Constant('#4A90E2'))();
+}
+
+class EventTagRelationTable extends Table {
+  @override
+  String get tableName => 'event_tag_relations';
+
+  IntColumn get eventId => integer().references(EventTable, #id)();
+  IntColumn get tagId => integer().references(EventTagTable, #id)();
+
+  @override
+  Set<Column> get primaryKey => {eventId, tagId};
+}
+
 class FolderTable extends Table {
   @override
   String get tableName => 'folders';
@@ -98,6 +118,13 @@ class EventTable extends Table {
   TextColumn get locationName => text().nullable()();
   RealColumn get locationLat => real().nullable()();
   RealColumn get locationLng => real().nullable()();
+
+  TextColumn get startDate => text().nullable()();
+  TextColumn get endDate => text().nullable()();
+  TextColumn get startTime => text().nullable()();
+  TextColumn get endTime => text().nullable()();
+  BoolColumn get isAllDay => boolean().withDefault(const Constant(true))();
+  TextColumn get content => text().nullable()();
 }
 
 @DriftDatabase(
@@ -109,13 +136,15 @@ class EventTable extends Table {
     SettingTable,
     EventTable,
     FolderTable,
+    EventTagTable,
+    EventTagRelationTable,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   /// 신규 설치와 기존 데이터베이스 업그레이드 모두에서 공통으로 쓰이는
   /// 기본 폴더를 생성하고, 폴더가 비어 있는 메모에 자동으로 연결합니다.
@@ -183,6 +212,16 @@ class AppDatabase extends _$AppDatabase {
           folderTable,
           folderTable.favoriteSortOrder as GeneratedColumn,
         );
+      }
+      if (from < 8) {
+        await m.createTable(eventTagTable);
+        await m.createTable(eventTagRelationTable);
+        await m.addColumn(eventTable, eventTable.startDate as GeneratedColumn);
+        await m.addColumn(eventTable, eventTable.endDate as GeneratedColumn);
+        await m.addColumn(eventTable, eventTable.startTime as GeneratedColumn);
+        await m.addColumn(eventTable, eventTable.endTime as GeneratedColumn);
+        await m.addColumn(eventTable, eventTable.isAllDay as GeneratedColumn);
+        await m.addColumn(eventTable, eventTable.content as GeneratedColumn);
       }
     },
   );

@@ -2348,6 +2348,76 @@ class $EventTableTable extends EventTable
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _startDateMeta = const VerificationMeta(
+    'startDate',
+  );
+  @override
+  late final GeneratedColumn<String> startDate = GeneratedColumn<String>(
+    'start_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _endDateMeta = const VerificationMeta(
+    'endDate',
+  );
+  @override
+  late final GeneratedColumn<String> endDate = GeneratedColumn<String>(
+    'end_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startTimeMeta = const VerificationMeta(
+    'startTime',
+  );
+  @override
+  late final GeneratedColumn<String> startTime = GeneratedColumn<String>(
+    'start_time',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _endTimeMeta = const VerificationMeta(
+    'endTime',
+  );
+  @override
+  late final GeneratedColumn<String> endTime = GeneratedColumn<String>(
+    'end_time',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isAllDayMeta = const VerificationMeta(
+    'isAllDay',
+  );
+  @override
+  late final GeneratedColumn<bool> isAllDay = GeneratedColumn<bool>(
+    'is_all_day',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_all_day" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2363,6 +2433,12 @@ class $EventTableTable extends EventTable
     locationName,
     locationLat,
     locationLng,
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    isAllDay,
+    content,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2476,6 +2552,42 @@ class $EventTableTable extends EventTable
         ),
       );
     }
+    if (data.containsKey('start_date')) {
+      context.handle(
+        _startDateMeta,
+        startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta),
+      );
+    }
+    if (data.containsKey('end_date')) {
+      context.handle(
+        _endDateMeta,
+        endDate.isAcceptableOrUnknown(data['end_date']!, _endDateMeta),
+      );
+    }
+    if (data.containsKey('start_time')) {
+      context.handle(
+        _startTimeMeta,
+        startTime.isAcceptableOrUnknown(data['start_time']!, _startTimeMeta),
+      );
+    }
+    if (data.containsKey('end_time')) {
+      context.handle(
+        _endTimeMeta,
+        endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta),
+      );
+    }
+    if (data.containsKey('is_all_day')) {
+      context.handle(
+        _isAllDayMeta,
+        isAllDay.isAcceptableOrUnknown(data['is_all_day']!, _isAllDayMeta),
+      );
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    }
     return context;
   }
 
@@ -2537,6 +2649,30 @@ class $EventTableTable extends EventTable
         DriftSqlType.double,
         data['${effectivePrefix}location_lng'],
       ),
+      startDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_date'],
+      ),
+      endDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_date'],
+      ),
+      startTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_time'],
+      ),
+      endTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_time'],
+      ),
+      isAllDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_all_day'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      ),
     );
   }
 
@@ -2560,6 +2696,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
   final String? locationName;
   final double? locationLat;
   final double? locationLng;
+  final String? startDate;
+  final String? endDate;
+  final String? startTime;
+  final String? endTime;
+  final bool isAllDay;
+  final String? content;
   const EventTableData({
     required this.id,
     required this.title,
@@ -2574,6 +2716,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     this.locationName,
     this.locationLat,
     this.locationLng,
+    this.startDate,
+    this.endDate,
+    this.startTime,
+    this.endTime,
+    required this.isAllDay,
+    this.content,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2596,6 +2744,22 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     }
     if (!nullToAbsent || locationLng != null) {
       map['location_lng'] = Variable<double>(locationLng);
+    }
+    if (!nullToAbsent || startDate != null) {
+      map['start_date'] = Variable<String>(startDate);
+    }
+    if (!nullToAbsent || endDate != null) {
+      map['end_date'] = Variable<String>(endDate);
+    }
+    if (!nullToAbsent || startTime != null) {
+      map['start_time'] = Variable<String>(startTime);
+    }
+    if (!nullToAbsent || endTime != null) {
+      map['end_time'] = Variable<String>(endTime);
+    }
+    map['is_all_day'] = Variable<bool>(isAllDay);
+    if (!nullToAbsent || content != null) {
+      map['content'] = Variable<String>(content);
     }
     return map;
   }
@@ -2621,6 +2785,22 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       locationLng: locationLng == null && nullToAbsent
           ? const Value.absent()
           : Value(locationLng),
+      startDate: startDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startDate),
+      endDate: endDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endDate),
+      startTime: startTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startTime),
+      endTime: endTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endTime),
+      isAllDay: Value(isAllDay),
+      content: content == null && nullToAbsent
+          ? const Value.absent()
+          : Value(content),
     );
   }
 
@@ -2643,6 +2823,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       locationName: serializer.fromJson<String?>(json['locationName']),
       locationLat: serializer.fromJson<double?>(json['locationLat']),
       locationLng: serializer.fromJson<double?>(json['locationLng']),
+      startDate: serializer.fromJson<String?>(json['startDate']),
+      endDate: serializer.fromJson<String?>(json['endDate']),
+      startTime: serializer.fromJson<String?>(json['startTime']),
+      endTime: serializer.fromJson<String?>(json['endTime']),
+      isAllDay: serializer.fromJson<bool>(json['isAllDay']),
+      content: serializer.fromJson<String?>(json['content']),
     );
   }
   @override
@@ -2662,6 +2848,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       'locationName': serializer.toJson<String?>(locationName),
       'locationLat': serializer.toJson<double?>(locationLat),
       'locationLng': serializer.toJson<double?>(locationLng),
+      'startDate': serializer.toJson<String?>(startDate),
+      'endDate': serializer.toJson<String?>(endDate),
+      'startTime': serializer.toJson<String?>(startTime),
+      'endTime': serializer.toJson<String?>(endTime),
+      'isAllDay': serializer.toJson<bool>(isAllDay),
+      'content': serializer.toJson<String?>(content),
     };
   }
 
@@ -2679,6 +2871,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     Value<String?> locationName = const Value.absent(),
     Value<double?> locationLat = const Value.absent(),
     Value<double?> locationLng = const Value.absent(),
+    Value<String?> startDate = const Value.absent(),
+    Value<String?> endDate = const Value.absent(),
+    Value<String?> startTime = const Value.absent(),
+    Value<String?> endTime = const Value.absent(),
+    bool? isAllDay,
+    Value<String?> content = const Value.absent(),
   }) => EventTableData(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -2693,6 +2891,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     locationName: locationName.present ? locationName.value : this.locationName,
     locationLat: locationLat.present ? locationLat.value : this.locationLat,
     locationLng: locationLng.present ? locationLng.value : this.locationLng,
+    startDate: startDate.present ? startDate.value : this.startDate,
+    endDate: endDate.present ? endDate.value : this.endDate,
+    startTime: startTime.present ? startTime.value : this.startTime,
+    endTime: endTime.present ? endTime.value : this.endTime,
+    isAllDay: isAllDay ?? this.isAllDay,
+    content: content.present ? content.value : this.content,
   );
   EventTableData copyWithCompanion(EventTableCompanion data) {
     return EventTableData(
@@ -2723,6 +2927,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       locationLng: data.locationLng.present
           ? data.locationLng.value
           : this.locationLng,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      endDate: data.endDate.present ? data.endDate.value : this.endDate,
+      startTime: data.startTime.present ? data.startTime.value : this.startTime,
+      endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      isAllDay: data.isAllDay.present ? data.isAllDay.value : this.isAllDay,
+      content: data.content.present ? data.content.value : this.content,
     );
   }
 
@@ -2741,7 +2951,13 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           ..write('googleEventId: $googleEventId, ')
           ..write('locationName: $locationName, ')
           ..write('locationLat: $locationLat, ')
-          ..write('locationLng: $locationLng')
+          ..write('locationLng: $locationLng, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('isAllDay: $isAllDay, ')
+          ..write('content: $content')
           ..write(')'))
         .toString();
   }
@@ -2761,6 +2977,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     locationName,
     locationLat,
     locationLng,
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    isAllDay,
+    content,
   );
   @override
   bool operator ==(Object other) =>
@@ -2778,7 +3000,13 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           other.googleEventId == this.googleEventId &&
           other.locationName == this.locationName &&
           other.locationLat == this.locationLat &&
-          other.locationLng == this.locationLng);
+          other.locationLng == this.locationLng &&
+          other.startDate == this.startDate &&
+          other.endDate == this.endDate &&
+          other.startTime == this.startTime &&
+          other.endTime == this.endTime &&
+          other.isAllDay == this.isAllDay &&
+          other.content == this.content);
 }
 
 class EventTableCompanion extends UpdateCompanion<EventTableData> {
@@ -2795,6 +3023,12 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
   final Value<String?> locationName;
   final Value<double?> locationLat;
   final Value<double?> locationLng;
+  final Value<String?> startDate;
+  final Value<String?> endDate;
+  final Value<String?> startTime;
+  final Value<String?> endTime;
+  final Value<bool> isAllDay;
+  final Value<String?> content;
   const EventTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -2809,6 +3043,12 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.locationName = const Value.absent(),
     this.locationLat = const Value.absent(),
     this.locationLng = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.endDate = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.isAllDay = const Value.absent(),
+    this.content = const Value.absent(),
   });
   EventTableCompanion.insert({
     this.id = const Value.absent(),
@@ -2824,6 +3064,12 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.locationName = const Value.absent(),
     this.locationLat = const Value.absent(),
     this.locationLng = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.endDate = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.isAllDay = const Value.absent(),
+    this.content = const Value.absent(),
   }) : eventDate = Value(eventDate),
        createdAt = Value(createdAt);
   static Insertable<EventTableData> custom({
@@ -2840,6 +3086,12 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Expression<String>? locationName,
     Expression<double>? locationLat,
     Expression<double>? locationLng,
+    Expression<String>? startDate,
+    Expression<String>? endDate,
+    Expression<String>? startTime,
+    Expression<String>? endTime,
+    Expression<bool>? isAllDay,
+    Expression<String>? content,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2855,6 +3107,12 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       if (locationName != null) 'location_name': locationName,
       if (locationLat != null) 'location_lat': locationLat,
       if (locationLng != null) 'location_lng': locationLng,
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+      if (startTime != null) 'start_time': startTime,
+      if (endTime != null) 'end_time': endTime,
+      if (isAllDay != null) 'is_all_day': isAllDay,
+      if (content != null) 'content': content,
     });
   }
 
@@ -2872,6 +3130,12 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Value<String?>? locationName,
     Value<double?>? locationLat,
     Value<double?>? locationLng,
+    Value<String?>? startDate,
+    Value<String?>? endDate,
+    Value<String?>? startTime,
+    Value<String?>? endTime,
+    Value<bool>? isAllDay,
+    Value<String?>? content,
   }) {
     return EventTableCompanion(
       id: id ?? this.id,
@@ -2887,6 +3151,12 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       locationName: locationName ?? this.locationName,
       locationLat: locationLat ?? this.locationLat,
       locationLng: locationLng ?? this.locationLng,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      isAllDay: isAllDay ?? this.isAllDay,
+      content: content ?? this.content,
     );
   }
 
@@ -2932,6 +3202,24 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     if (locationLng.present) {
       map['location_lng'] = Variable<double>(locationLng.value);
     }
+    if (startDate.present) {
+      map['start_date'] = Variable<String>(startDate.value);
+    }
+    if (endDate.present) {
+      map['end_date'] = Variable<String>(endDate.value);
+    }
+    if (startTime.present) {
+      map['start_time'] = Variable<String>(startTime.value);
+    }
+    if (endTime.present) {
+      map['end_time'] = Variable<String>(endTime.value);
+    }
+    if (isAllDay.present) {
+      map['is_all_day'] = Variable<bool>(isAllDay.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
     return map;
   }
 
@@ -2950,7 +3238,488 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
           ..write('googleEventId: $googleEventId, ')
           ..write('locationName: $locationName, ')
           ..write('locationLat: $locationLat, ')
-          ..write('locationLng: $locationLng')
+          ..write('locationLng: $locationLng, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('isAllDay: $isAllDay, ')
+          ..write('content: $content')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $EventTagTableTable extends EventTagTable
+    with TableInfo<$EventTagTableTable, EventTagTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EventTagTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<String> color = GeneratedColumn<String>(
+    'color',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('#4A90E2'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, color];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'event_tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EventTagTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EventTagTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EventTagTableData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color'],
+      )!,
+    );
+  }
+
+  @override
+  $EventTagTableTable createAlias(String alias) {
+    return $EventTagTableTable(attachedDatabase, alias);
+  }
+}
+
+class EventTagTableData extends DataClass
+    implements Insertable<EventTagTableData> {
+  final int id;
+  final String name;
+  final String color;
+  const EventTagTableData({
+    required this.id,
+    required this.name,
+    required this.color,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['color'] = Variable<String>(color);
+    return map;
+  }
+
+  EventTagTableCompanion toCompanion(bool nullToAbsent) {
+    return EventTagTableCompanion(
+      id: Value(id),
+      name: Value(name),
+      color: Value(color),
+    );
+  }
+
+  factory EventTagTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EventTagTableData(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      color: serializer.fromJson<String>(json['color']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'color': serializer.toJson<String>(color),
+    };
+  }
+
+  EventTagTableData copyWith({int? id, String? name, String? color}) =>
+      EventTagTableData(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        color: color ?? this.color,
+      );
+  EventTagTableData copyWithCompanion(EventTagTableCompanion data) {
+    return EventTagTableData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      color: data.color.present ? data.color.value : this.color,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventTagTableData(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('color: $color')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, color);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EventTagTableData &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.color == this.color);
+}
+
+class EventTagTableCompanion extends UpdateCompanion<EventTagTableData> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String> color;
+  const EventTagTableCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.color = const Value.absent(),
+  });
+  EventTagTableCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.color = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<EventTagTableData> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? color,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (color != null) 'color': color,
+    });
+  }
+
+  EventTagTableCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<String>? color,
+  }) {
+    return EventTagTableCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      color: color ?? this.color,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<String>(color.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventTagTableCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('color: $color')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $EventTagRelationTableTable extends EventTagRelationTable
+    with TableInfo<$EventTagRelationTableTable, EventTagRelationTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EventTagRelationTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  @override
+  late final GeneratedColumn<int> eventId = GeneratedColumn<int>(
+    'event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES events (id)',
+    ),
+  );
+  static const VerificationMeta _tagIdMeta = const VerificationMeta('tagId');
+  @override
+  late final GeneratedColumn<int> tagId = GeneratedColumn<int>(
+    'tag_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES event_tags (id)',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [eventId, tagId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'event_tag_relations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EventTagRelationTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventIdMeta);
+    }
+    if (data.containsKey('tag_id')) {
+      context.handle(
+        _tagIdMeta,
+        tagId.isAcceptableOrUnknown(data['tag_id']!, _tagIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tagIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {eventId, tagId};
+  @override
+  EventTagRelationTableData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EventTagRelationTableData(
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}event_id'],
+      )!,
+      tagId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}tag_id'],
+      )!,
+    );
+  }
+
+  @override
+  $EventTagRelationTableTable createAlias(String alias) {
+    return $EventTagRelationTableTable(attachedDatabase, alias);
+  }
+}
+
+class EventTagRelationTableData extends DataClass
+    implements Insertable<EventTagRelationTableData> {
+  final int eventId;
+  final int tagId;
+  const EventTagRelationTableData({required this.eventId, required this.tagId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['event_id'] = Variable<int>(eventId);
+    map['tag_id'] = Variable<int>(tagId);
+    return map;
+  }
+
+  EventTagRelationTableCompanion toCompanion(bool nullToAbsent) {
+    return EventTagRelationTableCompanion(
+      eventId: Value(eventId),
+      tagId: Value(tagId),
+    );
+  }
+
+  factory EventTagRelationTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EventTagRelationTableData(
+      eventId: serializer.fromJson<int>(json['eventId']),
+      tagId: serializer.fromJson<int>(json['tagId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'eventId': serializer.toJson<int>(eventId),
+      'tagId': serializer.toJson<int>(tagId),
+    };
+  }
+
+  EventTagRelationTableData copyWith({int? eventId, int? tagId}) =>
+      EventTagRelationTableData(
+        eventId: eventId ?? this.eventId,
+        tagId: tagId ?? this.tagId,
+      );
+  EventTagRelationTableData copyWithCompanion(
+    EventTagRelationTableCompanion data,
+  ) {
+    return EventTagRelationTableData(
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      tagId: data.tagId.present ? data.tagId.value : this.tagId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventTagRelationTableData(')
+          ..write('eventId: $eventId, ')
+          ..write('tagId: $tagId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(eventId, tagId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EventTagRelationTableData &&
+          other.eventId == this.eventId &&
+          other.tagId == this.tagId);
+}
+
+class EventTagRelationTableCompanion
+    extends UpdateCompanion<EventTagRelationTableData> {
+  final Value<int> eventId;
+  final Value<int> tagId;
+  final Value<int> rowid;
+  const EventTagRelationTableCompanion({
+    this.eventId = const Value.absent(),
+    this.tagId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EventTagRelationTableCompanion.insert({
+    required int eventId,
+    required int tagId,
+    this.rowid = const Value.absent(),
+  }) : eventId = Value(eventId),
+       tagId = Value(tagId);
+  static Insertable<EventTagRelationTableData> custom({
+    Expression<int>? eventId,
+    Expression<int>? tagId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (eventId != null) 'event_id': eventId,
+      if (tagId != null) 'tag_id': tagId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EventTagRelationTableCompanion copyWith({
+    Value<int>? eventId,
+    Value<int>? tagId,
+    Value<int>? rowid,
+  }) {
+    return EventTagRelationTableCompanion(
+      eventId: eventId ?? this.eventId,
+      tagId: tagId ?? this.tagId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (eventId.present) {
+      map['event_id'] = Variable<int>(eventId.value);
+    }
+    if (tagId.present) {
+      map['tag_id'] = Variable<int>(tagId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventTagRelationTableCompanion(')
+          ..write('eventId: $eventId, ')
+          ..write('tagId: $tagId, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -2968,6 +3737,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $SettingTableTable settingTable = $SettingTableTable(this);
   late final $EventTableTable eventTable = $EventTableTable(this);
+  late final $EventTagTableTable eventTagTable = $EventTagTableTable(this);
+  late final $EventTagRelationTableTable eventTagRelationTable =
+      $EventTagRelationTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2980,6 +3752,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     attachmentTable,
     settingTable,
     eventTable,
+    eventTagTable,
+    eventTagRelationTable,
   ];
 }
 
@@ -5146,6 +5920,12 @@ typedef $$EventTableTableCreateCompanionBuilder =
       Value<String?> locationName,
       Value<double?> locationLat,
       Value<double?> locationLng,
+      Value<String?> startDate,
+      Value<String?> endDate,
+      Value<String?> startTime,
+      Value<String?> endTime,
+      Value<bool> isAllDay,
+      Value<String?> content,
     });
 typedef $$EventTableTableUpdateCompanionBuilder =
     EventTableCompanion Function({
@@ -5162,7 +5942,46 @@ typedef $$EventTableTableUpdateCompanionBuilder =
       Value<String?> locationName,
       Value<double?> locationLat,
       Value<double?> locationLng,
+      Value<String?> startDate,
+      Value<String?> endDate,
+      Value<String?> startTime,
+      Value<String?> endTime,
+      Value<bool> isAllDay,
+      Value<String?> content,
     });
+
+final class $$EventTableTableReferences
+    extends BaseReferences<_$AppDatabase, $EventTableTable, EventTableData> {
+  $$EventTableTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<
+    $EventTagRelationTableTable,
+    List<EventTagRelationTableData>
+  >
+  _eventTagRelationTableRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.eventTagRelationTable,
+        aliasName: $_aliasNameGenerator(
+          db.eventTable.id,
+          db.eventTagRelationTable.eventId,
+        ),
+      );
+
+  $$EventTagRelationTableTableProcessedTableManager
+  get eventTagRelationTableRefs {
+    final manager = $$EventTagRelationTableTableTableManager(
+      $_db,
+      $_db.eventTagRelationTable,
+    ).filter((f) => f.eventId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _eventTagRelationTableRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
 
 class $$EventTableTableFilterComposer
     extends Composer<_$AppDatabase, $EventTableTable> {
@@ -5237,6 +6056,62 @@ class $$EventTableTableFilterComposer
     column: $table.locationLng,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isAllDay => $composableBuilder(
+    column: $table.isAllDay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> eventTagRelationTableRefs(
+    Expression<bool> Function($$EventTagRelationTableTableFilterComposer f) f,
+  ) {
+    final $$EventTagRelationTableTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.eventTagRelationTable,
+          getReferencedColumn: (t) => t.eventId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$EventTagRelationTableTableFilterComposer(
+                $db: $db,
+                $table: $db.eventTagRelationTable,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$EventTableTableOrderingComposer
@@ -5312,6 +6187,36 @@ class $$EventTableTableOrderingComposer
     column: $table.locationLng,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isAllDay => $composableBuilder(
+    column: $table.isAllDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EventTableTableAnnotationComposer
@@ -5375,6 +6280,50 @@ class $$EventTableTableAnnotationComposer
     column: $table.locationLng,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<String> get endDate =>
+      $composableBuilder(column: $table.endDate, builder: (column) => column);
+
+  GeneratedColumn<String> get startTime =>
+      $composableBuilder(column: $table.startTime, builder: (column) => column);
+
+  GeneratedColumn<String> get endTime =>
+      $composableBuilder(column: $table.endTime, builder: (column) => column);
+
+  GeneratedColumn<bool> get isAllDay =>
+      $composableBuilder(column: $table.isAllDay, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  Expression<T> eventTagRelationTableRefs<T extends Object>(
+    Expression<T> Function($$EventTagRelationTableTableAnnotationComposer a) f,
+  ) {
+    final $$EventTagRelationTableTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.eventTagRelationTable,
+          getReferencedColumn: (t) => t.eventId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$EventTagRelationTableTableAnnotationComposer(
+                $db: $db,
+                $table: $db.eventTagRelationTable,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$EventTableTableTableManager
@@ -5388,12 +6337,9 @@ class $$EventTableTableTableManager
           $$EventTableTableAnnotationComposer,
           $$EventTableTableCreateCompanionBuilder,
           $$EventTableTableUpdateCompanionBuilder,
-          (
-            EventTableData,
-            BaseReferences<_$AppDatabase, $EventTableTable, EventTableData>,
-          ),
+          (EventTableData, $$EventTableTableReferences),
           EventTableData,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool eventTagRelationTableRefs})
         > {
   $$EventTableTableTableManager(_$AppDatabase db, $EventTableTable table)
     : super(
@@ -5421,6 +6367,12 @@ class $$EventTableTableTableManager
                 Value<String?> locationName = const Value.absent(),
                 Value<double?> locationLat = const Value.absent(),
                 Value<double?> locationLng = const Value.absent(),
+                Value<String?> startDate = const Value.absent(),
+                Value<String?> endDate = const Value.absent(),
+                Value<String?> startTime = const Value.absent(),
+                Value<String?> endTime = const Value.absent(),
+                Value<bool> isAllDay = const Value.absent(),
+                Value<String?> content = const Value.absent(),
               }) => EventTableCompanion(
                 id: id,
                 title: title,
@@ -5435,6 +6387,12 @@ class $$EventTableTableTableManager
                 locationName: locationName,
                 locationLat: locationLat,
                 locationLng: locationLng,
+                startDate: startDate,
+                endDate: endDate,
+                startTime: startTime,
+                endTime: endTime,
+                isAllDay: isAllDay,
+                content: content,
               ),
           createCompanionCallback:
               ({
@@ -5451,6 +6409,12 @@ class $$EventTableTableTableManager
                 Value<String?> locationName = const Value.absent(),
                 Value<double?> locationLat = const Value.absent(),
                 Value<double?> locationLng = const Value.absent(),
+                Value<String?> startDate = const Value.absent(),
+                Value<String?> endDate = const Value.absent(),
+                Value<String?> startTime = const Value.absent(),
+                Value<String?> endTime = const Value.absent(),
+                Value<bool> isAllDay = const Value.absent(),
+                Value<String?> content = const Value.absent(),
               }) => EventTableCompanion.insert(
                 id: id,
                 title: title,
@@ -5465,11 +6429,53 @@ class $$EventTableTableTableManager
                 locationName: locationName,
                 locationLat: locationLat,
                 locationLng: locationLng,
+                startDate: startDate,
+                endDate: endDate,
+                startTime: startTime,
+                endTime: endTime,
+                isAllDay: isAllDay,
+                content: content,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$EventTableTableReferences(db, table, e),
+                ),
+              )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({eventTagRelationTableRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (eventTagRelationTableRefs) db.eventTagRelationTable,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (eventTagRelationTableRefs)
+                    await $_getPrefetchedData<
+                      EventTableData,
+                      $EventTableTable,
+                      EventTagRelationTableData
+                    >(
+                      currentTable: table,
+                      referencedTable: $$EventTableTableReferences
+                          ._eventTagRelationTableRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$EventTableTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).eventTagRelationTableRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.eventId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
         ),
       );
 }
@@ -5484,12 +6490,661 @@ typedef $$EventTableTableProcessedTableManager =
       $$EventTableTableAnnotationComposer,
       $$EventTableTableCreateCompanionBuilder,
       $$EventTableTableUpdateCompanionBuilder,
-      (
-        EventTableData,
-        BaseReferences<_$AppDatabase, $EventTableTable, EventTableData>,
-      ),
+      (EventTableData, $$EventTableTableReferences),
       EventTableData,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool eventTagRelationTableRefs})
+    >;
+typedef $$EventTagTableTableCreateCompanionBuilder =
+    EventTagTableCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<String> color,
+    });
+typedef $$EventTagTableTableUpdateCompanionBuilder =
+    EventTagTableCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<String> color,
+    });
+
+final class $$EventTagTableTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $EventTagTableTable, EventTagTableData> {
+  $$EventTagTableTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<
+    $EventTagRelationTableTable,
+    List<EventTagRelationTableData>
+  >
+  _eventTagRelationTableRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.eventTagRelationTable,
+        aliasName: $_aliasNameGenerator(
+          db.eventTagTable.id,
+          db.eventTagRelationTable.tagId,
+        ),
+      );
+
+  $$EventTagRelationTableTableProcessedTableManager
+  get eventTagRelationTableRefs {
+    final manager = $$EventTagRelationTableTableTableManager(
+      $_db,
+      $_db.eventTagRelationTable,
+    ).filter((f) => f.tagId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _eventTagRelationTableRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$EventTagTableTableFilterComposer
+    extends Composer<_$AppDatabase, $EventTagTableTable> {
+  $$EventTagTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> eventTagRelationTableRefs(
+    Expression<bool> Function($$EventTagRelationTableTableFilterComposer f) f,
+  ) {
+    final $$EventTagRelationTableTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.eventTagRelationTable,
+          getReferencedColumn: (t) => t.tagId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$EventTagRelationTableTableFilterComposer(
+                $db: $db,
+                $table: $db.eventTagRelationTable,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$EventTagTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $EventTagTableTable> {
+  $$EventTagTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$EventTagTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EventTagTableTable> {
+  $$EventTagTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  Expression<T> eventTagRelationTableRefs<T extends Object>(
+    Expression<T> Function($$EventTagRelationTableTableAnnotationComposer a) f,
+  ) {
+    final $$EventTagRelationTableTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.eventTagRelationTable,
+          getReferencedColumn: (t) => t.tagId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$EventTagRelationTableTableAnnotationComposer(
+                $db: $db,
+                $table: $db.eventTagRelationTable,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$EventTagTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EventTagTableTable,
+          EventTagTableData,
+          $$EventTagTableTableFilterComposer,
+          $$EventTagTableTableOrderingComposer,
+          $$EventTagTableTableAnnotationComposer,
+          $$EventTagTableTableCreateCompanionBuilder,
+          $$EventTagTableTableUpdateCompanionBuilder,
+          (EventTagTableData, $$EventTagTableTableReferences),
+          EventTagTableData,
+          PrefetchHooks Function({bool eventTagRelationTableRefs})
+        > {
+  $$EventTagTableTableTableManager(_$AppDatabase db, $EventTagTableTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EventTagTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EventTagTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EventTagTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> color = const Value.absent(),
+              }) => EventTagTableCompanion(id: id, name: name, color: color),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<String> color = const Value.absent(),
+              }) => EventTagTableCompanion.insert(
+                id: id,
+                name: name,
+                color: color,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$EventTagTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({eventTagRelationTableRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (eventTagRelationTableRefs) db.eventTagRelationTable,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (eventTagRelationTableRefs)
+                    await $_getPrefetchedData<
+                      EventTagTableData,
+                      $EventTagTableTable,
+                      EventTagRelationTableData
+                    >(
+                      currentTable: table,
+                      referencedTable: $$EventTagTableTableReferences
+                          ._eventTagRelationTableRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$EventTagTableTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).eventTagRelationTableRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.tagId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$EventTagTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EventTagTableTable,
+      EventTagTableData,
+      $$EventTagTableTableFilterComposer,
+      $$EventTagTableTableOrderingComposer,
+      $$EventTagTableTableAnnotationComposer,
+      $$EventTagTableTableCreateCompanionBuilder,
+      $$EventTagTableTableUpdateCompanionBuilder,
+      (EventTagTableData, $$EventTagTableTableReferences),
+      EventTagTableData,
+      PrefetchHooks Function({bool eventTagRelationTableRefs})
+    >;
+typedef $$EventTagRelationTableTableCreateCompanionBuilder =
+    EventTagRelationTableCompanion Function({
+      required int eventId,
+      required int tagId,
+      Value<int> rowid,
+    });
+typedef $$EventTagRelationTableTableUpdateCompanionBuilder =
+    EventTagRelationTableCompanion Function({
+      Value<int> eventId,
+      Value<int> tagId,
+      Value<int> rowid,
+    });
+
+final class $$EventTagRelationTableTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $EventTagRelationTableTable,
+          EventTagRelationTableData
+        > {
+  $$EventTagRelationTableTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $EventTableTable _eventIdTable(_$AppDatabase db) =>
+      db.eventTable.createAlias(
+        $_aliasNameGenerator(
+          db.eventTagRelationTable.eventId,
+          db.eventTable.id,
+        ),
+      );
+
+  $$EventTableTableProcessedTableManager get eventId {
+    final $_column = $_itemColumn<int>('event_id')!;
+
+    final manager = $$EventTableTableTableManager(
+      $_db,
+      $_db.eventTable,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_eventIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $EventTagTableTable _tagIdTable(_$AppDatabase db) =>
+      db.eventTagTable.createAlias(
+        $_aliasNameGenerator(
+          db.eventTagRelationTable.tagId,
+          db.eventTagTable.id,
+        ),
+      );
+
+  $$EventTagTableTableProcessedTableManager get tagId {
+    final $_column = $_itemColumn<int>('tag_id')!;
+
+    final manager = $$EventTagTableTableTableManager(
+      $_db,
+      $_db.eventTagTable,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_tagIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$EventTagRelationTableTableFilterComposer
+    extends Composer<_$AppDatabase, $EventTagRelationTableTable> {
+  $$EventTagRelationTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$EventTableTableFilterComposer get eventId {
+    final $$EventTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.eventId,
+      referencedTable: $db.eventTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventTableTableFilterComposer(
+            $db: $db,
+            $table: $db.eventTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$EventTagTableTableFilterComposer get tagId {
+    final $$EventTagTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.eventTagTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventTagTableTableFilterComposer(
+            $db: $db,
+            $table: $db.eventTagTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EventTagRelationTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $EventTagRelationTableTable> {
+  $$EventTagRelationTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$EventTableTableOrderingComposer get eventId {
+    final $$EventTableTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.eventId,
+      referencedTable: $db.eventTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventTableTableOrderingComposer(
+            $db: $db,
+            $table: $db.eventTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$EventTagTableTableOrderingComposer get tagId {
+    final $$EventTagTableTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.eventTagTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventTagTableTableOrderingComposer(
+            $db: $db,
+            $table: $db.eventTagTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EventTagRelationTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EventTagRelationTableTable> {
+  $$EventTagRelationTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$EventTableTableAnnotationComposer get eventId {
+    final $$EventTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.eventId,
+      referencedTable: $db.eventTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.eventTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$EventTagTableTableAnnotationComposer get tagId {
+    final $$EventTagTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.eventTagTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventTagTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.eventTagTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EventTagRelationTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EventTagRelationTableTable,
+          EventTagRelationTableData,
+          $$EventTagRelationTableTableFilterComposer,
+          $$EventTagRelationTableTableOrderingComposer,
+          $$EventTagRelationTableTableAnnotationComposer,
+          $$EventTagRelationTableTableCreateCompanionBuilder,
+          $$EventTagRelationTableTableUpdateCompanionBuilder,
+          (EventTagRelationTableData, $$EventTagRelationTableTableReferences),
+          EventTagRelationTableData,
+          PrefetchHooks Function({bool eventId, bool tagId})
+        > {
+  $$EventTagRelationTableTableTableManager(
+    _$AppDatabase db,
+    $EventTagRelationTableTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EventTagRelationTableTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$EventTagRelationTableTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$EventTagRelationTableTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> eventId = const Value.absent(),
+                Value<int> tagId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EventTagRelationTableCompanion(
+                eventId: eventId,
+                tagId: tagId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int eventId,
+                required int tagId,
+                Value<int> rowid = const Value.absent(),
+              }) => EventTagRelationTableCompanion.insert(
+                eventId: eventId,
+                tagId: tagId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$EventTagRelationTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({eventId = false, tagId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (eventId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.eventId,
+                                referencedTable:
+                                    $$EventTagRelationTableTableReferences
+                                        ._eventIdTable(db),
+                                referencedColumn:
+                                    $$EventTagRelationTableTableReferences
+                                        ._eventIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+                    if (tagId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.tagId,
+                                referencedTable:
+                                    $$EventTagRelationTableTableReferences
+                                        ._tagIdTable(db),
+                                referencedColumn:
+                                    $$EventTagRelationTableTableReferences
+                                        ._tagIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$EventTagRelationTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EventTagRelationTableTable,
+      EventTagRelationTableData,
+      $$EventTagRelationTableTableFilterComposer,
+      $$EventTagRelationTableTableOrderingComposer,
+      $$EventTagRelationTableTableAnnotationComposer,
+      $$EventTagRelationTableTableCreateCompanionBuilder,
+      $$EventTagRelationTableTableUpdateCompanionBuilder,
+      (EventTagRelationTableData, $$EventTagRelationTableTableReferences),
+      EventTagRelationTableData,
+      PrefetchHooks Function({bool eventId, bool tagId})
     >;
 
 class $AppDatabaseManager {
@@ -5509,4 +7164,8 @@ class $AppDatabaseManager {
       $$SettingTableTableTableManager(_db, _db.settingTable);
   $$EventTableTableTableManager get eventTable =>
       $$EventTableTableTableManager(_db, _db.eventTable);
+  $$EventTagTableTableTableManager get eventTagTable =>
+      $$EventTagTableTableTableManager(_db, _db.eventTagTable);
+  $$EventTagRelationTableTableTableManager get eventTagRelationTable =>
+      $$EventTagRelationTableTableTableManager(_db, _db.eventTagRelationTable);
 }

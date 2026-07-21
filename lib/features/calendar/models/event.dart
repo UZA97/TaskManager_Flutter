@@ -14,6 +14,12 @@ class Event {
   final String? locationName;
   final double? locationLat;
   final double? locationLng;
+  final String? startDate;
+  final String? endDate;
+  final String? startTime;
+  final String? endTime;
+  final bool isAllDay;
+  final String? content;
 
   const Event({
     this.id,
@@ -29,6 +35,12 @@ class Event {
     this.locationName,
     this.locationLat,
     this.locationLng,
+    this.startDate,
+    this.endDate,
+    this.startTime,
+    this.endTime,
+    this.isAllDay = true,
+    this.content,
   });
 
   Event copyWith({

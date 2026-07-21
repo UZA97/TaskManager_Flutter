@@ -374,5 +374,9 @@ class GoogleDriveSyncService {
     }
 
     onStatus?.call('다운로드 완료 — 앱을 재시작합니다');
+    await Future.delayed(const Duration(seconds: 1)); // 메시지 보여주고
+    final executablePath = Platform.resolvedExecutable;
+    await Process.start(executablePath, [], mode: ProcessStartMode.detached);
+    exit(0);
   }
 }

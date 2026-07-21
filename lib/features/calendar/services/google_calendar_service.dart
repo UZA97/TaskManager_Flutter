@@ -52,6 +52,20 @@ class GoogleCalendarService {
 
   // 일정 추가
   Future<String?> addEvent(String accessToken, Event event) async {
+    final start = event.isAllDay
+        ? {'date': event.startDate ?? event.eventDate}
+        : {
+            'dateTime':
+                '${event.startDate ?? event.eventDate}T${event.startTime ?? '00:00'}:00',
+          };
+
+    final end = event.isAllDay
+        ? {'date': event.endDate ?? event.eventDate}
+        : {
+            'dateTime':
+                '${event.endDate ?? event.eventDate}T${event.endTime ?? '00:00'}:00',
+          };
+
     final response = await http.post(
       Uri.parse('$_baseUrl/calendars/primary/events'),
       headers: {
@@ -60,14 +74,47 @@ class GoogleCalendarService {
       },
       body: jsonEncode({
         'summary': event.title,
-        'start': {'date': event.eventDate},
-        'end': {'date': event.eventDate},
+        'description': event.content,
+        'location': event.locationName,
+        'start': {'date': start},
+        'end': {'date': end},
       }),
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) return null;
     final data = jsonDecode(response.body);
     return data['id'] as String?;
+  }
+
+  // 다운로드할 때 Google 포맷 → 우리 포맷
+  Event _googleEventToEvent(Map<String, dynamic> item) {
+    final isAllDay = item['start']['date'] != null;
+    final startDate = isAllDay
+        ? item['start']['date'] as String
+        : (item['start']['dateTime'] as String).substring(0, 10);
+    final endDate = isAllDay
+        ? item['end']['date'] as String
+        : (item['end']['dateTime'] as String).substring(0, 10);
+    final startTime = isAllDay
+        ? null
+        : (item['start']['dateTime'] as String).substring(11, 16);
+    final endTime = isAllDay
+        ? null
+        : (item['end']['dateTime'] as String).substring(11, 16);
+
+    return Event(
+      title: item['summary'] as String? ?? '(제목 없음)',
+      eventDate: startDate,
+      startDate: startDate,
+      endDate: endDate,
+      startTime: startTime,
+      endTime: endTime,
+      isAllDay: isAllDay,
+      content: item['description'] as String?,
+      locationName: item['location'] as String?,
+      createdAt: DateTime.now().toIso8601String(),
+      googleEventId: item['id'] as String?,
+    );
   }
 
   // 일정 삭제

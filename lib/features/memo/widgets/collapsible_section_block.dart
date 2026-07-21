@@ -252,7 +252,7 @@ class _CollapsibleSectionBlockWidgetState
     Widget child = Container(
       key: blockComponentKey,
       decoration: BoxDecoration(
-        color: bgColor ?? Colors.transparent,
+        color: bgColor,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFFDDDDDD)),
       ),
