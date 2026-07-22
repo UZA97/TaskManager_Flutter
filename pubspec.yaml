@@ -1,6 +1,6 @@
 name: taskmanager
 description: "Task Manager - 메모, 캘린더, 메일 통합 앱"
-version: 0.0.4+1
+version: 0.0.5+1
 
 environment:
   sdk: '>=3.8.0 <4.0.0'

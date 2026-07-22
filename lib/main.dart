@@ -115,6 +115,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   /// 앱 실행 중 트레이 동작과 창 표시/종료를 담당하는 서비스입니다.
   final _trayService = TrayService();
   bool _isLocked = false;
+  final Set<int> _notifiedEventIds = {};
 
   /// 메인 화면 좌측 네비게이션에 표시할 항목 목록입니다.
   static const List<NavigationRailDestination> _navigationDestinations = [
@@ -263,10 +264,13 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       final alarmDateTime = eventDateTime.subtract(
         Duration(minutes: alarmMinutesBefore),
       );
-      print(
-        'eventDateTime: $eventDateTime, alarmDateTime: $alarmDateTime, now: $now',
-      );
-      print('diff: ${alarmDateTime.difference(now).inMinutes}');
+      final diff = alarmDateTime.difference(now).inMinutes;
+      // 알람 시각이 지났거나 1분 이내인 경우
+      if (diff <= 0 && diff >= -1) {
+        if (_notifiedEventIds.contains(event.id)) continue; // 중복 방지
+        _notifiedEventIds.add(event.id!);
+        await NotificationService.show(title: '📅 일정 알람', body: event.title);
+      }
     }
   }
 

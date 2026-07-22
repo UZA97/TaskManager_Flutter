@@ -31,7 +31,17 @@ class EventRepository {
                 (t) => OrderingTerm.asc(t.eventDate),
               ]))
             .get();
-    return rows.map(_rowToEvent).toList();
+
+    final events = rows.map(_rowToEvent).toList();
+
+    return Future.wait(
+      events.map((event) async {
+        if (event.id == null) return event;
+        final tags = await getEventTags(event.id!);
+        if (tags.isEmpty) return event;
+        return event.copyWith(tagColor: tags.first.color);
+      }),
+    );
   }
 
   Future<List<Event>> getAllAlarmEvents() async {
@@ -112,6 +122,10 @@ class EventRepository {
         eventDate: Value(event.eventDate),
         alarmEnabled: Value(event.alarmEnabled),
         alarmTime: Value(event.alarmTime),
+        alarmDaysBefore: Value(event.alarmDaysBefore),
+        isCompleted: Value(event.isCompleted),
+        priority: Value(event.priority),
+        googleEventId: Value(event.googleEventId ?? ''),
         isAllDay: Value(event.isAllDay),
         startDate: Value(event.startDate),
         endDate: Value(event.endDate),

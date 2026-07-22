@@ -38,6 +38,7 @@ class VworldService {
     final response = await http.get(uri);
     if (response.statusCode != 200) throw Exception('검색 실패');
 
+    print('Vworld 응답: ${response.body}');
     final data = jsonDecode(response.body);
     final status = data['response']['status'] as String;
     if (status != 'OK') return [];

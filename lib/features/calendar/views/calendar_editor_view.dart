@@ -5,7 +5,6 @@ import '../models/event.dart';
 import '../data/event_repository.dart';
 import '../../map/services/vworld_service.dart';
 import '../../map/widgets/location_search_dialog.dart';
-import '../../../core/notification/notification_service.dart';
 
 class CalendarEditorView extends ConsumerWidget {
   const CalendarEditorView({super.key});
@@ -318,12 +317,17 @@ class _CalendarCell extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4A90E2).withOpacity(0.15),
+                        color: event.tagColor != null
+                            ? _hexToColor(event.tagColor!).withOpacity(0.8)
+                            : const Color(0xFF4A90E2).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: Text(
                         event.title.isEmpty ? '(제목 없음)' : event.title,
-                        style: const TextStyle(fontSize: 10),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: event.tagColor != null ? Colors.white : null,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -335,6 +339,14 @@ class _CalendarCell extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _hexToColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+    } catch (_) {
+      return const Color(0xFF4A90E2);
+    }
   }
 }
 
@@ -359,7 +371,7 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
   DateTime? _endDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
-  Set<int> _selectedTagIds = {};
+  int? _selectedTagId;
   double? _locationLat;
   double? _locationLng;
   int? _alarmMinutesBefore; // null = 알림 없음
@@ -409,17 +421,9 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
       if (widget.event?.id != null) {
         final repo = ref.read(eventRepositoryProvider);
         final tags = await repo.getEventTags(widget.event!.id!);
-        setState(() => _selectedTagIds = tags.map((t) => t.id!).toSet());
+        setState(() => _selectedTagId = tags.isNotEmpty ? tags.first.id : null);
       }
     });
-  }
-
-  int? _snapToAlarmOption(int minutes) {
-    const options = [5, 10, 30, 60, 120, 1440];
-    if (minutes <= 0) return null;
-    return options.reduce(
-      (a, b) => (a - minutes).abs() < (b - minutes).abs() ? a : b,
-    );
   }
 
   @override
@@ -483,25 +487,6 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
     });
   }
 
-  String _calculateAlarmTime(
-    DateTime date,
-    TimeOfDay? time,
-    int minutesBefore,
-  ) {
-    final baseTime = time ?? const TimeOfDay(hour: 9, minute: 0);
-    final baseDateTime = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      baseTime.hour,
-      baseTime.minute,
-    );
-    final alarmDateTime = baseDateTime.subtract(
-      Duration(minutes: minutesBefore),
-    );
-    return '${alarmDateTime.hour.toString().padLeft(2, '0')}:${alarmDateTime.minute.toString().padLeft(2, '0')}';
-  }
-
   Future<void> _save() async {
     if (_titleController.text.isEmpty) return;
 
@@ -514,7 +499,7 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
       eventDate: startDateStr,
       createdAt: widget.event?.createdAt ?? DateTime.now().toIso8601String(),
       alarmEnabled: _alarmMinutesBefore != null,
-      alarmDaysBefore: _alarmMinutesBefore ?? 0, // 분 단위로 저장
+      alarmDaysBefore: _alarmMinutesBefore ?? 0,
       alarmTime: '09:00',
       isAllDay: _isAllDay,
       startDate: startDateStr,
@@ -553,7 +538,10 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
       final savedId =
           widget.event?.id ?? (ref.read(eventListProvider).value?.last.id);
       if (savedId != null) {
-        await repo.setEventTags(savedId, _selectedTagIds.toList());
+        await repo.setEventTags(
+          savedId,
+          _selectedTagId != null ? [_selectedTagId!] : [],
+        );
       }
     }
 
@@ -797,15 +785,12 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
                         spacing: 6,
                         runSpacing: 6,
                         children: tags.map((tag) {
-                          final isSelected = _selectedTagIds.contains(tag.id);
+                          final isSelected = _selectedTagId == tag.id;
                           final color = _hexToColor(tag.color);
                           return GestureDetector(
                             onTap: () => setState(() {
-                              if (isSelected) {
-                                _selectedTagIds.remove(tag.id);
-                              } else {
-                                _selectedTagIds.add(tag.id!);
-                              }
+                              // 같은 태그 누르면 해제
+                              _selectedTagId = isSelected ? null : tag.id;
                             }),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -866,6 +851,7 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
                   value: _alarmMinutesBefore,
                   isDense: true,
                   items: const [
+                    DropdownMenuItem(value: 1, child: Text('1분 전')),
                     DropdownMenuItem(value: 5, child: Text('5분 전')),
                     DropdownMenuItem(value: 10, child: Text('10분 전')),
                     DropdownMenuItem(value: 30, child: Text('30분 전')),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:taskmanager/features/map/services/kakao_local_service.dart';
+import 'package:taskmanager/features/map/services/location_search_result.dart';
+import 'package:taskmanager/features/map/widgets/location_search_dialog.dart';
 import '../providers/map_provider.dart';
 import '../services/vworld_service.dart';
-import '../model/search_type.dart';
 
 class MapSidebarView extends ConsumerStatefulWidget {
   const MapSidebarView({super.key});
@@ -14,11 +16,9 @@ class MapSidebarView extends ConsumerStatefulWidget {
 
 class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
   final _searchController = TextEditingController();
-  List<VworldSearchResult> _results = [];
+  List<LocationSearchResult> _results = [];
   bool _isLoading = false;
   String? _error;
-  SearchType _searchType = SearchType.place; // 기본값 장소
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -36,23 +36,23 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
     });
 
     try {
-      final service = VworldService();
-      final results = _searchType == SearchType.place
-          ? await service.search(query)
-          : await service.searchAddress(query);
+      final service = KakaoLocalService();
+      final results = await service.search(query);
       setState(() {
         _results = results;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stack) {
       setState(() {
+        print('검색 에러: $e');
+        print('스택: $stack');
         _error = '검색 실패: $e';
         _isLoading = false;
       });
     }
   }
 
-  void _selectResult(VworldSearchResult result) {
+  void _selectResult(LocationSearchResult result) {
     ref
         .read(selectedLocationProvider.notifier)
         .select(
@@ -89,31 +89,6 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
               isDense: true,
             ),
             onSubmitted: (_) => _search(),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: SegmentedButton<SearchType>(
-            segments: const [
-              ButtonSegment(
-                value: SearchType.place,
-                label: Text('장소', style: TextStyle(fontSize: 12)),
-                icon: Icon(Icons.place, size: 14),
-              ),
-              ButtonSegment(
-                value: SearchType.address,
-                label: Text('주소', style: TextStyle(fontSize: 12)),
-                icon: Icon(Icons.home, size: 14),
-              ),
-            ],
-            selected: {_searchType},
-            onSelectionChanged: (value) {
-              setState(() {
-                _searchType = value.first;
-                _results = []; // 타입 바꾸면 결과 초기화
-              });
-            },
-            style: ButtonStyle(visualDensity: VisualDensity.compact),
           ),
         ),
         const SizedBox(height: 8),

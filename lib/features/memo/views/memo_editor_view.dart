@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:taskmanager/features/map/services/location_search_result.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
 import '../widgets/local_image_block.dart';
@@ -75,7 +76,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   );
 
   Future<void> _showLocationSearchDialog(EditorState editorState) async {
-    final result = await showDialog<VworldSearchResult>(
+    final result = await showDialog<LocationSearchResult>(
       context: context,
       builder: (context) => const LocationSearchDialog(),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:taskmanager/features/map/services/kakao_local_service.dart';
+import 'package:taskmanager/features/map/services/location_search_result.dart';
 import '../services/vworld_service.dart';
-import '../model/search_type.dart';
 
 class LocationSearchDialog extends StatefulWidget {
   const LocationSearchDialog({super.key});
@@ -11,10 +12,9 @@ class LocationSearchDialog extends StatefulWidget {
 
 class _LocationSearchDialogState extends State<LocationSearchDialog> {
   final _searchController = TextEditingController();
-  List<VworldSearchResult> _results = [];
+  List<LocationSearchResult> _results = [];
   bool _isLoading = false;
   String? _error;
-  SearchType _searchType = SearchType.place;
 
   @override
   void dispose() {
@@ -33,10 +33,9 @@ class _LocationSearchDialogState extends State<LocationSearchDialog> {
     });
 
     try {
-      final service = VworldService();
-      final results = _searchType == SearchType.place
-          ? await service.search(query)
-          : await service.searchAddress(query);
+      final service = KakaoLocalService();
+      final results = await service.search(query);
+
       setState(() {
         _results = results;
         _isLoading = false;
@@ -87,31 +86,7 @@ class _LocationSearchDialogState extends State<LocationSearchDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SegmentedButton<SearchType>(
-                segments: const [
-                  ButtonSegment(
-                    value: SearchType.place,
-                    label: Text('장소', style: TextStyle(fontSize: 12)),
-                    icon: Icon(Icons.place, size: 14),
-                  ),
-                  ButtonSegment(
-                    value: SearchType.address,
-                    label: Text('주소', style: TextStyle(fontSize: 12)),
-                    icon: Icon(Icons.home, size: 14),
-                  ),
-                ],
-                selected: {_searchType},
-                onSelectionChanged: (value) {
-                  setState(() {
-                    _searchType = value.first;
-                    _results = [];
-                  });
-                },
-                style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              ),
-            ),
+
             const SizedBox(height: 8),
             Expanded(
               child: _isLoading

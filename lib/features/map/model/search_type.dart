@@ -1,1 +1,0 @@
-enum SearchType { place, address }

@@ -20,6 +20,7 @@ class Event {
   final String? endTime;
   final bool isAllDay;
   final String? content;
+  final String? tagColor;
 
   const Event({
     this.id,
@@ -41,6 +42,7 @@ class Event {
     this.endTime,
     this.isAllDay = true,
     this.content,
+    this.tagColor,
   });
 
   Event copyWith({
@@ -54,6 +56,7 @@ class Event {
     bool? isCompleted,
     int? priority,
     String? googleEventId,
+    String? tagColor,
     // 위치 필드만 Value<T> 패턴
     Value<String?> locationName = const Value.absent(),
     Value<double?> locationLat = const Value.absent(),
@@ -75,6 +78,7 @@ class Event {
           : this.locationName,
       locationLat: locationLat.present ? locationLat.value : this.locationLat,
       locationLng: locationLng.present ? locationLng.value : this.locationLng,
+      tagColor: tagColor ?? this.tagColor,
     );
   }
 }
