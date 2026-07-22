@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../features/calendar/data/event_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -18,6 +20,9 @@ import 'features/map/views/map_sidebar_view.dart';
 import 'core/providers/navigation_provider.dart';
 import 'features/settings/views/settings_detail_view.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'features/mail/data/mail_repository.dart';
+import 'features/mail/services/mail_check_service.dart';
+import 'core/database/database_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -178,19 +183,91 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     await windowManager.focus();
   }
 
+  Timer? _alarmTimer;
   @override
   void initState() {
     super.initState();
     windowManager.addListener(this);
     _initTray();
 
-    // 앱 시작 시 잠금 체크
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 메일 폴링 시작
+      final mailAccount = await ref.read(mailRepositoryProvider).getAccount();
+      if (mailAccount != null) {
+        ref.read(mailCheckServiceProvider).start(mailAccount);
+      }
+
+      // 알람 체커 시작
+      _startAlarmChecker();
+
+      // 앱 시작 시 잠금 체크
       final settings = ref.read(settingsProvider).value;
       if (settings?.lockEnabled ?? false) {
         setState(() => _isLocked = true);
       }
     });
+  }
+
+  void _startAlarmChecker() {
+    _alarmTimer?.cancel();
+    _alarmTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _checkAlarms();
+    });
+  }
+
+  Future<void> _checkAlarms() async {
+    print('알람 체크 실행: ${DateTime.now()}');
+
+    final settings = ref.read(settingsProvider).value;
+    if (!(settings?.notificationEnabled ?? true)) {
+      print('알림 비활성화');
+      return;
+    }
+
+    final db = ref.read(databaseProvider);
+    final repo = EventRepository(db);
+    final events = await repo.getAllAlarmEvents();
+    print('알람 이벤트 수: ${events.length}');
+
+    final now = DateTime.now();
+    for (final event in events) {
+      print(
+        '이벤트: ${event.title}, alarmEnabled: ${event.alarmEnabled}, alarmDaysBefore: ${event.alarmDaysBefore}',
+      );
+      if (!event.alarmEnabled) continue;
+
+      final eventDate = DateTime.parse(event.eventDate);
+      final alarmMinutesBefore = event.alarmDaysBefore;
+      print('alarmMinutesBefore: $alarmMinutesBefore');
+
+      DateTime eventDateTime;
+      if (event.startTime != null) {
+        final parts = event.startTime!.split(':');
+        eventDateTime = DateTime(
+          eventDate.year,
+          eventDate.month,
+          eventDate.day,
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+        );
+      } else {
+        eventDateTime = DateTime(
+          eventDate.year,
+          eventDate.month,
+          eventDate.day,
+          9,
+          0,
+        );
+      }
+
+      final alarmDateTime = eventDateTime.subtract(
+        Duration(minutes: alarmMinutesBefore),
+      );
+      print(
+        'eventDateTime: $eventDateTime, alarmDateTime: $alarmDateTime, now: $now',
+      );
+      print('diff: ${alarmDateTime.difference(now).inMinutes}');
+    }
   }
 
   Future<void> _initTray() async {
@@ -240,5 +317,12 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _alarmTimer?.cancel();
+    windowManager.removeListener(this);
+    super.dispose();
   }
 }

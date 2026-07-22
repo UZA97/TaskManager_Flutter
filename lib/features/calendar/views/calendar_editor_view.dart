@@ -5,11 +5,7 @@ import '../models/event.dart';
 import '../data/event_repository.dart';
 import '../../map/services/vworld_service.dart';
 import '../../map/widgets/location_search_dialog.dart';
-// import '../models/event_tag.dart';
-// import '../../../core/notification/notification_service.dart';
-// import '../../../core/providers/navigation_provider.dart';
-// import '../../map/providers/map_provider.dart';
-// import 'package:latlong2/latlong.dart';
+import '../../../core/notification/notification_service.dart';
 
 class CalendarEditorView extends ConsumerWidget {
   const CalendarEditorView({super.key});
@@ -43,6 +39,7 @@ class CalendarEditorView extends ConsumerWidget {
                 onPressed: () {
                   final now = DateTime.now();
                   ref.read(currentMonthProvider.notifier).setYear(now.year);
+                  ref.read(currentMonthProvider.notifier).setMonth(now.month);
                   ref.read(selectedDateProvider.notifier).select(now);
                 },
                 style: OutlinedButton.styleFrom(
@@ -197,9 +194,16 @@ class _CalendarGrid extends StatelessWidget {
                   date.year == DateTime.now().year &&
                   date.month == DateTime.now().month &&
                   date.day == DateTime.now().day;
-              final dayEvents = events
-                  .where((e) => e.eventDate == dateStr)
-                  .toList();
+              final dayEvents = events.where((e) {
+                final cellDateStr = dateStr;
+                // 기간 이벤트
+                if (e.startDate != null && e.endDate != null) {
+                  return cellDateStr.compareTo(e.startDate!) >= 0 &&
+                      cellDateStr.compareTo(e.endDate!) <= 0;
+                }
+                // 단일 날짜 이벤트
+                return e.eventDate == cellDateStr;
+              }).toList();
 
               return Expanded(
                 child: _CalendarCell(
@@ -358,6 +362,7 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
   Set<int> _selectedTagIds = {};
   double? _locationLat;
   double? _locationLng;
+  int? _alarmMinutesBefore; // null = 알림 없음
 
   @override
   void initState() {
@@ -371,6 +376,9 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
       _locationLng = e.locationLng;
       _isAllDay = e.isAllDay;
       _alarmEnabled = e.alarmEnabled;
+      if (e.alarmEnabled) {
+        _alarmMinutesBefore = e.alarmDaysBefore > 0 ? e.alarmDaysBefore : 30;
+      }
       _startDate = e.startDate != null
           ? DateTime.parse(e.startDate!)
           : widget.initialDate;
@@ -404,6 +412,14 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
         setState(() => _selectedTagIds = tags.map((t) => t.id!).toSet());
       }
     });
+  }
+
+  int? _snapToAlarmOption(int minutes) {
+    const options = [5, 10, 30, 60, 120, 1440];
+    if (minutes <= 0) return null;
+    return options.reduce(
+      (a, b) => (a - minutes).abs() < (b - minutes).abs() ? a : b,
+    );
   }
 
   @override
@@ -467,6 +483,25 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
     });
   }
 
+  String _calculateAlarmTime(
+    DateTime date,
+    TimeOfDay? time,
+    int minutesBefore,
+  ) {
+    final baseTime = time ?? const TimeOfDay(hour: 9, minute: 0);
+    final baseDateTime = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      baseTime.hour,
+      baseTime.minute,
+    );
+    final alarmDateTime = baseDateTime.subtract(
+      Duration(minutes: minutesBefore),
+    );
+    return '${alarmDateTime.hour.toString().padLeft(2, '0')}:${alarmDateTime.minute.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _save() async {
     if (_titleController.text.isEmpty) return;
 
@@ -478,11 +513,9 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
       title: _titleController.text,
       eventDate: startDateStr,
       createdAt: widget.event?.createdAt ?? DateTime.now().toIso8601String(),
-      alarmEnabled: _alarmEnabled,
-      alarmTime: _startTime != null
-          ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
-          : '09:00',
-      alarmDaysBefore: 0,
+      alarmEnabled: _alarmMinutesBefore != null,
+      alarmDaysBefore: _alarmMinutesBefore ?? 0, // 분 단위로 저장
+      alarmTime: '09:00',
       isAllDay: _isAllDay,
       startDate: startDateStr,
       endDate: endDateStr,
@@ -590,22 +623,25 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
                           style: TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                         const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () => _pickDate(true),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: const Color(0xFFDDDDDD),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () => _pickDate(true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
                               ),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              _formatDate(_startDate ?? widget.initialDate),
-                              style: const TextStyle(fontSize: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: const Color(0xFFDDDDDD),
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                _formatDate(_startDate ?? widget.initialDate),
+                                style: const TextStyle(fontSize: 12),
+                              ),
                             ),
                           ),
                         ),
@@ -655,22 +691,25 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
                           style: TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                         const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () => _pickDate(false),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: const Color(0xFFDDDDDD),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () => _pickDate(false),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
                               ),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              _formatDate(_endDate ?? widget.initialDate),
-                              style: const TextStyle(fontSize: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: const Color(0xFFDDDDDD),
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                _formatDate(_endDate ?? widget.initialDate),
+                                style: const TextStyle(fontSize: 12),
+                              ),
                             ),
                           ),
                         ),
@@ -814,11 +853,30 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
                   const Text('알림', style: TextStyle(fontSize: 13)),
                   const Spacer(),
                   Switch(
-                    value: _alarmEnabled,
-                    onChanged: (v) => setState(() => _alarmEnabled = v),
+                    value: _alarmMinutesBefore != null,
+                    onChanged: (v) => setState(() {
+                      _alarmMinutesBefore = v ? 30 : null; // 켜면 기본 30분
+                    }),
                   ),
                 ],
               ),
+              if (_alarmMinutesBefore != null) ...[
+                const SizedBox(height: 8),
+                DropdownButton<int>(
+                  value: _alarmMinutesBefore,
+                  isDense: true,
+                  items: const [
+                    DropdownMenuItem(value: 5, child: Text('5분 전')),
+                    DropdownMenuItem(value: 10, child: Text('10분 전')),
+                    DropdownMenuItem(value: 30, child: Text('30분 전')),
+                    DropdownMenuItem(value: 60, child: Text('1시간 전')),
+                    DropdownMenuItem(value: 120, child: Text('2시간 전')),
+                    DropdownMenuItem(value: 1440, child: Text('1일 전')),
+                  ],
+                  onChanged: (v) => setState(() => _alarmMinutesBefore = v),
+                ),
+              ],
+
               const SizedBox(height: 20),
 
               // 버튼

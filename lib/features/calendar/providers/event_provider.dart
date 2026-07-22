@@ -63,6 +63,7 @@ class CurrentMonthNotifier extends Notifier<DateTime> {
   void prevMonth() => state = DateTime(state.year, state.month - 1);
   void nextMonth() => state = DateTime(state.year, state.month + 1);
   void setYear(int year) => state = DateTime(year, state.month);
+  void setMonth(int month) => state = DateTime(state.year, month);
 }
 
 final currentMonthProvider = NotifierProvider<CurrentMonthNotifier, DateTime>(

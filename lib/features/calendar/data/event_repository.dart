@@ -13,9 +13,19 @@ class EventRepository {
   Future<List<Event>> getEventsByMonth(int year, int month) async {
     final yearStr = year.toString().padLeft(4, '0');
     final monthStr = month.toString().padLeft(2, '0');
+    final monthStart = '$yearStr-$monthStr-01';
+    final monthEnd = '$yearStr-$monthStr-31';
+
     final rows =
         await (_db.select(_db.eventTable)
-              ..where((t) => t.eventDate.like('$yearStr-$monthStr-%'))
+              ..where(
+                (t) =>
+                    // 시작일이 이번달 안에 있거나
+                    t.eventDate.isBetweenValues(monthStart, monthEnd) |
+                    // 기간이 있는 경우 시작~종료가 이번달에 걸치는 경우
+                    (t.startDate.isSmallerOrEqualValue(monthEnd) &
+                        t.endDate.isBiggerOrEqualValue(monthStart)),
+              )
               ..orderBy([
                 (t) => OrderingTerm.desc(t.priority),
                 (t) => OrderingTerm.asc(t.eventDate),
