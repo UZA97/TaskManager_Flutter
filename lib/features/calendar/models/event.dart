@@ -57,6 +57,8 @@ class Event {
     int? priority,
     String? googleEventId,
     String? tagColor,
+    String? startDate,
+    String? endDate,
     // 위치 필드만 Value<T> 패턴
     Value<String?> locationName = const Value.absent(),
     Value<double?> locationLat = const Value.absent(),
@@ -79,6 +81,8 @@ class Event {
       locationLat: locationLat.present ? locationLat.value : this.locationLat,
       locationLng: locationLng.present ? locationLng.value : this.locationLng,
       tagColor: tagColor ?? this.tagColor,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
     );
   }
 }

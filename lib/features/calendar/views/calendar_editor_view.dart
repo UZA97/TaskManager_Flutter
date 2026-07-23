@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:taskmanager/features/map/services/location_search_result.dart';
 import '../providers/event_provider.dart';
 import '../models/event.dart';
 import '../data/event_repository.dart';
-import '../../map/services/vworld_service.dart';
 import '../../map/widgets/location_search_dialog.dart';
 
 class CalendarEditorView extends ConsumerWidget {
@@ -132,7 +132,7 @@ class CalendarEditorView extends ConsumerWidget {
   }) {
     showDialog(
       context: context,
-      builder: (context) => _EventDialog(
+      builder: (context) => EventDialog(
         initialDate: date ?? ref.read(selectedDateProvider),
         event: event,
       ),
@@ -195,8 +195,8 @@ class _CalendarGrid extends StatelessWidget {
                   date.day == DateTime.now().day;
               final dayEvents = events.where((e) {
                 final cellDateStr = dateStr;
-                // 기간 이벤트
                 if (e.startDate != null && e.endDate != null) {
+                  // 기간 이벤트
                   return cellDateStr.compareTo(e.startDate!) >= 0 &&
                       cellDateStr.compareTo(e.endDate!) <= 0;
                 }
@@ -351,17 +351,17 @@ class _CalendarCell extends StatelessWidget {
 }
 
 // ── 일정 다이얼로그 ───────────────────────────────────────
-class _EventDialog extends ConsumerStatefulWidget {
+class EventDialog extends ConsumerStatefulWidget {
   final DateTime initialDate;
   final Event? event;
 
-  const _EventDialog({required this.initialDate, this.event});
+  const EventDialog({required this.initialDate, this.event});
 
   @override
-  ConsumerState<_EventDialog> createState() => _EventDialogState();
+  ConsumerState<EventDialog> createState() => _EventDialogState();
 }
 
-class _EventDialogState extends ConsumerState<_EventDialog> {
+class _EventDialogState extends ConsumerState<EventDialog> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _locationController = TextEditingController();
@@ -475,7 +475,7 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
   }
 
   Future<void> _pickLocation() async {
-    final result = await showDialog<VworldSearchResult>(
+    final result = await showDialog<LocationSearchResult>(
       context: context,
       builder: (context) => const LocationSearchDialog(),
     );
@@ -496,12 +496,12 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
     final event = Event(
       id: widget.event?.id,
       title: _titleController.text,
-      eventDate: startDateStr,
       createdAt: widget.event?.createdAt ?? DateTime.now().toIso8601String(),
       alarmEnabled: _alarmMinutesBefore != null,
       alarmDaysBefore: _alarmMinutesBefore ?? 0,
       alarmTime: '09:00',
       isAllDay: _isAllDay,
+      eventDate: startDateStr,
       startDate: startDateStr,
       endDate: endDateStr,
       startTime: _isAllDay
@@ -523,26 +523,26 @@ class _EventDialogState extends ConsumerState<_EventDialog> {
       googleEventId: widget.event?.googleEventId,
       priority: widget.event?.priority ?? 1,
       isCompleted: widget.event?.isCompleted ?? false,
+      tagColor: widget.event?.tagColor,
     );
 
     final notifier = ref.read(eventListProvider.notifier);
-    if (widget.event != null) {
-      await notifier.updateEvent(event);
-    } else {
-      await notifier.addEvent(event);
-    }
 
     // 태그 저장
-    if (event.id != null || widget.event == null) {
+    int? savedId;
+    if (widget.event != null) {
+      await notifier.updateEvent(event);
+      savedId = widget.event!.id;
+    } else {
+      savedId = await notifier.addEvent(event);
+    }
+
+    if (savedId != null) {
       final repo = ref.read(eventRepositoryProvider);
-      final savedId =
-          widget.event?.id ?? (ref.read(eventListProvider).value?.last.id);
-      if (savedId != null) {
-        await repo.setEventTags(
-          savedId,
-          _selectedTagId != null ? [_selectedTagId!] : [],
-        );
-      }
+      await repo.setEventTags(
+        savedId,
+        _selectedTagId != null ? [_selectedTagId!] : [],
+      );
     }
 
     if (mounted) Navigator.pop(context);

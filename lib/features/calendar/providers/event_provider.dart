@@ -96,19 +96,23 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
     await _syncGoogleCalendar(month.year, month.month);
 
     final events = await repo.getEventsByMonth(month.year, month.month);
+    print('태그 미필터 적용: $tagFilter');
 
     if (tagFilter.isEmpty) return events;
 
     // 태그 필터 적용
-    final filtered = <Event>[];
-    for (final event in events) {
-      if (event.id == null) continue;
-      final tags = await repo.getEventTags(event.id!);
-      if (tags.any((t) => tagFilter.contains(t.id))) {
-        filtered.add(event);
+    if (tagFilter.isNotEmpty) {
+      final filtered = <Event>[];
+      for (final event in events) {
+        if (event.id == null) continue;
+        final tags = await repo.getEventTags(event.id!);
+        if (tags.any((t) => tagFilter.contains(t.id))) {
+          filtered.add(event);
+        }
       }
+      return filtered; // tagColor 포함된 event 반환
     }
-    return filtered;
+    return events;
   }
 
   Future<String?> _getAccessToken() async {
@@ -163,22 +167,24 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
     }
   }
 
-  Future<void> addEvent(Event event) async {
+  Future<int> addEvent(Event event) async {
     final repo = ref.read(eventRepositoryProvider);
-
     // Google Calendar에도 추가
     final accessToken = await _getAccessToken();
     if (accessToken != null) {
       final googleEventId = await _calendarService.addEvent(accessToken, event);
       if (googleEventId != null) {
-        await repo.addEvent(event.copyWith(googleEventId: googleEventId));
+        final id = await repo.addEvent(
+          event.copyWith(googleEventId: googleEventId),
+        );
         ref.invalidateSelf();
-        return;
+        return id;
       }
     }
 
-    await repo.addEvent(event);
+    final id = await repo.addEvent(event);
     ref.invalidateSelf();
+    return id;
   }
 
   Future<void> updateEvent(Event event) async {
@@ -220,8 +226,13 @@ final selectedDateEventsProvider = Provider<List<Event>>((ref) {
   final events = ref.watch(eventListProvider).value ?? [];
   final selectedDate = ref.watch(selectedDateProvider);
   final dateStr =
-      '${selectedDate.year}-'
-      '${selectedDate.month.toString().padLeft(2, '0')}-'
-      '${selectedDate.day.toString().padLeft(2, '0')}';
-  return events.where((e) => e.eventDate == dateStr).toList();
+      '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}';
+
+  return events.where((e) {
+    if (e.startDate != null && e.endDate != null) {
+      return dateStr.compareTo(e.startDate!) >= 0 &&
+          dateStr.compareTo(e.endDate!) <= 0;
+    }
+    return e.eventDate == dateStr;
+  }).toList();
 });

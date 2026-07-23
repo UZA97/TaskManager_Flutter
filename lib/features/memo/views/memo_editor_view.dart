@@ -1004,16 +1004,27 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                               !_currentNote!.isImportant,
                             ),
                       ),
-                      _buildToggleButton(
-                        icon: Icons.search,
-                        activeColor: const Color(0xFF4A90E2),
-                        isActive: false,
+                      IconButton(
+                        icon: const Icon(Icons.search, size: 18),
                         tooltip: '찾기/바꾸기 [Ctrl+F]',
-                        onTap: () {
-                          openFindDialog(
+                        onPressed: () {
+                          if (_editorState == null) return;
+                          _findReplaceService = FindReplaceMenu(
                             context: context,
+                            editorState: _editorState!,
+                            showReplaceMenu: false,
+                            localizations: FindReplaceLocalizations(
+                              find: '찾기',
+                              previousMatch: '이전',
+                              nextMatch: '다음',
+                              close: '닫기',
+                              replace: '바꾸기',
+                              replaceAll: '모두 바꾸기',
+                              noResult: '결과 없음',
+                            ),
                             style: FindReplaceStyle(),
-                          ).handler.call(_editorState!);
+                          );
+                          _findReplaceService?.show();
                         },
                       ),
                     ],

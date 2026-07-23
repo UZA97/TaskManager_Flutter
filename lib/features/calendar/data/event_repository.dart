@@ -53,11 +53,12 @@ class EventRepository {
     return rows.map(_rowToEvent).toList();
   }
 
-  Future<void> addEvent(Event event) async {
-    await _db
+  Future<int> addEvent(Event event) async {
+    return await _db
         .into(_db.eventTable)
         .insert(
           EventTableCompanion.insert(
+            id: Value.absentIfNull(event.id),
             title: Value(event.title),
             eventDate: event.eventDate,
             createdAt: event.createdAt,
@@ -118,6 +119,7 @@ class EventRepository {
       _db.eventTable,
     )..where((t) => t.id.equals(event.id!))).write(
       EventTableCompanion(
+        id: Value.absentIfNull(event.id),
         title: Value(event.title),
         eventDate: Value(event.eventDate),
         alarmEnabled: Value(event.alarmEnabled),
@@ -196,6 +198,7 @@ class EventRepository {
   }
 
   Event _rowToEvent(EventTableData row) {
+    print("Start :${row.startDate} /End : ${row.endDate}");
     return Event(
       id: row.id,
       title: row.title,

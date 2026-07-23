@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/event_provider.dart';
 import '../providers/google_calendar_provider.dart';
 import '../models/event_tag.dart';
+import 'calendar_editor_view.dart';
 
 class CalendarView extends ConsumerWidget {
   const CalendarView({super.key});
@@ -28,7 +29,21 @@ class _MiniCalendar extends ConsumerWidget {
     final currentMonth = ref.watch(currentMonthProvider);
     final eventsAsync = ref.watch(eventListProvider);
     final selectedDate = ref.watch(selectedDateProvider);
-    final eventDates = eventsAsync.value?.map((e) => e.eventDate).toSet() ?? {};
+    final eventDates = <String>{};
+    for (final event in eventsAsync.value ?? []) {
+      if (event.startDate != null && event.endDate != null) {
+        var current = DateTime.parse(event.startDate!);
+        final end = DateTime.parse(event.endDate!);
+        while (!current.isAfter(end)) {
+          eventDates.add(
+            '${current.year}-${current.month.toString().padLeft(2, '0')}-${current.day.toString().padLeft(2, '0')}',
+          );
+          current = current.add(const Duration(days: 1));
+        }
+      } else {
+        eventDates.add(event.eventDate);
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.all(8),
@@ -276,7 +291,10 @@ class _TagFilterSection extends ConsumerWidget {
               if (tagFilter.isNotEmpty) ...[
                 const SizedBox(width: 4),
                 GestureDetector(
-                  onTap: () => ref.read(tagFilterProvider.notifier).clear(),
+                  onTap: () {
+                    print('현재 필터: ${ref.read(tagFilterProvider)}');
+                    ref.read(tagFilterProvider.notifier).clear();
+                  },
                   child: const Text(
                     '초기화',
                     style: TextStyle(fontSize: 10, color: Color(0xFF4A90E2)),
@@ -476,35 +494,139 @@ class _SelectedDateEventList extends ConsumerWidget {
                   itemCount: selectedEvents.length,
                   itemBuilder: (context, index) {
                     final event = selectedEvents[index];
-                    return ListTile(
-                      dense: true,
-                      leading: Checkbox(
-                        value: event.isCompleted,
-                        onChanged: (v) => ref
-                            .read(eventListProvider.notifier)
-                            .updateCompletion(event.id!, v ?? false),
-                      ),
-                      title: Text(
-                        event.title,
-                        style: TextStyle(
-                          fontSize: 12,
-                          decoration: event.isCompleted
-                              ? TextDecoration.lineThrough
-                              : null,
-                          color: event.isCompleted ? Colors.grey : null,
+                    final tagColor = event.tagColor != null
+                        ? Color(
+                            int.parse(
+                              event.tagColor!.replaceFirst('#', '0xFF'),
+                            ),
+                          )
+                        : const Color(0xFF4A90E2);
+
+                    return GestureDetector(
+                      onTap: () => showDialog(
+                        context: context,
+                        builder: (context) => EventDialog(
+                          initialDate: selectedDate,
+                          event: event,
                         ),
                       ),
-                      subtitle: event.isAllDay
-                          ? null
-                          : Text(
-                              '${event.startTime ?? ''} ~ ${event.endTime ?? ''}',
-                              style: const TextStyle(fontSize: 10),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: tagColor.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border(
+                            left: BorderSide(color: tagColor, width: 3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // 완료 체크박스
+                            GestureDetector(
+                              onTap: () => ref
+                                  .read(eventListProvider.notifier)
+                                  .updateCompletion(
+                                    event.id!,
+                                    !event.isCompleted,
+                                  ),
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: event.isCompleted
+                                      ? tagColor
+                                      : Colors.transparent,
+                                  border: Border.all(
+                                    color: tagColor,
+                                    width: 1.5,
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: event.isCompleted
+                                    ? const Icon(
+                                        Icons.check,
+                                        size: 12,
+                                        color: Colors.white,
+                                      )
+                                    : null,
+                              ),
                             ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.close, size: 14),
-                        onPressed: () => ref
-                            .read(eventListProvider.notifier)
-                            .deleteEvent(event.id!),
+                            const SizedBox(width: 10),
+                            // 제목 + 시간
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    event.title.isEmpty
+                                        ? '(제목 없음)'
+                                        : event.title,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      decoration: event.isCompleted
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                      color: event.isCompleted
+                                          ? Colors.grey
+                                          : null,
+                                    ),
+                                  ),
+                                  if (!event.isAllDay &&
+                                      event.startTime != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${event.startTime} ${event.endTime != null ? '~ ${event.endTime}' : ''}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: tagColor.withOpacity(0.8),
+                                      ),
+                                    ),
+                                  ],
+                                  if (event.locationName != null) ...[
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.location_on,
+                                          size: 11,
+                                          color: Colors.grey[400],
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          event.locationName!,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[400],
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            // 삭제
+                            GestureDetector(
+                              onTap: () => ref
+                                  .read(eventListProvider.notifier)
+                                  .deleteEvent(event.id!),
+                              child: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

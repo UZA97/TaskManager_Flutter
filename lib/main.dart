@@ -217,11 +217,8 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   }
 
   Future<void> _checkAlarms() async {
-    print('알람 체크 실행: ${DateTime.now()}');
-
     final settings = ref.read(settingsProvider).value;
     if (!(settings?.notificationEnabled ?? true)) {
-      print('알림 비활성화');
       return;
     }
 
@@ -232,14 +229,10 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
 
     final now = DateTime.now();
     for (final event in events) {
-      print(
-        '이벤트: ${event.title}, alarmEnabled: ${event.alarmEnabled}, alarmDaysBefore: ${event.alarmDaysBefore}',
-      );
       if (!event.alarmEnabled) continue;
 
       final eventDate = DateTime.parse(event.eventDate);
       final alarmMinutesBefore = event.alarmDaysBefore;
-      print('alarmMinutesBefore: $alarmMinutesBefore');
 
       DateTime eventDateTime;
       if (event.startTime != null) {
