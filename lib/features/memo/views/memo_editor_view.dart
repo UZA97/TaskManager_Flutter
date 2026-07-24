@@ -1169,7 +1169,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       // Strikethrough
                       IconButton(
                         icon: const Icon(Icons.format_strikethrough),
-                        tooltip: '취소선',
+                        tooltip: '취소선 [Ctrl+Shift+X]',
                         onPressed: () => _toggleFormat('strikethrough'),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
