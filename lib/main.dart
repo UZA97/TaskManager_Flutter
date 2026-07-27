@@ -23,6 +23,7 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'features/mail/data/mail_repository.dart';
 import 'features/mail/services/mail_check_service.dart';
 import 'core/database/database_provider.dart';
+import 'core/update/update_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -206,7 +207,20 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       if (settings?.lockEnabled ?? false) {
         setState(() => _isLocked = true);
       }
+      _checkForUpdate();
     });
+  }
+
+  Future<void> _checkForUpdate() async {
+    final result = await UpdateService().checkForUpdate();
+    if (!result.hasUpdate) return;
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _UpdateDialog(result: result),
+    );
   }
 
   void _startAlarmChecker() {
@@ -321,5 +335,66 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     _alarmTimer?.cancel();
     windowManager.removeListener(this);
     super.dispose();
+  }
+}
+
+class _UpdateDialog extends StatefulWidget {
+  final UpdateCheckResult result;
+  const _UpdateDialog({required this.result});
+
+  @override
+  State<_UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<_UpdateDialog> {
+  bool _isDownloading = false;
+  double _progress = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('업데이트 가능'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('현재 버전: ${widget.result.currentVersion}'),
+          Text('최신 버전: ${widget.result.latestVersion}'),
+          if (_isDownloading) ...[
+            const SizedBox(height: 16),
+            LinearProgressIndicator(value: _progress),
+            const SizedBox(height: 8),
+            Text(
+              '다운로드 중... ${(_progress * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ],
+      ),
+      actions: _isDownloading
+          ? null
+          : [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('나중에'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  setState(() => _isDownloading = true);
+                  await UpdateService().downloadAndInstall(
+                    widget.result.downloadUrl!,
+                    onProgress: (progress) {
+                      setState(() => _progress = progress);
+                    },
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A90E2),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('업데이트'),
+              ),
+            ],
+    );
   }
 }
