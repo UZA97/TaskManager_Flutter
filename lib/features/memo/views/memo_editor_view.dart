@@ -12,12 +12,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:taskmanager/features/map/services/location_search_result.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
+import '../providers/tab_provider.dart';
 import '../widgets/local_image_block.dart';
 import '../widgets/local_file_block.dart';
 import '../widgets/local_location_block.dart';
 import '../widgets/local_code_block.dart';
 import '../widgets/collapsible_section_block.dart';
-import '../../map/services/vworld_service.dart';
+import '../widgets/memo_tab_bar.dart';
 import '../../map/widgets/location_search_dialog.dart';
 import 'package:pasteboard/pasteboard.dart';
 import '../data/note_repository.dart';
@@ -876,6 +877,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       if (freshNote.id != _currentNote?.id) {
         _currentNote = freshNote;
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(tabProvider.notifier).addTab(freshNote.id!);
           _initEditor(freshNote);
         });
       } else {
@@ -945,6 +947,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         children: [
           Column(
             children: [
+              const MemoTabBar(),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
                 child: Row(
