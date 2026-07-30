@@ -26,6 +26,8 @@ import '../services/pdf_export_service.dart';
 import 'memo_editor_widgets.dart';
 import '../../../core/providers/navigation_provider.dart';
 import 'package:appflowy_editor/src/editor/find_replace_menu/find_menu_service.dart';
+import '../widgets/ask_ai_dialog.dart';
+import '../services/gemini_service.dart';
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -43,6 +45,30 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   Timer? _saveTimer;
   StreamSubscription<void>? _transactionSubscription;
   VoidCallback? _selectionListener;
+
+  SelectionMenuItem get _askAiMenuItem => SelectionMenuItem(
+    getName: () => 'Ask AI',
+    icon: (editorState, onSelected, style) =>
+        const Icon(Icons.auto_awesome, color: Color(0xFF4A90E2), size: 18),
+    keywords: ['ai', 'ask', '질문', 'gemini'],
+    handler: (editorState, menuService, context) {
+      menuService.dismiss();
+      _showAskAiDialog(editorState);
+    },
+  );
+  Future<void> _showAskAiDialog(EditorState editorState) async {
+    final controller = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AskAiDialog(
+        onAsk: (question) async {
+          final service = GeminiService();
+          return await service.ask(question);
+        },
+      ),
+    );
+  }
 
   SelectionMenuItem get _locationMenuItem => SelectionMenuItem(
     getName: () => 'Location',
@@ -138,6 +164,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _locationMenuItem,
       _codeMenuItem,
       _fileMenuItem,
+      _askAiMenuItem,
     ];
 
     _transactionSubscription = editorState.transactionStream.listen((_) {
@@ -1084,6 +1111,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                         _locationMenuItem,
                         _codeMenuItem,
                         _fileMenuItem,
+                        _askAiMenuItem,
                       ]),
                       ...standardCharacterShortcutEvents.where(
                         (e) => e.key != 'show the slash menu',
