@@ -1,4 +1,3 @@
-// AI API Key :  AIzaSyAoq-bHFy5Izp9VB6zJJ93JDj98ieovK90
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database.dart';

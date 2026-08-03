@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 
-class GeminiService {
-  static const _apiKey = 'AIzaSyAoq-bHFy5Izp9VB6zJJ93JDj98ieovK90';
-  static const _baseUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+final json = jsonDecode(File('config/gemini_service.json').readAsStringSync());
+final _apiKey = json['installed']['_apiKey'];
+final _baseUrl = json['installed']['_baseUrl'];
 
+class GeminiService {
   Future<String> ask(String prompt) async {
     final response = await http.post(
       Uri.parse('$_baseUrl?key=$_apiKey'),
@@ -22,6 +23,7 @@ class GeminiService {
     );
 
     if (response.statusCode != 200) {
+      print('Error Body: ${response.body}');
       throw Exception('Gemini 호출 실패: ${response.statusCode}');
     }
 
