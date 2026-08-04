@@ -539,7 +539,6 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
       onTap: () {
         setState(() => _isExpanded = !_isExpanded);
         ref.read(selectedFolderProvider.notifier).select(widget.folder);
-        ref.read(selectedNoteProvider.notifier).select(null); // 추가
       },
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, details.globalPosition),
@@ -782,7 +781,6 @@ class _NoteNode extends ConsumerWidget {
     final noteRow = GestureDetector(
       onTap: () {
         ref.read(selectedNoteProvider.notifier).select(note);
-        ref.read(selectedFolderProvider.notifier).select(null); // 추가
       },
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),

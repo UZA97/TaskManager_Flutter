@@ -57,6 +57,29 @@ class MailMessagesNotifier extends AsyncNotifier<List<MailMessage>> {
       return service.fetchMessages();
     });
   }
+
+  Future<void> markAsRead(String messageId) async {
+    final service = ref.read(mailCheckServiceProvider);
+    await service.markAsRead(messageId);
+    // 로컬 상태 업데이트
+    final current = state.value ?? [];
+    state = AsyncData(
+      current
+          .map(
+            (m) => m.id == messageId
+                ? MailMessage(
+                    id: m.id,
+                    subject: m.subject,
+                    from: m.from,
+                    preview: m.preview,
+                    date: m.date,
+                    isRead: true,
+                  )
+                : m,
+          )
+          .toList(),
+    );
+  }
 }
 
 class SelectedMailNotifier extends Notifier<MailMessage?> {

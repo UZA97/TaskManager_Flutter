@@ -45,6 +45,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   Timer? _saveTimer;
   StreamSubscription<void>? _transactionSubscription;
   VoidCallback? _selectionListener;
+  List<Map<String, dynamic>>? _internalClipboard;
 
   SelectionMenuItem get _askAiMenuItem => SelectionMenuItem(
     getName: () => 'Ask AI',
@@ -636,25 +637,73 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
   }
 
-  late final _pasteHandler = CommandShortcutEvent(
-    key: 'paste local image',
-    getDescription: () => 'Paste local image from clipboard',
-    command: 'ctrl+v',
+  late final _copyHandler = CommandShortcutEvent(
+    key: 'copy with delta',
+    getDescription: () => 'Copy with delta attributes',
+    command: 'ctrl+c',
     handler: (editorState) {
-      // 코드 블록 편집 중이면 TextField가 처리하도록 통과
       final selection = editorState.selection;
-      if (selection != null) {
-        final node = editorState.getNodeAtPath(selection.end.path);
-        if (node?.type == localCodeType) {
-          return KeyEventResult.ignored;
-        }
+      if (selection == null || selection.isCollapsed)
+        return KeyEventResult.ignored;
+
+      final nodes = editorState.getNodesInSelection(selection);
+      final copied = <Map<String, dynamic>>[];
+
+      for (final node in nodes) {
+        copied.add(node.toJson());
       }
 
-      // 이미지/텍스트 처리
-      _handlePasteImage(editorState);
+      _internalClipboard = copied;
       return KeyEventResult.ignored;
     },
   );
+
+  late final _pasteHandler = CommandShortcutEvent(
+    key: 'paste with delta',
+    getDescription: () => 'Paste with delta attributes',
+    command: 'ctrl+v',
+    handler: (editorState) {
+      final selection = editorState.selection;
+      if (selection != null) {
+        final node = editorState.getNodeAtPath(selection.end.path);
+        if (node?.type == localCodeType) return KeyEventResult.ignored;
+      }
+
+      // 이미지 처리 - try-catch 추가
+      Pasteboard.image
+          .then((imageBytes) {
+            if (imageBytes != null) _handlePasteImage(editorState);
+          })
+          .catchError((_) {});
+
+      if (_internalClipboard != null && _internalClipboard!.isNotEmpty) {
+        _pasteInternalClipboard(editorState);
+        return KeyEventResult.handled;
+      }
+
+      return KeyEventResult.ignored;
+    },
+  );
+  void _pasteInternalClipboard(EditorState editorState) {
+    final selection = editorState.selection;
+    if (selection == null) return;
+
+    final clipboard = _internalClipboard!;
+    final transaction = editorState.transaction;
+    final insertBasePath = selection.start.path;
+
+    // 역순으로 삽입해야 순서가 유지됨
+    for (int i = clipboard.length - 1; i >= 0; i--) {
+      final node = Node.fromJson(clipboard[i].cast<String, Object>());
+      final insertPath = [
+        ...insertBasePath.sublist(0, insertBasePath.length - 1),
+        insertBasePath.last + 1,
+      ];
+      transaction.insertNode(insertPath, node);
+    }
+
+    editorState.apply(transaction);
+  }
 
   late final List<CommandShortcutEvent> _textColorHandlers = List.generate(
     8,
@@ -937,6 +986,8 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         .toList();
 
     final shortcutEvents = [
+      _copyHandler,
+      _findHandler,
       _findHandler,
       _replaceHandler,
       _strikethroughHandler,
@@ -944,6 +995,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _h2Handler,
       _h3Handler,
       _codeBlockHandler,
+      _copyHandler,
       _pasteHandler,
       _backspaceHandler,
       _deleteHandler,

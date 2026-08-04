@@ -171,6 +171,42 @@ class MailCheckService {
     }
   }
 
+  Future<void> markAsRead(String messageId) async {
+    final account = await _repo.getAccount();
+    if (account == null) return;
+    final accessToken = await _getValidAccessToken(account);
+    if (accessToken == null) return;
+
+    if (account.isOutlook) {
+      await http.patch(
+        Uri.parse('https://graph.microsoft.com/v1.0/me/messages/$messageId'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'isRead': true}),
+      );
+    } else {
+      final response = await http.post(
+        Uri.parse(
+          'https://gmail.googleapis.com/gmail/v1/users/me/messages/$messageId/modify',
+        ),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'removeLabelIds': ['UNREAD'],
+        }),
+      );
+      if (response.statusCode == 200) {
+        print('읽음 처리 성공!');
+      } else {
+        print('실패: ${response.statusCode} - ${response.body}');
+      }
+    }
+  }
+
   Future<List<MailMessage>> fetchMessages({
     int count = 20,
     String? pageToken,

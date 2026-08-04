@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/note_repository.dart';
 import '../models/note.dart';
 import '../providers/folder_provider.dart';
+import 'tab_provider.dart';
 
 // 검색어 상태
 class SearchQueryNotifier extends Notifier<String> {
@@ -101,6 +102,8 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     if (selected?.id == id) {
       ref.read(selectedNoteProvider.notifier).select(null);
     }
+    // 탭에서도 제거
+    ref.read(tabProvider.notifier).closeTab(id);
   }
 
   Future<void> refresh() async {

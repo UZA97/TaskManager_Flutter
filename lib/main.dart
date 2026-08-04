@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
+import 'features/memo/providers/note_provider.dart';
+import 'features/memo/providers/tab_provider.dart';
+
 import '../features/calendar/data/event_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -191,6 +195,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     super.initState();
     windowManager.addListener(this);
     _initTray();
+    HardwareKeyboard.instance.addHandler(_handleGlobalKey);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // 메일 폴링 시작
@@ -332,9 +337,82 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _alarmTimer?.cancel();
     windowManager.removeListener(this);
     super.dispose();
+  }
+
+  bool _handleGlobalKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+
+    final ctrl = HardwareKeyboard.instance.isControlPressed;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+
+    if (!ctrl) return false;
+
+    final tabState = ref.read(tabProvider).value;
+    if (tabState == null || tabState.tabNoteIds.isEmpty) return false;
+
+    // 현재 탭이 메모 탭일 때만
+    if (ref.read(navigationProvider) != 0) return false;
+
+    final ids = tabState.tabNoteIds;
+    final currentIndex = ids.indexOf(tabState.activeNoteId ?? -1);
+    final notes = ref.read(noteListProvider).value ?? [];
+
+    if (event.logicalKey == LogicalKeyboardKey.tab && !shift) {
+      // Ctrl+Tab: 다음 탭
+      final nextId = ids[(currentIndex + 1) % ids.length];
+      ref.read(tabProvider.notifier).setActive(nextId);
+      final note = notes.firstWhere(
+        (n) => n.id == nextId,
+        orElse: () => notes.first,
+      );
+      ref.read(selectedNoteProvider.notifier).select(note);
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.tab && shift) {
+      // Ctrl+Shift+Tab: 이전 탭
+      final prevId = ids[(currentIndex - 1 + ids.length) % ids.length];
+      ref.read(tabProvider.notifier).setActive(prevId);
+      final note = notes.firstWhere(
+        (n) => n.id == prevId,
+        orElse: () => notes.first,
+      );
+      ref.read(selectedNoteProvider.notifier).select(note);
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.keyW && !shift) {
+      // Ctrl+W: 현재 탭 닫기
+      if (tabState.activeNoteId == null) return false;
+      ref.read(tabProvider.notifier).closeTab(tabState.activeNoteId!);
+      final newState = ref.read(tabProvider).value;
+      if (newState?.activeNoteId != null) {
+        final note = notes.firstWhere(
+          (n) => n.id == newState!.activeNoteId,
+          orElse: () => notes.first,
+        );
+        ref.read(selectedNoteProvider.notifier).select(note);
+      } else {
+        ref.read(selectedNoteProvider.notifier).select(null);
+      }
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.keyW && shift) {
+      // Ctrl+Shift+W: 전체 탭 닫기
+      final allIds = List<int>.from(ids);
+      for (final id in allIds) {
+        ref.read(tabProvider.notifier).closeTab(id);
+      }
+      ref.read(selectedNoteProvider.notifier).select(null);
+      return true;
+    }
+
+    return false;
   }
 }
 
