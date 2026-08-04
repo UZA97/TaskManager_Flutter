@@ -38,6 +38,8 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
         _results = results;
         _isLoading = false;
       });
+      // 검색 결과 지도 마커 업데이트
+      ref.read(searchResultsProvider.notifier).setResults(results);
     } catch (e) {
       setState(() => _isLoading = false);
     }

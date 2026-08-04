@@ -38,28 +38,37 @@ class KakaoLocalService {
     }).toList();
   }
 
-  // 주소 검색
-  // Future<List<LocationSearchResult>> searchAddress(String query) async {
-  //   final uri = Uri.parse(
-  //     '$_baseUrl/search/address.json'
-  //     '?query=$query'
-  //     '&size=10',
-  //   );
+  Future<List<LocationSearchResult>> searchByCategory({
+    required String categoryCode,
+    required double lat,
+    required double lng,
+    int radius = 2000,
+  }) async {
+    final uri = Uri.parse(
+      '$_baseUrl/search/category.json'
+      '?category_group_code=$categoryCode'
+      '&x=$lng'
+      '&y=$lat'
+      '&radius=$radius'
+      '&size=15',
+    );
 
-  //   final response = await http.get(uri, headers: _headers);
-  //   if (response.statusCode != 200) throw Exception('주소 검색 실패');
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode != 200) throw Exception('카테고리 검색 실패');
 
-  //   final data = jsonDecode(response.body);
-  //   final items = data['documents'] as List<dynamic>? ?? [];
+    final data = jsonDecode(response.body);
+    final items = data['documents'] as List<dynamic>? ?? [];
 
-  //   return items.map((item) {
-  //     final address = item['address'] ?? item['road_address'];
-  //     return LocationSearchResult(
-  //       name: item['address_name'] as String,
-  //       address: item['address_name'] as String,
-  //       lat: double.parse(item['y'] as String),
-  //       lng: double.parse(item['x'] as String),
-  //     );
-  //   }).toList();
-  // }
+    return items.map((item) {
+      return LocationSearchResult(
+        name: item['place_name'] as String,
+        address:
+            item['road_address_name'] as String? ??
+            item['address_name'] as String? ??
+            '',
+        lat: double.parse(item['y'] as String),
+        lng: double.parse(item['x'] as String),
+      );
+    }).toList();
+  }
 }

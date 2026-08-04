@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../data/map_repository.dart';
+import '../services/location_search_result.dart';
 
 class SelectedLocation {
   final String name;
@@ -91,4 +92,52 @@ class MapPlaceNotifier extends AsyncNotifier<List<MapPlace>> {
 final mapPlaceProvider =
     AsyncNotifierProvider<MapPlaceNotifier, List<MapPlace>>(
       MapPlaceNotifier.new,
+    );
+
+// 음식점 목록
+class NearbyRestaurantsNotifier extends Notifier<List<LocationSearchResult>> {
+  @override
+  List<LocationSearchResult> build() => [];
+
+  void setRestaurants(List<LocationSearchResult> results) => state = results;
+  void clear() => state = [];
+}
+
+final nearbyRestaurantsProvider =
+    NotifierProvider<NearbyRestaurantsNotifier, List<LocationSearchResult>>(
+      NearbyRestaurantsNotifier.new,
+    );
+
+// 음식점 표시 여부
+class ShowRestaurantsNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void toggle() => state = !state;
+  void set(bool value) => state = value;
+}
+
+// 검색 결과 마커
+class SearchResultsNotifier extends Notifier<List<LocationSearchResult>> {
+  @override
+  List<LocationSearchResult> build() => [];
+
+  void setResults(List<LocationSearchResult> results) => state = results;
+  void clear() => state = [];
+}
+
+final searchResultsProvider =
+    NotifierProvider<SearchResultsNotifier, List<LocationSearchResult>>(
+      SearchResultsNotifier.new,
+    );
+
+// 활성화된 카테고리
+class ActiveCategoryNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? code) => state = code;
+}
+
+final activeCategoryProvider =
+    NotifierProvider<ActiveCategoryNotifier, String?>(
+      ActiveCategoryNotifier.new,
     );
