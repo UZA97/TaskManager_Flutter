@@ -77,6 +77,28 @@ class NoteTagTable extends Table {
   Set<Column> get primaryKey => {noteId, tagId};
 }
 
+class MapTagTable extends Table {
+  @override
+  String get tableName => 'map_tags';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  TextColumn get color => text().withDefault(const Constant('#4A90E2'))();
+}
+
+class MapPlaceTable extends Table {
+  @override
+  String get tableName => 'map_places';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  TextColumn get address => text().withDefault(const Constant(''))();
+  RealColumn get lat => real()();
+  RealColumn get lng => real()();
+  IntColumn get tagId => integer().references(MapTagTable, #id)();
+  TextColumn get createdAt => text()();
+}
+
 class AttachmentTable extends Table {
   @override
   String get tableName => 'attachments';
@@ -138,13 +160,15 @@ class EventTable extends Table {
     FolderTable,
     EventTagTable,
     EventTagRelationTable,
+    MapTagTable,
+    MapPlaceTable,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   /// 신규 설치와 기존 데이터베이스 업그레이드 모두에서 공통으로 쓰이는
   /// 기본 폴더를 생성하고, 폴더가 비어 있는 메모에 자동으로 연결합니다.
@@ -222,6 +246,10 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(eventTable, eventTable.endTime as GeneratedColumn);
         await m.addColumn(eventTable, eventTable.isAllDay as GeneratedColumn);
         await m.addColumn(eventTable, eventTable.content as GeneratedColumn);
+      }
+      if (from < 9) {
+        await m.createTable(mapTagTable);
+        await m.createTable(mapPlaceTable);
       }
     },
   );

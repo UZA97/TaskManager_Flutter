@@ -3725,6 +3725,692 @@ class EventTagRelationTableCompanion
   }
 }
 
+class $MapTagTableTable extends MapTagTable
+    with TableInfo<$MapTagTableTable, MapTagTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MapTagTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<String> color = GeneratedColumn<String>(
+    'color',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('#4A90E2'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, color];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'map_tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MapTagTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MapTagTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MapTagTableData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color'],
+      )!,
+    );
+  }
+
+  @override
+  $MapTagTableTable createAlias(String alias) {
+    return $MapTagTableTable(attachedDatabase, alias);
+  }
+}
+
+class MapTagTableData extends DataClass implements Insertable<MapTagTableData> {
+  final int id;
+  final String name;
+  final String color;
+  const MapTagTableData({
+    required this.id,
+    required this.name,
+    required this.color,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['color'] = Variable<String>(color);
+    return map;
+  }
+
+  MapTagTableCompanion toCompanion(bool nullToAbsent) {
+    return MapTagTableCompanion(
+      id: Value(id),
+      name: Value(name),
+      color: Value(color),
+    );
+  }
+
+  factory MapTagTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MapTagTableData(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      color: serializer.fromJson<String>(json['color']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'color': serializer.toJson<String>(color),
+    };
+  }
+
+  MapTagTableData copyWith({int? id, String? name, String? color}) =>
+      MapTagTableData(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        color: color ?? this.color,
+      );
+  MapTagTableData copyWithCompanion(MapTagTableCompanion data) {
+    return MapTagTableData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      color: data.color.present ? data.color.value : this.color,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MapTagTableData(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('color: $color')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, color);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MapTagTableData &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.color == this.color);
+}
+
+class MapTagTableCompanion extends UpdateCompanion<MapTagTableData> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String> color;
+  const MapTagTableCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.color = const Value.absent(),
+  });
+  MapTagTableCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.color = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<MapTagTableData> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? color,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (color != null) 'color': color,
+    });
+  }
+
+  MapTagTableCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<String>? color,
+  }) {
+    return MapTagTableCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      color: color ?? this.color,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<String>(color.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MapTagTableCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('color: $color')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MapPlaceTableTable extends MapPlaceTable
+    with TableInfo<$MapPlaceTableTable, MapPlaceTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MapPlaceTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _addressMeta = const VerificationMeta(
+    'address',
+  );
+  @override
+  late final GeneratedColumn<String> address = GeneratedColumn<String>(
+    'address',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _latMeta = const VerificationMeta('lat');
+  @override
+  late final GeneratedColumn<double> lat = GeneratedColumn<double>(
+    'lat',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lngMeta = const VerificationMeta('lng');
+  @override
+  late final GeneratedColumn<double> lng = GeneratedColumn<double>(
+    'lng',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tagIdMeta = const VerificationMeta('tagId');
+  @override
+  late final GeneratedColumn<int> tagId = GeneratedColumn<int>(
+    'tag_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES map_tags (id)',
+    ),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    address,
+    lat,
+    lng,
+    tagId,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'map_places';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MapPlaceTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('address')) {
+      context.handle(
+        _addressMeta,
+        address.isAcceptableOrUnknown(data['address']!, _addressMeta),
+      );
+    }
+    if (data.containsKey('lat')) {
+      context.handle(
+        _latMeta,
+        lat.isAcceptableOrUnknown(data['lat']!, _latMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_latMeta);
+    }
+    if (data.containsKey('lng')) {
+      context.handle(
+        _lngMeta,
+        lng.isAcceptableOrUnknown(data['lng']!, _lngMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lngMeta);
+    }
+    if (data.containsKey('tag_id')) {
+      context.handle(
+        _tagIdMeta,
+        tagId.isAcceptableOrUnknown(data['tag_id']!, _tagIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tagIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MapPlaceTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MapPlaceTableData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      address: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}address'],
+      )!,
+      lat: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}lat'],
+      )!,
+      lng: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}lng'],
+      )!,
+      tagId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}tag_id'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MapPlaceTableTable createAlias(String alias) {
+    return $MapPlaceTableTable(attachedDatabase, alias);
+  }
+}
+
+class MapPlaceTableData extends DataClass
+    implements Insertable<MapPlaceTableData> {
+  final int id;
+  final String name;
+  final String address;
+  final double lat;
+  final double lng;
+  final int tagId;
+  final String createdAt;
+  const MapPlaceTableData({
+    required this.id,
+    required this.name,
+    required this.address,
+    required this.lat,
+    required this.lng,
+    required this.tagId,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['address'] = Variable<String>(address);
+    map['lat'] = Variable<double>(lat);
+    map['lng'] = Variable<double>(lng);
+    map['tag_id'] = Variable<int>(tagId);
+    map['created_at'] = Variable<String>(createdAt);
+    return map;
+  }
+
+  MapPlaceTableCompanion toCompanion(bool nullToAbsent) {
+    return MapPlaceTableCompanion(
+      id: Value(id),
+      name: Value(name),
+      address: Value(address),
+      lat: Value(lat),
+      lng: Value(lng),
+      tagId: Value(tagId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory MapPlaceTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MapPlaceTableData(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      address: serializer.fromJson<String>(json['address']),
+      lat: serializer.fromJson<double>(json['lat']),
+      lng: serializer.fromJson<double>(json['lng']),
+      tagId: serializer.fromJson<int>(json['tagId']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'address': serializer.toJson<String>(address),
+      'lat': serializer.toJson<double>(lat),
+      'lng': serializer.toJson<double>(lng),
+      'tagId': serializer.toJson<int>(tagId),
+      'createdAt': serializer.toJson<String>(createdAt),
+    };
+  }
+
+  MapPlaceTableData copyWith({
+    int? id,
+    String? name,
+    String? address,
+    double? lat,
+    double? lng,
+    int? tagId,
+    String? createdAt,
+  }) => MapPlaceTableData(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    address: address ?? this.address,
+    lat: lat ?? this.lat,
+    lng: lng ?? this.lng,
+    tagId: tagId ?? this.tagId,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  MapPlaceTableData copyWithCompanion(MapPlaceTableCompanion data) {
+    return MapPlaceTableData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      address: data.address.present ? data.address.value : this.address,
+      lat: data.lat.present ? data.lat.value : this.lat,
+      lng: data.lng.present ? data.lng.value : this.lng,
+      tagId: data.tagId.present ? data.tagId.value : this.tagId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MapPlaceTableData(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('address: $address, ')
+          ..write('lat: $lat, ')
+          ..write('lng: $lng, ')
+          ..write('tagId: $tagId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, name, address, lat, lng, tagId, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MapPlaceTableData &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.address == this.address &&
+          other.lat == this.lat &&
+          other.lng == this.lng &&
+          other.tagId == this.tagId &&
+          other.createdAt == this.createdAt);
+}
+
+class MapPlaceTableCompanion extends UpdateCompanion<MapPlaceTableData> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String> address;
+  final Value<double> lat;
+  final Value<double> lng;
+  final Value<int> tagId;
+  final Value<String> createdAt;
+  const MapPlaceTableCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.address = const Value.absent(),
+    this.lat = const Value.absent(),
+    this.lng = const Value.absent(),
+    this.tagId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  MapPlaceTableCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.address = const Value.absent(),
+    required double lat,
+    required double lng,
+    required int tagId,
+    required String createdAt,
+  }) : name = Value(name),
+       lat = Value(lat),
+       lng = Value(lng),
+       tagId = Value(tagId),
+       createdAt = Value(createdAt);
+  static Insertable<MapPlaceTableData> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? address,
+    Expression<double>? lat,
+    Expression<double>? lng,
+    Expression<int>? tagId,
+    Expression<String>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (address != null) 'address': address,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+      if (tagId != null) 'tag_id': tagId,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  MapPlaceTableCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<String>? address,
+    Value<double>? lat,
+    Value<double>? lng,
+    Value<int>? tagId,
+    Value<String>? createdAt,
+  }) {
+    return MapPlaceTableCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      address: address ?? this.address,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      tagId: tagId ?? this.tagId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (address.present) {
+      map['address'] = Variable<String>(address.value);
+    }
+    if (lat.present) {
+      map['lat'] = Variable<double>(lat.value);
+    }
+    if (lng.present) {
+      map['lng'] = Variable<double>(lng.value);
+    }
+    if (tagId.present) {
+      map['tag_id'] = Variable<int>(tagId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MapPlaceTableCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('address: $address, ')
+          ..write('lat: $lat, ')
+          ..write('lng: $lng, ')
+          ..write('tagId: $tagId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3740,6 +4426,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $EventTagTableTable eventTagTable = $EventTagTableTable(this);
   late final $EventTagRelationTableTable eventTagRelationTable =
       $EventTagRelationTableTable(this);
+  late final $MapTagTableTable mapTagTable = $MapTagTableTable(this);
+  late final $MapPlaceTableTable mapPlaceTable = $MapPlaceTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3754,6 +4442,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     eventTable,
     eventTagTable,
     eventTagRelationTable,
+    mapTagTable,
+    mapPlaceTable,
   ];
 }
 
@@ -7146,6 +7836,614 @@ typedef $$EventTagRelationTableTableProcessedTableManager =
       EventTagRelationTableData,
       PrefetchHooks Function({bool eventId, bool tagId})
     >;
+typedef $$MapTagTableTableCreateCompanionBuilder =
+    MapTagTableCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<String> color,
+    });
+typedef $$MapTagTableTableUpdateCompanionBuilder =
+    MapTagTableCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<String> color,
+    });
+
+final class $$MapTagTableTableReferences
+    extends BaseReferences<_$AppDatabase, $MapTagTableTable, MapTagTableData> {
+  $$MapTagTableTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$MapPlaceTableTable, List<MapPlaceTableData>>
+  _mapPlaceTableRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.mapPlaceTable,
+    aliasName: $_aliasNameGenerator(db.mapTagTable.id, db.mapPlaceTable.tagId),
+  );
+
+  $$MapPlaceTableTableProcessedTableManager get mapPlaceTableRefs {
+    final manager = $$MapPlaceTableTableTableManager(
+      $_db,
+      $_db.mapPlaceTable,
+    ).filter((f) => f.tagId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_mapPlaceTableRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$MapTagTableTableFilterComposer
+    extends Composer<_$AppDatabase, $MapTagTableTable> {
+  $$MapTagTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> mapPlaceTableRefs(
+    Expression<bool> Function($$MapPlaceTableTableFilterComposer f) f,
+  ) {
+    final $$MapPlaceTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.mapPlaceTable,
+      getReferencedColumn: (t) => t.tagId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MapPlaceTableTableFilterComposer(
+            $db: $db,
+            $table: $db.mapPlaceTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$MapTagTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $MapTagTableTable> {
+  $$MapTagTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MapTagTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MapTagTableTable> {
+  $$MapTagTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  Expression<T> mapPlaceTableRefs<T extends Object>(
+    Expression<T> Function($$MapPlaceTableTableAnnotationComposer a) f,
+  ) {
+    final $$MapPlaceTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.mapPlaceTable,
+      getReferencedColumn: (t) => t.tagId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MapPlaceTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.mapPlaceTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$MapTagTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MapTagTableTable,
+          MapTagTableData,
+          $$MapTagTableTableFilterComposer,
+          $$MapTagTableTableOrderingComposer,
+          $$MapTagTableTableAnnotationComposer,
+          $$MapTagTableTableCreateCompanionBuilder,
+          $$MapTagTableTableUpdateCompanionBuilder,
+          (MapTagTableData, $$MapTagTableTableReferences),
+          MapTagTableData,
+          PrefetchHooks Function({bool mapPlaceTableRefs})
+        > {
+  $$MapTagTableTableTableManager(_$AppDatabase db, $MapTagTableTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MapTagTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MapTagTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MapTagTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> color = const Value.absent(),
+              }) => MapTagTableCompanion(id: id, name: name, color: color),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<String> color = const Value.absent(),
+              }) =>
+                  MapTagTableCompanion.insert(id: id, name: name, color: color),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MapTagTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({mapPlaceTableRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (mapPlaceTableRefs) db.mapPlaceTable,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (mapPlaceTableRefs)
+                    await $_getPrefetchedData<
+                      MapTagTableData,
+                      $MapTagTableTable,
+                      MapPlaceTableData
+                    >(
+                      currentTable: table,
+                      referencedTable: $$MapTagTableTableReferences
+                          ._mapPlaceTableRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$MapTagTableTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).mapPlaceTableRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.tagId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MapTagTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MapTagTableTable,
+      MapTagTableData,
+      $$MapTagTableTableFilterComposer,
+      $$MapTagTableTableOrderingComposer,
+      $$MapTagTableTableAnnotationComposer,
+      $$MapTagTableTableCreateCompanionBuilder,
+      $$MapTagTableTableUpdateCompanionBuilder,
+      (MapTagTableData, $$MapTagTableTableReferences),
+      MapTagTableData,
+      PrefetchHooks Function({bool mapPlaceTableRefs})
+    >;
+typedef $$MapPlaceTableTableCreateCompanionBuilder =
+    MapPlaceTableCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<String> address,
+      required double lat,
+      required double lng,
+      required int tagId,
+      required String createdAt,
+    });
+typedef $$MapPlaceTableTableUpdateCompanionBuilder =
+    MapPlaceTableCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<String> address,
+      Value<double> lat,
+      Value<double> lng,
+      Value<int> tagId,
+      Value<String> createdAt,
+    });
+
+final class $$MapPlaceTableTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $MapPlaceTableTable, MapPlaceTableData> {
+  $$MapPlaceTableTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MapTagTableTable _tagIdTable(_$AppDatabase db) =>
+      db.mapTagTable.createAlias(
+        $_aliasNameGenerator(db.mapPlaceTable.tagId, db.mapTagTable.id),
+      );
+
+  $$MapTagTableTableProcessedTableManager get tagId {
+    final $_column = $_itemColumn<int>('tag_id')!;
+
+    final manager = $$MapTagTableTableTableManager(
+      $_db,
+      $_db.mapTagTable,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_tagIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MapPlaceTableTableFilterComposer
+    extends Composer<_$AppDatabase, $MapPlaceTableTable> {
+  $$MapPlaceTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get address => $composableBuilder(
+    column: $table.address,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lat => $composableBuilder(
+    column: $table.lat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lng => $composableBuilder(
+    column: $table.lng,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MapTagTableTableFilterComposer get tagId {
+    final $$MapTagTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.mapTagTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MapTagTableTableFilterComposer(
+            $db: $db,
+            $table: $db.mapTagTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MapPlaceTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $MapPlaceTableTable> {
+  $$MapPlaceTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get address => $composableBuilder(
+    column: $table.address,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get lat => $composableBuilder(
+    column: $table.lat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get lng => $composableBuilder(
+    column: $table.lng,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MapTagTableTableOrderingComposer get tagId {
+    final $$MapTagTableTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.mapTagTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MapTagTableTableOrderingComposer(
+            $db: $db,
+            $table: $db.mapTagTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MapPlaceTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MapPlaceTableTable> {
+  $$MapPlaceTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get address =>
+      $composableBuilder(column: $table.address, builder: (column) => column);
+
+  GeneratedColumn<double> get lat =>
+      $composableBuilder(column: $table.lat, builder: (column) => column);
+
+  GeneratedColumn<double> get lng =>
+      $composableBuilder(column: $table.lng, builder: (column) => column);
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$MapTagTableTableAnnotationComposer get tagId {
+    final $$MapTagTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.mapTagTable,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MapTagTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.mapTagTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MapPlaceTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MapPlaceTableTable,
+          MapPlaceTableData,
+          $$MapPlaceTableTableFilterComposer,
+          $$MapPlaceTableTableOrderingComposer,
+          $$MapPlaceTableTableAnnotationComposer,
+          $$MapPlaceTableTableCreateCompanionBuilder,
+          $$MapPlaceTableTableUpdateCompanionBuilder,
+          (MapPlaceTableData, $$MapPlaceTableTableReferences),
+          MapPlaceTableData,
+          PrefetchHooks Function({bool tagId})
+        > {
+  $$MapPlaceTableTableTableManager(_$AppDatabase db, $MapPlaceTableTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MapPlaceTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MapPlaceTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MapPlaceTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> address = const Value.absent(),
+                Value<double> lat = const Value.absent(),
+                Value<double> lng = const Value.absent(),
+                Value<int> tagId = const Value.absent(),
+                Value<String> createdAt = const Value.absent(),
+              }) => MapPlaceTableCompanion(
+                id: id,
+                name: name,
+                address: address,
+                lat: lat,
+                lng: lng,
+                tagId: tagId,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<String> address = const Value.absent(),
+                required double lat,
+                required double lng,
+                required int tagId,
+                required String createdAt,
+              }) => MapPlaceTableCompanion.insert(
+                id: id,
+                name: name,
+                address: address,
+                lat: lat,
+                lng: lng,
+                tagId: tagId,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MapPlaceTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({tagId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (tagId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.tagId,
+                                referencedTable: $$MapPlaceTableTableReferences
+                                    ._tagIdTable(db),
+                                referencedColumn: $$MapPlaceTableTableReferences
+                                    ._tagIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MapPlaceTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MapPlaceTableTable,
+      MapPlaceTableData,
+      $$MapPlaceTableTableFilterComposer,
+      $$MapPlaceTableTableOrderingComposer,
+      $$MapPlaceTableTableAnnotationComposer,
+      $$MapPlaceTableTableCreateCompanionBuilder,
+      $$MapPlaceTableTableUpdateCompanionBuilder,
+      (MapPlaceTableData, $$MapPlaceTableTableReferences),
+      MapPlaceTableData,
+      PrefetchHooks Function({bool tagId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7168,4 +8466,8 @@ class $AppDatabaseManager {
       $$EventTagTableTableTableManager(_db, _db.eventTagTable);
   $$EventTagRelationTableTableTableManager get eventTagRelationTable =>
       $$EventTagRelationTableTableTableManager(_db, _db.eventTagRelationTable);
+  $$MapTagTableTableTableManager get mapTagTable =>
+      $$MapTagTableTableTableManager(_db, _db.mapTagTable);
+  $$MapPlaceTableTableTableManager get mapPlaceTable =>
+      $$MapPlaceTableTableTableManager(_db, _db.mapPlaceTable);
 }
