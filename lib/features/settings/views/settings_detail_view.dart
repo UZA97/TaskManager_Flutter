@@ -22,7 +22,7 @@ class SettingsDetailView extends ConsumerWidget {
       SettingsCategory.general => _GeneralSettings(),
       SettingsCategory.appearance => _AppearanceSettings(),
       SettingsCategory.notification => _NotificationSettings(),
-      SettingsCategory.productivity => _PlaceholderSettings(label: '생산성'),
+      // SettingsCategory.productivity => _PlaceholderSettings(label: '생산성'),
       SettingsCategory.security => _SecuritySettings(),
       SettingsCategory.advanced => _AdvancedSettings(),
       SettingsCategory.info => _InfoSettings(),
@@ -657,6 +657,98 @@ class _NotificationSettings extends ConsumerWidget {
                   ref.read(settingsProvider.notifier).setNotificationEnabled(v),
             ),
           ),
+          const SizedBox(height: 16),
+          const _SectionHeader(title: '집중모드'),
+          _SettingsRow(
+            title: '집중모드',
+            subtitle: '설정한 시간대에 알림을 비활성화합니다',
+            trailing: Switch(
+              value: settings.focusModeEnabled,
+              onChanged: (v) =>
+                  ref.read(settingsProvider.notifier).setFocusMode(v),
+            ),
+          ),
+          if (settings.focusModeEnabled) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Text('시작', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: () async {
+                    final parts = settings.focusModeStart.split(':');
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay(
+                        hour: int.parse(parts[0]),
+                        minute: int.parse(parts[1]),
+                      ),
+                    );
+                    if (picked == null) return;
+                    final timeStr =
+                        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setFocusModeStart(timeStr);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFDDDDDD)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      settings.focusModeStart,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Text('~', style: TextStyle(color: Colors.grey)),
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: () async {
+                    final parts = settings.focusModeEnd.split(':');
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay(
+                        hour: int.parse(parts[0]),
+                        minute: int.parse(parts[1]),
+                      ),
+                    );
+                    if (picked == null) return;
+                    final timeStr =
+                        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setFocusModeEnd(timeStr);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFDDDDDD)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      settings.focusModeEnd,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${settings.focusModeStart} ~ ${settings.focusModeEnd} 동안 알림이 비활성화됩니다',
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ],
         ],
       ),
     );

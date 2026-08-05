@@ -13,7 +13,7 @@ dependencies:
 
   # 상태관리
   flutter_riverpod: ^2.6.1
-
+  fast_immutable_collections: ^11.2.0
   # DB
   drift: ^2.20.0
   drift_flutter: ^0.2.8

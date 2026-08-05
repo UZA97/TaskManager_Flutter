@@ -190,6 +190,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   }
 
   Timer? _alarmTimer;
+  Timer? _focusModeTimer;
   @override
   void initState() {
     super.initState();
@@ -214,6 +215,37 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       }
       _checkForUpdate();
     });
+
+    _startFocusModeChecker();
+  }
+
+  void _startFocusModeChecker() {
+    _focusModeTimer?.cancel();
+    _focusModeTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _checkFocusModeEnd();
+    });
+  }
+
+  void _checkFocusModeEnd() {
+    final settings = ref.read(settingsProvider).value;
+    if (settings == null) return;
+    if (!settings.focusModeEnabled) return;
+
+    // 집중모드 종료 시간인지 체크
+    final now = TimeOfDay.now();
+    final end = _parseTime(settings.focusModeEnd);
+    if (now.hour == end.hour && now.minute == end.minute) {
+      // 집중모드 종료 시간 도달 - 알림으로 알려줌
+      NotificationService.show(
+        title: '집중모드 종료',
+        body: '집중모드가 종료되었습니다. 알림이 다시 활성화됩니다.',
+      );
+    }
+  }
+
+  TimeOfDay _parseTime(String time) {
+    final parts = time.split(':');
+    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
   }
 
   Future<void> _checkForUpdate() async {
@@ -318,16 +350,24 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
           Container(
             width: 250,
             color: Theme.of(context).colorScheme.surfaceContainerLow,
-            child: IndexedStack(
-              index: ref.watch(navigationProvider),
-              children: _sidePanels,
+            child: // 사이드 패널
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: KeyedSubtree(
+                key: ValueKey(ref.watch(navigationProvider)),
+                child: _sidePanels[ref.watch(navigationProvider)],
+              ),
             ),
           ),
           const VerticalDivider(width: 1, color: Color(0xFFDDDDDD)),
+          // 메인 패널
           Expanded(
-            child: IndexedStack(
-              index: ref.watch(navigationProvider),
-              children: _detailPanels,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: KeyedSubtree(
+                key: ValueKey(ref.watch(navigationProvider)),
+                child: _detailPanels[ref.watch(navigationProvider)],
+              ),
             ),
           ),
         ],
@@ -340,6 +380,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _alarmTimer?.cancel();
     windowManager.removeListener(this);
+    _focusModeTimer?.cancel();
     super.dispose();
   }
 

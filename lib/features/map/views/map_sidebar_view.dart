@@ -324,7 +324,7 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
               error: (e, _) => const SizedBox(),
               data: (places) {
                 final filtered = activeTags.isEmpty
-                    ? places
+                    ? <MapPlace>[]
                     : places
                           .where((p) => activeTags.contains(p.tagId))
                           .toList();

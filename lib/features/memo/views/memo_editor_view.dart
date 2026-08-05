@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,6 +29,7 @@ import '../../../core/providers/navigation_provider.dart';
 import 'package:appflowy_editor/src/editor/find_replace_menu/find_menu_service.dart';
 import '../widgets/ask_ai_dialog.dart';
 import '../services/gemini_service.dart';
+// import 'package:fast_immutable_collections/fast_immutable_collections.dart;'
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -478,7 +480,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       if (allSameType) {
         transaction.insertNode(
           node.path,
-          paragraphNode(delta: node.delta ?? Delta()),
+          Node(
+            type: 'paragraph',
+            attributes: {'delta': node.delta?.toJson() ?? []},
+            children: IList(node.children), // children 유지
+          ),
         );
         transaction.deleteNode(node);
       } else {
@@ -491,6 +497,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
               ...newNode.attributes,
               'delta': node.delta?.toJson() ?? [],
             },
+            children: IList(node.children), // children 유지
           ),
         );
         transaction.deleteNode(node);
@@ -498,7 +505,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
     editorState.apply(transaction);
 
-    // selection 복원
     WidgetsBinding.instance.addPostFrameCallback((_) {
       editorState.selection = selection;
     });

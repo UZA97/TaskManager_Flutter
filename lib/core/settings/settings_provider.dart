@@ -36,7 +36,47 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
         _ => AppTimeFormat.h24,
       },
       lockEnabled: map['lock_enabled'] == 'true',
+
+      focusModeEnabled: map['focus_mode_enabled'] == 'true',
+      focusModeStart: map['focus_mode_start'] ?? "22:00",
+      focusModeEnd: map['focus_mode_end'] ?? "08:00",
     );
+  }
+
+  Future<void> setFocusMode(bool enabled) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(
+            key: 'focus_mode_enabled',
+            value: enabled.toString(),
+          ),
+        );
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(focusModeEnabled: enabled));
+  }
+
+  Future<void> setFocusModeStart(String time) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(key: 'focus_mode_start', value: time),
+        );
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(focusModeStart: time));
+  }
+
+  Future<void> setFocusModeEnd(String time) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(key: 'focus_mode_end', value: time),
+        );
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(focusModeEnd: time));
   }
 
   Future<void> setLockEnabled(bool enabled) async {

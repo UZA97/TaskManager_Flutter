@@ -109,7 +109,7 @@ class _MapViewState extends ConsumerState<MapView> {
   static const _defaultCenter = LatLng(37.5665, 126.9780);
   static const _defaultZoom = 13.0;
   static const _minZoom = 6.0;
-  static const _maxZoom = 18.0;
+  static const _maxZoom = 19.0;
   bool _isLoadingCategory = false;
 
   @override
@@ -152,14 +152,14 @@ class _MapViewState extends ConsumerState<MapView> {
     final activeTags = ref.watch(activeMapTagsProvider);
     final placesAsync = ref.watch(mapPlaceProvider);
     final tagsAsync = ref.watch(mapTagProvider);
-    final selectedLocation = ref.watch(selectedLocationProvider);
+    // final selectedLocation = ref.watch(selectedLocationProvider);
     final categoryResults = ref.watch(nearbyRestaurantsProvider);
     final activeCategory = ref.watch(activeCategoryProvider);
     final searchResults = ref.watch(searchResultsProvider);
 
     ref.listen(selectedLocationProvider, (prev, next) {
       if (next != null) {
-        _mapController.move(next.position, 15.0);
+        _mapController.move(next.position, _maxZoom);
       }
     });
 
@@ -173,11 +173,17 @@ class _MapViewState extends ConsumerState<MapView> {
       children: [
         FlutterMap(
           mapController: _mapController,
-          options: const MapOptions(
+          options: MapOptions(
             initialCenter: _defaultCenter,
             initialZoom: _defaultZoom,
             minZoom: _minZoom,
             maxZoom: _maxZoom,
+            cameraConstraint: CameraConstraint.containCenter(
+              bounds: LatLngBounds(
+                const LatLng(35.75, 125.4), // 남서
+                const LatLng(40.4, 132), // 북동
+              ),
+            ),
           ),
           children: [
             TileLayer(
@@ -211,10 +217,28 @@ class _MapViewState extends ConsumerState<MapView> {
                                 position: LatLng(place.lat, place.lng),
                               ),
                             );
-                        _mapController.move(LatLng(place.lat, place.lng), 16.0);
+                        _mapController.move(
+                          LatLng(place.lat, place.lng),
+                          _maxZoom,
+                        );
                       },
-                      child: Tooltip(
-                        message: place.name,
+                      child: _HoverMarker(
+                        tooltip: place.name,
+                        size: 28,
+                        onTap: () {
+                          ref
+                              .read(selectedLocationProvider.notifier)
+                              .select(
+                                SelectedLocation(
+                                  name: place.name,
+                                  position: LatLng(place.lat, place.lng),
+                                ),
+                              );
+                          _mapController.move(
+                            LatLng(place.lat, place.lng),
+                            16.0,
+                          );
+                        },
                         child: Icon(Icons.location_pin, color: color, size: 28),
                       ),
                     ),
@@ -244,11 +268,23 @@ class _MapViewState extends ConsumerState<MapView> {
                                 position: LatLng(r.lat, r.lng),
                               ),
                             );
-                        _mapController.move(LatLng(r.lat, r.lng), 16.0);
+                        _mapController.move(LatLng(r.lat, r.lng), _maxZoom);
                       },
-                      child: Tooltip(
-                        message: r.name,
-                        child: Icon(cat.icon, color: cat.color, size: 25),
+                      child: _HoverMarker(
+                        tooltip: r.name,
+                        size: 22,
+                        onTap: () {
+                          ref
+                              .read(selectedLocationProvider.notifier)
+                              .select(
+                                SelectedLocation(
+                                  name: r.name,
+                                  position: LatLng(r.lat, r.lng),
+                                ),
+                              );
+                          _mapController.move(LatLng(r.lat, r.lng), _maxZoom);
+                        },
+                        child: Icon(cat.icon, color: cat.color, size: 22),
                       ),
                     ),
                   );
@@ -273,14 +309,26 @@ class _MapViewState extends ConsumerState<MapView> {
                                 position: LatLng(r.lat, r.lng),
                               ),
                             );
-                        _mapController.move(LatLng(r.lat, r.lng), 16.0);
+                        _mapController.move(LatLng(r.lat, r.lng), _maxZoom);
                       },
-                      child: Tooltip(
-                        message: r.name,
+                      child: _HoverMarker(
+                        tooltip: r.name,
+                        size: 22,
+                        onTap: () {
+                          ref
+                              .read(selectedLocationProvider.notifier)
+                              .select(
+                                SelectedLocation(
+                                  name: r.name,
+                                  position: LatLng(r.lat, r.lng),
+                                ),
+                              );
+                          _mapController.move(LatLng(r.lat, r.lng), _maxZoom);
+                        },
                         child: const Icon(
                           Icons.place,
-                          color: Color(0xFFE53935),
-                          size: 30,
+                          color: Color(0xFF4A90E2),
+                          size: 22,
                         ),
                       ),
                     ),
@@ -373,6 +421,48 @@ class _MapViewState extends ConsumerState<MapView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _HoverMarker extends StatefulWidget {
+  final Widget child;
+  final double size;
+  final VoidCallback? onTap;
+  final String tooltip;
+
+  const _HoverMarker({
+    required this.child,
+    required this.size,
+    this.onTap,
+    required this.tooltip,
+  });
+
+  @override
+  State<_HoverMarker> createState() => _HoverMarkerState();
+}
+
+class _HoverMarkerState extends State<_HoverMarker> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = _hovered ? 1.3 : 1.0;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Tooltip(
+          message: widget.tooltip,
+          child: AnimatedScale(
+            scale: scale,
+            duration: const Duration(milliseconds: 150),
+            child: widget.child,
+          ),
+        ),
+      ),
     );
   }
 }

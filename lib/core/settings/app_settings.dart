@@ -15,6 +15,9 @@ class AppSettings {
   final AppDateFormat dateFormat;
   final AppTimeFormat timeFormat;
   final bool lockEnabled;
+  final bool focusModeEnabled;
+  final String focusModeStart; // "22:00"
+  final String focusModeEnd; // "08:00"
 
   const AppSettings({
     this.trayModeEnabled = true,
@@ -25,6 +28,9 @@ class AppSettings {
     this.dateFormat = AppDateFormat.korean,
     this.timeFormat = AppTimeFormat.h24,
     this.lockEnabled = false,
+    this.focusModeEnabled = false,
+    this.focusModeStart = "22:00",
+    this.focusModeEnd = "08:00",
   });
 
   AppSettings copyWith({
@@ -36,6 +42,9 @@ class AppSettings {
     AppDateFormat? dateFormat,
     AppTimeFormat? timeFormat,
     bool? lockEnabled,
+    bool? focusModeEnabled,
+    String? focusModeStart,
+    String? focusModeEnd,
   }) {
     return AppSettings(
       trayModeEnabled: trayModeEnabled ?? this.trayModeEnabled,
@@ -46,6 +55,9 @@ class AppSettings {
       dateFormat: dateFormat ?? this.dateFormat,
       timeFormat: timeFormat ?? this.timeFormat,
       lockEnabled: lockEnabled ?? this.lockEnabled,
+      focusModeEnabled: focusModeEnabled ?? this.focusModeEnabled,
+      focusModeStart: focusModeStart ?? this.focusModeStart,
+      focusModeEnd: focusModeEnd ?? this.focusModeEnd,
     );
   }
 }

@@ -2,7 +2,7 @@ enum SettingsCategory {
   general,
   appearance,
   notification,
-  productivity,
+  // productivity,
   security,
   advanced,
   info,

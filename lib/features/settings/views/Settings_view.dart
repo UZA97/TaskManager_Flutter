@@ -35,11 +35,11 @@ class SettingsView extends ConsumerWidget {
       icon: Icons.notifications,
       label: '알림',
     ),
-    _SettingsCategoryItem(
-      category: SettingsCategory.productivity,
-      icon: Icons.bolt,
-      label: '생산성',
-    ),
+    // _SettingsCategoryItem(
+    //   category: SettingsCategory.productivity,
+    //   icon: Icons.bolt,
+    //   label: '생산성',
+    // ),
     _SettingsCategoryItem(
       category: SettingsCategory.security,
       icon: Icons.lock,
