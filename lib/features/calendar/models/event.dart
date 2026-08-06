@@ -59,6 +59,7 @@ class Event {
     String? tagColor,
     String? startDate,
     String? endDate,
+    String? content,
     // 위치 필드만 Value<T> 패턴
     Value<String?> locationName = const Value.absent(),
     Value<double?> locationLat = const Value.absent(),
@@ -83,6 +84,7 @@ class Event {
       tagColor: tagColor ?? this.tagColor,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
+      content: content ?? this.content,
     );
   }
 }
