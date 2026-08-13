@@ -45,6 +45,8 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   final _titleController = TextEditingController();
   bool _isDragging = false;
   bool _isToolbarExpanded = true;
+  bool _isSaving = false;
+  bool _saveSucceeded = false;
   Selection? _lastSelection;
   Timer? _saveTimer;
   StreamSubscription<void>? _transactionSubscription;
@@ -195,14 +197,32 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     if (_currentNote == null || _editorState == null) return;
 
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 500), () {
+    if (mounted) {
+      setState(() {
+        _isSaving = true;
+        _saveSucceeded = false;
+      });
+    }
+
+    _saveTimer = Timer(const Duration(milliseconds: 500), () async {
       if (_currentNote == null || _editorState == null) return;
       final content = jsonEncode(_editorState!.document.toJson());
       final updated = _currentNote!.copyWith(
         title: _titleController.text,
         content: content,
       );
-      ref.read(noteListProvider.notifier).saveNote(updated);
+      await ref.read(noteListProvider.notifier).saveNote(updated);
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _saveSucceeded = true;
+        });
+      }
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() => _saveSucceeded = false);
+        }
+      });
     });
   }
 
@@ -1457,10 +1477,16 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       const SizedBox(width: 4),
                     ],
                     const Spacer(),
-                    const Text(
-                      '저장됨',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
+                    if (_isSaving)
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else if (_saveSucceeded)
+                      const Icon(Icons.check, size: 14, color: Colors.blueGrey)
+                    else
+                      const SizedBox.shrink(),
                   ],
                 ),
               ),
