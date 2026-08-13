@@ -284,31 +284,34 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                           children: tags.map((tag) {
                             final isActive = activeTags.contains(tag.id);
                             final color = _hexToColor(tag.color);
-                            return GestureDetector(
-                              onTap: () => ref
-                                  .read(activeMapTagsProvider.notifier)
-                                  .toggle(tag.id!),
-                              onLongPress: () => _showDeleteTagDialog(tag),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isActive
-                                      ? color
-                                      : color.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: color),
-                                ),
-                                child: Text(
-                                  tag.name,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: isActive ? Colors.white : color,
-                                  ),
+                            return InputChip(
+                              label: Text(
+                                tag.name,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isActive ? Colors.white : color,
                                 ),
                               ),
+                              labelPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 0,
+                              ),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              backgroundColor: isActive
+                                  ? color
+                                  : color.withOpacity(0.15),
+                              side: BorderSide(color: color),
+                              onPressed: () => ref
+                                  .read(activeMapTagsProvider.notifier)
+                                  .toggle(tag.id!),
+                              onDeleted: () => _showDeleteTagDialog(tag),
+                              deleteIcon: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: isActive ? Colors.white : color,
+                              ),
+                              deleteButtonTooltipMessage: '삭제',
                             );
                           }).toList(),
                         ),

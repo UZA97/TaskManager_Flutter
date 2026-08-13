@@ -31,6 +31,8 @@ import '../widgets/ask_ai_dialog.dart';
 import '../services/gemini_service.dart';
 // import 'package:fast_immutable_collections/fast_immutable_collections.dart;'
 
+enum LastCopySource { internal, external }
+
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
   @override
@@ -48,6 +50,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   StreamSubscription<void>? _transactionSubscription;
   VoidCallback? _selectionListener;
   List<Map<String, dynamic>>? _internalClipboard;
+  LastCopySource _lastCopySource = LastCopySource.external;
 
   SelectionMenuItem get _askAiMenuItem => SelectionMenuItem(
     getName: () => 'Ask AI',
@@ -598,7 +601,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     },
   );
   // Backspace 핸들러 — local_image / local_file 블록일 때 삭제 다이얼로그
-  void _handlePasteImage(EditorState editorState) async {
+  Future<void> _handlePasteImage(EditorState editorState) async {
     // 1. 먼저 이미지 바이트 확인 (캡처 도구 등)
     final imageBytes = await Pasteboard.image;
     if (imageBytes != null) {
@@ -643,6 +646,17 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     }
   }
 
+  String _plainTextFromNodes(List<Node> nodes) {
+    final text = <String>[];
+    for (final node in nodes) {
+      final deltaText = node.delta?.toPlainText();
+      if (deltaText != null && deltaText.trim().isNotEmpty) {
+        text.add(deltaText);
+      }
+    }
+    return text.join('\n');
+  }
+
   late final _copyHandler = CommandShortcutEvent(
     key: 'copy with delta',
     getDescription: () => 'Copy with delta attributes',
@@ -653,13 +667,26 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         return KeyEventResult.ignored;
 
       final nodes = editorState.getNodesInSelection(selection);
-      final copied = <Map<String, dynamic>>[];
 
+      if (nodes.length <= 1) {
+        _internalClipboard = null;
+        _lastCopySource = LastCopySource.external;
+        return KeyEventResult.ignored;
+      }
+
+      final copied = <Map<String, dynamic>>[];
       for (final node in nodes) {
         copied.add(node.toJson());
       }
 
       _internalClipboard = copied;
+      _lastCopySource = LastCopySource.internal;
+
+      final plainText = _plainTextFromNodes(nodes);
+      if (plainText.isNotEmpty) {
+        Clipboard.setData(ClipboardData(text: plainText));
+      }
+
       return KeyEventResult.ignored;
     },
   );
@@ -675,17 +702,30 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         if (node?.type == localCodeType) return KeyEventResult.ignored;
       }
 
-      // 이미지 처리 - try-catch 추가
-      Pasteboard.image
-          .then((imageBytes) {
-            if (imageBytes != null) _handlePasteImage(editorState);
-          })
-          .catchError((_) {});
+      () async {
+        final imageBytes = await Pasteboard.image;
+        if (imageBytes != null) {
+          _internalClipboard = null;
+          _lastCopySource = LastCopySource.external;
+          await _handlePasteImage(editorState);
+          return;
+        }
 
-      if (_internalClipboard != null && _internalClipboard!.isNotEmpty) {
-        _pasteInternalClipboard(editorState);
-        return KeyEventResult.handled;
-      }
+        if (_lastCopySource == LastCopySource.internal &&
+            _internalClipboard != null &&
+            _internalClipboard!.isNotEmpty) {
+          _pasteInternalClipboard(editorState);
+          return;
+        }
+
+        final clipboardText = await Clipboard.getData(Clipboard.kTextPlain);
+        if (clipboardText?.text != null &&
+            clipboardText!.text!.trim().isNotEmpty) {
+          _internalClipboard = null;
+          _lastCopySource = LastCopySource.external;
+          return;
+        }
+      }();
 
       return KeyEventResult.ignored;
     },
