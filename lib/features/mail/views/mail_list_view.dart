@@ -123,15 +123,15 @@ class _MailListViewState extends ConsumerState<MailListView> {
                   },
                 ),
               ),
-              // 계정 관리 버튼
-              IconButton(
-                icon: const Icon(Icons.manage_accounts, size: 18),
-                tooltip: '계정 관리',
-                onPressed: () => showMailLoginDialog(context),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 8),
+              // // 계정 관리 버튼
+              // IconButton(
+              //   icon: const Icon(Icons.manage_accounts, size: 18),
+              //   tooltip: '계정 관리',
+              //   onPressed: () => showMailLoginDialog(context),
+              //   padding: EdgeInsets.zero,
+              //   constraints: const BoxConstraints(),
+              // ),
+              // const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 18),
                 tooltip: '새로고침',

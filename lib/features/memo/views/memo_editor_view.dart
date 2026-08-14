@@ -64,18 +64,10 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _showAskAiDialog(editorState);
     },
   );
-  Future<void> _showAskAiDialog(EditorState editorState) async {
-    final controller = TextEditingController();
 
-    await showDialog(
-      context: context,
-      builder: (ctx) => AskAiDialog(
-        onAsk: (question) async {
-          final service = GeminiService();
-          return await service.ask(question);
-        },
-      ),
-    );
+  // AI
+  Future<void> _showAskAiDialog(EditorState editorState) async {
+    await showDialog(context: context, builder: (ctx) => const AskAiDialog());
   }
 
   SelectionMenuItem get _locationMenuItem => SelectionMenuItem(

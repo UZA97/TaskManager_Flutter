@@ -632,50 +632,50 @@ class _SelectedDateEventList extends ConsumerWidget {
                   },
                 ),
         ),
-        // Google Calendar 연동 버튼
-        Padding(
-          padding: const EdgeInsets.all(8),
-          child: ref
-              .watch(googleCalendarProvider)
-              .when(
-                loading: () => const SizedBox(),
-                error: (e, _) => const SizedBox(),
-                data: (isConnected) => SizedBox(
-                  width: double.infinity,
-                  child: isConnected
-                      ? OutlinedButton.icon(
-                          onPressed: () => ref
-                              .read(googleCalendarProvider.notifier)
-                              .disconnect(),
-                          icon: const Icon(Icons.link_off, size: 14),
-                          label: const Text(
-                            'Google Calendar 해제',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                          ),
-                        )
-                      : OutlinedButton.icon(
-                          onPressed: () => ref
-                              .read(googleCalendarProvider.notifier)
-                              .connect(),
-                          icon: const Icon(Icons.calendar_today, size: 14),
-                          label: const Text(
-                            'Google Calendar 연동',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF4A90E2),
-                            side: const BorderSide(color: Color(0xFF4A90E2)),
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                          ),
-                        ),
-                ),
-              ),
-        ),
+        // // Google Calendar 연동 버튼
+        // Padding(
+        //   padding: const EdgeInsets.all(8),
+        //   child: ref
+        //       .watch(googleCalendarProvider)
+        //       .when(
+        //         loading: () => const SizedBox(),
+        //         error: (e, _) => const SizedBox(),
+        //         data: (isConnected) => SizedBox(
+        //           width: double.infinity,
+        //           child: isConnected
+        //               ? OutlinedButton.icon(
+        //                   onPressed: () => ref
+        //                       .read(googleCalendarProvider.notifier)
+        //                       .disconnect(),
+        //                   icon: const Icon(Icons.link_off, size: 14),
+        //                   label: const Text(
+        //                     'Google Calendar 해제',
+        //                     style: TextStyle(fontSize: 11),
+        //                   ),
+        //                   style: OutlinedButton.styleFrom(
+        //                     foregroundColor: Colors.red,
+        //                     side: const BorderSide(color: Colors.red),
+        //                     padding: const EdgeInsets.symmetric(vertical: 4),
+        //                   ),
+        //                 )
+        //               : OutlinedButton.icon(
+        //                   onPressed: () => ref
+        //                       .read(googleCalendarProvider.notifier)
+        //                       .connect(),
+        //                   icon: const Icon(Icons.calendar_today, size: 14),
+        //                   label: const Text(
+        //                     'Google Calendar 연동',
+        //                     style: TextStyle(fontSize: 11),
+        //                   ),
+        //                   style: OutlinedButton.styleFrom(
+        //                     foregroundColor: const Color(0xFF4A90E2),
+        //                     side: const BorderSide(color: Color(0xFF4A90E2)),
+        //                     padding: const EdgeInsets.symmetric(vertical: 4),
+        //                   ),
+        //                 ),
+        //         ),
+        //       ),
+        // ),
       ],
     );
   }

@@ -1,52 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_provider.dart';
+import '../../mail/services/google_account_provider.dart';
 import '../../mail/services/google_auth_service.dart';
 import '../providers/event_provider.dart';
-import '../../../core/database/database.dart';
 
 class GoogleCalendarNotifier extends AsyncNotifier<bool> {
   @override
   Future<bool> build() async {
     final db = ref.watch(databaseProvider);
-    final row = await (db.select(
-      db.settingTable,
-    )..where((t) => t.key.equals('calendar_access_token'))).getSingleOrNull();
-    return row != null && row.value.isNotEmpty;
+    final email = await GoogleAuthService.getSavedEmail(db);
+    return email != null;
   }
 
   Future<void> connect() async {
-    final authService = GoogleAuthService();
-    final result = await authService.signInForCalendar();
-    if (result == null) return;
-
-    final db = ref.read(databaseProvider);
-    await db
-        .into(db.settingTable)
-        .insertOnConflictUpdate(
-          SettingTableCompanion.insert(
-            key: 'calendar_access_token',
-            value: result.accessToken,
-          ),
-        );
-    if (result.refreshToken != null) {
-      await db
-          .into(db.settingTable)
-          .insertOnConflictUpdate(
-            SettingTableCompanion.insert(
-              key: 'calendar_refresh_token',
-              value: result.refreshToken!,
-            ),
-          );
+    // 이미 구글 로그인 되어있으면 바로 연동
+    final account = ref.read(googleAccountProvider).value;
+    if (account != null) {
+      state = const AsyncData(true);
+      ref.invalidate(eventListProvider);
+      return;
     }
-    await db
-        .into(db.settingTable)
-        .insertOnConflictUpdate(
-          SettingTableCompanion.insert(
-            key: 'calendar_email',
-            value: result.email,
-          ),
-        );
-
+    // 안되어있으면 로그인 요청
+    await ref.read(googleAccountProvider.notifier).signIn();
     state = const AsyncData(true);
     ref.invalidate(eventListProvider);
   }

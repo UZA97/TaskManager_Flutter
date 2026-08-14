@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../core/database/database.dart';
+
 final json = jsonDecode(File('config/google_oauth.json').readAsStringSync());
 
 final _clientId = json['installed']['client_id'];
@@ -10,7 +12,6 @@ final _screet = json['installed']['client_secret'];
 
 class GoogleAuthService {
   static final _googleSignIn = GoogleSignIn(
-    // static으로 변경
     params: GoogleSignInParams(
       clientId: _clientId,
       clientSecret: _screet,
@@ -32,7 +33,6 @@ class GoogleAuthService {
       final credentials = await _googleSignIn.signIn();
       if (credentials == null) return null;
 
-      // refresh token으로 새 access token 발급
       String accessToken = credentials.accessToken;
       if (credentials.refreshToken != null) {
         final newToken = await refreshAccessToken(credentials.refreshToken!);
@@ -40,7 +40,6 @@ class GoogleAuthService {
       }
 
       final email = await _getEmail(accessToken);
-
       return GoogleAuthResult(
         accessToken: accessToken,
         refreshToken: credentials.refreshToken,
@@ -73,6 +72,84 @@ class GoogleAuthService {
     } catch (e) {
       return null;
     }
+  }
+
+  // 공통 토큰 저장
+  static Future<void> saveTokens(
+    AppDatabase db,
+    GoogleAuthResult result,
+  ) async {
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(
+            key: 'google_access_token',
+            value: result.accessToken,
+          ),
+        );
+    if (result.refreshToken != null) {
+      await db
+          .into(db.settingTable)
+          .insertOnConflictUpdate(
+            SettingTableCompanion.insert(
+              key: 'google_refresh_token',
+              value: result.refreshToken!,
+            ),
+          );
+    }
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(
+            key: 'google_email',
+            value: result.email,
+          ),
+        );
+  }
+
+  static Future<void> clearTokens(AppDatabase db) async {
+    for (final key in [
+      'google_access_token',
+      'google_refresh_token',
+      'google_email',
+    ]) {
+      await (db.delete(db.settingTable)..where((t) => t.key.equals(key))).go();
+    }
+  }
+
+  static Future<String?> getAccessToken(
+    AppDatabase db,
+    GoogleAuthService authService,
+  ) async {
+    final refreshRow = await (db.select(
+      db.settingTable,
+    )..where((t) => t.key.equals('google_refresh_token'))).getSingleOrNull();
+    if (refreshRow == null) return null;
+
+    final newToken = await authService.refreshAccessToken(refreshRow.value);
+    if (newToken != null) {
+      await db
+          .into(db.settingTable)
+          .insertOnConflictUpdate(
+            SettingTableCompanion.insert(
+              key: 'google_access_token',
+              value: newToken,
+            ),
+          );
+      return newToken;
+    }
+
+    final tokenRow = await (db.select(
+      db.settingTable,
+    )..where((t) => t.key.equals('google_access_token'))).getSingleOrNull();
+    return tokenRow?.value;
+  }
+
+  static Future<String?> getSavedEmail(AppDatabase db) async {
+    final row = await (db.select(
+      db.settingTable,
+    )..where((t) => t.key.equals('google_email'))).getSingleOrNull();
+    return row?.value;
   }
 
   Future<String?> refreshAccessToken(String refreshToken) async {

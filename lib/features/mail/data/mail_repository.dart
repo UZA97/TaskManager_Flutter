@@ -28,6 +28,24 @@ class MailRepository {
         );
   }
 
+  Future<String?> getGoogleRefreshToken() async {
+    final row = await (_db.select(
+      _db.settingTable,
+    )..where((t) => t.key.equals('google_refresh_token'))).getSingleOrNull();
+    return row?.value;
+  }
+
+  Future<void> saveGoogleAccessToken(String token) async {
+    await _db
+        .into(_db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(
+            key: 'google_access_token',
+            value: token,
+          ),
+        );
+  }
+
   Future<void> deleteAccount() async {
     await (_db.delete(
       _db.settingTable,

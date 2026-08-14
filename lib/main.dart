@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'features/mail/services/google_account_provider.dart';
+import 'features/mail/widgets/google_login_dialog.dart';
 import 'features/memo/providers/note_provider.dart';
 import 'features/memo/providers/tab_provider.dart';
 import '../features/calendar/data/event_repository.dart';
@@ -198,7 +200,16 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // 메일 폴링 시작
+      // 구글 로그인 여부 체크
+      final account = await ref.read(googleAccountProvider.future);
+      if (account == null) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const GoogleLoginDialog(),
+        );
+      }
+
       final mailAccount = await ref.read(mailRepositoryProvider).getAccount();
       if (mailAccount != null) {
         ref.read(mailCheckServiceProvider).start(mailAccount);

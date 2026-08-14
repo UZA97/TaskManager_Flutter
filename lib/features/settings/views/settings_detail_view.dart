@@ -6,10 +6,10 @@ import '../../../core/settings/settings_provider.dart';
 import '../../../core/update/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/settings/app_settings.dart';
+import '../../mail/services/google_account_provider.dart';
 import '../../memo/providers/note_provider.dart';
 import '../../../core/database/database_provider.dart';
 import '../views/google_drive_sync_service.dart';
-import '../../../features/mail/services/google_auth_service.dart';
 
 class SettingsDetailView extends ConsumerWidget {
   const SettingsDetailView({super.key});
@@ -38,82 +38,23 @@ class _AdvancedSettings extends ConsumerStatefulWidget {
 class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
   bool _isSyncing = false;
   String? _statusMessage;
-  String? _accessToken;
-  String? _email;
-
-  Future<void> _signIn() async {
-    final result = await GoogleAuthService().signIn();
-    if (result == null) return;
-    setState(() {
-      _accessToken = result.accessToken;
-      _email = result.email;
-    });
-  }
-
-  Future<void> _upload() async {
-    if (_accessToken == null) {
-      await _signIn();
-      if (_accessToken == null) return;
-    }
-
-    setState(() {
-      _isSyncing = true;
-      _statusMessage = '업로드 준비 중...';
-    });
-
-    try {
-      final db = ref.read(databaseProvider);
-      final service = GoogleDriveSyncService(accessToken: _accessToken!);
-      await service.upload(
-        db,
-        onStatus: (s) => setState(() => _statusMessage = s),
-      );
-    } catch (e) {
-      setState(() => _statusMessage = '오류: $e');
-    } finally {
-      setState(() => _isSyncing = false);
-    }
-  }
-
-  Future<void> _download() async {
-    if (_accessToken == null) {
-      await _signIn();
-      if (_accessToken == null) return;
-    }
-
-    setState(() {
-      _isSyncing = true;
-      _statusMessage = '다운로드 준비 중...';
-    });
-
-    try {
-      final db = ref.read(databaseProvider);
-      final service = GoogleDriveSyncService(accessToken: _accessToken!);
-      await service.download(
-        db,
-        onStatus: (s) => setState(() => _statusMessage = s),
-      );
-    } catch (e) {
-      setState(() => _statusMessage = '오류: $e');
-    } finally {
-      setState(() => _isSyncing = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    final accountAsync = ref.watch(googleAccountProvider);
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        const _SectionHeader(title: 'Google 계정'),
+        accountAsync.when(
+          loading: () => const CircularProgressIndicator(),
+          error: (e, _) => const SizedBox(),
+          data: (account) =>
+              account != null ? _buildConnected(account) : _buildDisconnected(),
+        ),
+        const SizedBox(height: 24),
         const _SectionHeader(title: 'Google Drive 동기화'),
-        if (_email != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              '계정: $_email',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ),
         if (_statusMessage != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -152,6 +93,116 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
         ),
       ],
     );
+  }
+
+  Widget _buildConnected(GoogleAccount account) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFDDDDDD)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF4A90E2).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(Icons.account_circle, color: Color(0xFF4A90E2)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '연결됨',
+                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+                Text(
+                  account.email,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () => ref.read(googleAccountProvider.notifier).signOut(),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+              side: const BorderSide(color: Colors.red),
+            ),
+            child: const Text('연결 해제'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDisconnected() {
+    return ElevatedButton.icon(
+      onPressed: () => ref.read(googleAccountProvider.notifier).signIn(),
+      icon: const Icon(Icons.login, size: 16),
+      label: const Text('Google 계정 연동'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF4A90E2),
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+
+  Future<void> _upload() async {
+    final account = ref.read(googleAccountProvider).value;
+    if (account == null) {
+      setState(() => _statusMessage = 'Google 계정 연동이 필요합니다');
+      return;
+    }
+    setState(() {
+      _isSyncing = true;
+      _statusMessage = '업로드 준비 중...';
+    });
+    try {
+      final db = ref.read(databaseProvider);
+      final service = GoogleDriveSyncService(accessToken: account.accessToken);
+      await service.upload(
+        db,
+        onStatus: (s) => setState(() => _statusMessage = s),
+      );
+    } catch (e) {
+      setState(() => _statusMessage = '오류: $e');
+    } finally {
+      setState(() => _isSyncing = false);
+    }
+  }
+
+  Future<void> _download() async {
+    final account = ref.read(googleAccountProvider).value;
+    if (account == null) {
+      setState(() => _statusMessage = 'Google 계정 연동이 필요합니다');
+      return;
+    }
+    setState(() {
+      _isSyncing = true;
+      _statusMessage = '다운로드 준비 중...';
+    });
+    try {
+      final db = ref.read(databaseProvider);
+      final service = GoogleDriveSyncService(accessToken: account.accessToken);
+      await service.download(
+        db,
+        onStatus: (s) => setState(() => _statusMessage = s),
+      );
+    } catch (e) {
+      setState(() => _statusMessage = '오류: $e');
+    } finally {
+      setState(() => _isSyncing = false);
+    }
   }
 }
 
