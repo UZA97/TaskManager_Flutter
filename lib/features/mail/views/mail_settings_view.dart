@@ -51,8 +51,6 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
         imapServer: 'imap.gmail.com',
         imapPort: 993,
         pollIntervalMinutes: _pollInterval,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
       );
 
       await ref.read(mailAccountProvider.notifier).saveAccount(account);

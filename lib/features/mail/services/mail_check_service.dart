@@ -108,17 +108,15 @@ class MailCheckService {
   }
 
   Future<String?> _getValidAccessToken(TaskMailAccount account) async {
-    //final db = // databaseProvider 접근 필요 - repo통해서
-    // google_refresh_token으로 갱신
     final refreshRow = await _repo.getGoogleRefreshToken();
-    if (refreshRow != null) {
-      final newToken = await _authService.refreshAccessToken(refreshRow);
-      if (newToken != null) {
-        await _repo.saveGoogleAccessToken(newToken);
-        return newToken;
-      }
+    if (refreshRow == null) return null;
+
+    final newToken = await _authService.refreshAccessToken(refreshRow);
+    if (newToken != null) {
+      await _repo.saveGoogleAccessToken(newToken);
+      return newToken;
     }
-    return account.accessToken;
+    return null; // fallback 제거
   }
 
   Future<MailMessage?> _fetchMessageDetail(

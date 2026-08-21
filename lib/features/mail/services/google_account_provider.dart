@@ -43,7 +43,17 @@ class GoogleAccountNotifier extends AsyncNotifier<GoogleAccount?> {
 
   Future<void> signOut() async {
     final db = ref.read(databaseProvider);
+    // 기존 키들
     await GoogleAuthService.clearTokens(db);
+    // 레거시 키 정리
+    for (final key in [
+      'calendar_access_token',
+      'calendar_refresh_token',
+      'calendar_email',
+      'mail_account',
+    ]) {
+      await (db.delete(db.settingTable)..where((t) => t.key.equals(key))).go();
+    }
     state = const AsyncData(null);
     ref.invalidate(mailAccountProvider);
     ref.invalidate(googleCalendarProvider);

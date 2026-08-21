@@ -118,32 +118,23 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
   Future<String?> _getAccessToken() async {
     final db = ref.read(databaseProvider);
 
-    // access token 읽기
-    final tokenRow = await (db.select(
-      db.settingTable,
-    )..where((t) => t.key.equals('calendar_access_token'))).getSingleOrNull();
-    if (tokenRow == null || tokenRow.value.isEmpty) return null;
-
-    // refresh token으로 갱신 시도
     final refreshRow = await (db.select(
       db.settingTable,
-    )..where((t) => t.key.equals('calendar_refresh_token'))).getSingleOrNull();
-    if (refreshRow == null) return tokenRow.value;
+    )..where((t) => t.key.equals('google_refresh_token'))).getSingleOrNull();
+    if (refreshRow == null) return null;
 
     final authService = GoogleAuthService();
     final newToken = await authService.refreshAccessToken(refreshRow.value);
-    if (newToken == null) return tokenRow.value;
+    if (newToken == null) return null;
 
-    // 갱신된 token 저장
     await db
         .into(db.settingTable)
         .insertOnConflictUpdate(
           SettingTableCompanion.insert(
-            key: 'calendar_access_token',
+            key: 'google_access_token',
             value: newToken,
           ),
         );
-
     return newToken;
   }
 

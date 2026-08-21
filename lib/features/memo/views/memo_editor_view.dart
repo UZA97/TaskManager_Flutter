@@ -659,14 +659,28 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   }
 
   String _plainTextFromNodes(List<Node> nodes) {
-    final text = <String>[];
+    final lines = <String>[];
+    int numberedIndex = 1;
+
     for (final node in nodes) {
-      final deltaText = node.delta?.toPlainText();
-      if (deltaText != null && deltaText.trim().isNotEmpty) {
-        text.add(deltaText);
+      final text = node.delta?.toPlainText() ?? '';
+      final depth = node.path.length - 1; // 0부터 시작
+      final indent = '    ' * depth;
+
+      switch (node.type) {
+        case 'bulleted_list':
+          lines.add('$indent• $text');
+          break;
+        case 'numbered_list':
+          lines.add('$indent$numberedIndex. $text');
+          numberedIndex++;
+          break;
+        default:
+          lines.add('$indent$text');
+          numberedIndex = 1;
       }
     }
-    return text.join('\n');
+    return lines.join('\n');
   }
 
   late final _copyHandler = CommandShortcutEvent(
@@ -699,7 +713,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         Clipboard.setData(ClipboardData(text: plainText));
       }
 
-      return KeyEventResult.ignored;
+      return KeyEventResult.handled;
     },
   );
 

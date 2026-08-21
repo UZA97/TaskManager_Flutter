@@ -3,16 +3,12 @@ class TaskMailAccount {
   final String imapServer;
   final int imapPort;
   final int pollIntervalMinutes;
-  final String? accessToken;
-  final String? refreshToken;
 
   const TaskMailAccount({
     required this.email,
     required this.imapServer,
     required this.imapPort,
     this.pollIntervalMinutes = 1,
-    this.accessToken,
-    this.refreshToken,
   });
 
   bool get isOutlook => imapServer == 'outlook';
@@ -24,8 +20,6 @@ class TaskMailAccount {
       imapServer: json['imapServer'] as String,
       imapPort: json['imapPort'] as int,
       pollIntervalMinutes: json['pollIntervalMinutes'] as int? ?? 5,
-      accessToken: json['accessToken'] as String?,
-      refreshToken: json['refreshToken'] as String?,
     );
   }
 
@@ -34,20 +28,12 @@ class TaskMailAccount {
     'imapServer': imapServer,
     'imapPort': imapPort,
     'pollIntervalMinutes': pollIntervalMinutes,
-    'accessToken': accessToken,
-    'refreshToken': refreshToken,
   };
 
-  TaskMailAccount copyWith({
-    String? accessToken,
-    String? refreshToken,
-    int? pollIntervalMinutes,
-  }) => TaskMailAccount(
+  TaskMailAccount copyWith({int? pollIntervalMinutes}) => TaskMailAccount(
     email: email,
     imapServer: imapServer,
     imapPort: imapPort,
     pollIntervalMinutes: pollIntervalMinutes ?? this.pollIntervalMinutes,
-    accessToken: accessToken ?? this.accessToken,
-    refreshToken: refreshToken ?? this.refreshToken,
   );
 }

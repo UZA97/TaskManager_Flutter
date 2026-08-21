@@ -31,8 +31,6 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
         imapServer: 'imap.gmail.com',
         imapPort: 993,
         pollIntervalMinutes: 5,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
       );
 
       await ref.read(mailAccountProvider.notifier).saveAccount(account);
@@ -60,8 +58,6 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
         imapServer: 'outlook',
         imapPort: 0,
         pollIntervalMinutes: 5,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
       );
 
       await ref.read(mailAccountProvider.notifier).saveAccount(account);
