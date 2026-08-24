@@ -29,9 +29,6 @@ import '../../../core/providers/navigation_provider.dart';
 import 'package:appflowy_editor/src/editor/find_replace_menu/find_menu_service.dart';
 import '../widgets/ask_ai_dialog.dart';
 import '../services/gemini_service.dart';
-// import 'package:fast_immutable_collections/fast_immutable_collections.dart;'
-
-enum LastCopySource { internal, external }
 
 class MemoEditorView extends ConsumerStatefulWidget {
   const MemoEditorView({super.key});
@@ -52,7 +49,8 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   StreamSubscription<void>? _transactionSubscription;
   VoidCallback? _selectionListener;
   List<Map<String, dynamic>>? _internalClipboard;
-  LastCopySource _lastCopySource = LastCopySource.external;
+  String? _internalClipboardText; // 추가
+  // LastCopySource _lastCopySource = LastCopySource.external;
 
   SelectionMenuItem get _askAiMenuItem => SelectionMenuItem(
     getName: () => 'Ask AI',
@@ -693,22 +691,36 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         return KeyEventResult.ignored;
 
       final nodes = editorState.getNodesInSelection(selection);
+      if (nodes.isEmpty) return KeyEventResult.ignored;
+
+      // path 기준 정렬
+      nodes.sort((a, b) {
+        for (int i = 0; i < a.path.length && i < b.path.length; i++) {
+          if (a.path[i] != b.path[i]) return a.path[i].compareTo(b.path[i]);
+        }
+        return a.path.length.compareTo(b.path.length);
+      });
 
       if (nodes.length <= 1) {
         _internalClipboard = null;
-        _lastCopySource = LastCopySource.external;
+        _internalClipboardText = null;
         return KeyEventResult.ignored;
       }
 
-      final copied = <Map<String, dynamic>>[];
+      // 루트 노드만 필터 (children은 toJson에 자동 포함)
+      final rootNodes = <Node>[];
       for (final node in nodes) {
-        copied.add(node.toJson());
+        final isChild = rootNodes.any(
+          (root) =>
+              node.path.length > root.path.length &&
+              node.path.sublist(0, root.path.length).equals(root.path),
+        );
+        if (!isChild) rootNodes.add(node);
       }
 
-      _internalClipboard = copied;
-      _lastCopySource = LastCopySource.internal;
-
-      final plainText = _plainTextFromNodes(nodes);
+      _internalClipboard = rootNodes.map((n) => n.toJson()).toList();
+      String plainText = _plainTextFromNodes(nodes);
+      _internalClipboardText = plainText;
       if (plainText.isNotEmpty) {
         Clipboard.setData(ClipboardData(text: plainText));
       }
@@ -732,44 +744,50 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         final imageBytes = await Pasteboard.image;
         if (imageBytes != null) {
           _internalClipboard = null;
-          _lastCopySource = LastCopySource.external;
+          _internalClipboardText = null;
           await _handlePasteImage(editorState);
           return;
         }
 
-        if (_lastCopySource == LastCopySource.internal &&
-            _internalClipboard != null &&
-            _internalClipboard!.isNotEmpty) {
-          _pasteInternalClipboard(editorState);
-          return;
-        }
+        final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+        bool isMatched = (_internalClipboardText == clipboardData?.text);
+        if (isMatched) {
+          ClipboardData? clipboardText = await Clipboard.getData(
+            Clipboard.kTextPlain,
+          );
 
-        final clipboardText = await Clipboard.getData(Clipboard.kTextPlain);
-        if (clipboardText?.text != null &&
-            clipboardText!.text!.trim().isNotEmpty) {
-          _internalClipboard = null;
-          _lastCopySource = LastCopySource.external;
-          return;
+          if (clipboardText?.text != null &&
+              clipboardText!.text!.trim().isNotEmpty) {
+            _internalClipboard = null;
+            _internalClipboardText = null;
+            return;
+          }
+        } else {
+          if (_internalClipboard != null && _internalClipboard!.isNotEmpty) {
+            _pasteInternalClipboard(editorState);
+            return;
+          }
         }
       }();
 
       return KeyEventResult.ignored;
     },
   );
+
   void _pasteInternalClipboard(EditorState editorState) {
     final selection = editorState.selection;
     if (selection == null) return;
 
     final clipboard = _internalClipboard!;
     final transaction = editorState.transaction;
-    final insertBasePath = selection.start.path;
+    final basePath = selection.normalized.end.path;
 
-    // 역순으로 삽입해야 순서가 유지됨
-    for (int i = clipboard.length - 1; i >= 0; i--) {
+    // 역순으로 삽입 (같은 path에 넣으면 앞으로 밀리므로 역순이 정순 결과)
+    for (int i = 0; i < clipboard.length; i++) {
       final node = Node.fromJson(clipboard[i].cast<String, Object>());
       final insertPath = [
-        ...insertBasePath.sublist(0, insertBasePath.length - 1),
-        insertBasePath.last + 1,
+        ...basePath.sublist(0, basePath.length - 1),
+        basePath.last + 1,
       ];
       transaction.insertNode(insertPath, node);
     }
