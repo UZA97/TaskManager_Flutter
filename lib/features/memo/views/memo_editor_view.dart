@@ -42,8 +42,9 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   final _titleController = TextEditingController();
   bool _isDragging = false;
   bool _isToolbarExpanded = true;
-  bool _isSaving = false;
-  bool _saveSucceeded = false;
+  // 저장 표시는 화면 전체 setState 대신 이 notifier로만 갱신
+  // (키 입력마다 에디터 전체가 다시 빌드되지 않도록)
+  final _saveStatus = ValueNotifier<_SaveStatus>(_SaveStatus.idle);
   Selection? _lastSelection;
   Timer? _saveTimer;
   StreamSubscription<void>? _transactionSubscription;
@@ -126,6 +127,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _editorState!.selectionNotifier.removeListener(_selectionListener!);
     }
     _titleController.dispose();
+    _saveStatus.dispose();
     super.dispose();
   }
 
@@ -187,12 +189,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     if (_currentNote == null || _editorState == null) return;
 
     _saveTimer?.cancel();
-    if (mounted) {
-      setState(() {
-        _isSaving = true;
-        _saveSucceeded = false;
-      });
-    }
+    _saveStatus.value = _SaveStatus.saving;
 
     _saveTimer = Timer(const Duration(milliseconds: 500), () async {
       if (_currentNote == null || _editorState == null) return;
@@ -202,15 +199,11 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         content: content,
       );
       await ref.read(noteListProvider.notifier).saveNote(updated);
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-          _saveSucceeded = true;
-        });
-      }
+      if (!mounted) return;
+      _saveStatus.value = _SaveStatus.saved;
       Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          setState(() => _saveSucceeded = false);
+        if (mounted && _saveStatus.value == _SaveStatus.saved) {
+          _saveStatus.value = _SaveStatus.idle;
         }
       });
     });
@@ -681,14 +674,33 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     return lines.join('\n');
   }
 
+  // 클립보드 비교용 정규화 (Windows 클립보드는 줄바꿈을 \r\n으로 바꿀 수 있음)
+  static String _normalizeClipboardText(String? text) =>
+      (text ?? '').replaceAll('\r\n', '\n');
+
+  // 서식(블록 타입)을 보존해야 하는 복사인지
+  // - 여러 블록 선택
+  // - 텍스트가 없는 블록(구분선, 이미지 등)
+  // - 문단이 아닌 블록(체크박스, 목록, 제목 등)을 통째로 선택
+  bool _shouldCopyAsBlocks(List<Node> nodes, Selection selection) {
+    if (nodes.length > 1) return true;
+    final node = nodes.first;
+    final delta = node.delta;
+    if (delta == null) return true;
+    if (node.type == 'paragraph') return false;
+    final range = selection.normalized;
+    return range.start.offset == 0 && range.end.offset >= delta.length;
+  }
+
   late final _copyHandler = CommandShortcutEvent(
     key: 'copy with delta',
     getDescription: () => 'Copy with delta attributes',
     command: 'ctrl+c',
     handler: (editorState) {
       final selection = editorState.selection;
-      if (selection == null || selection.isCollapsed)
+      if (selection == null || selection.isCollapsed) {
         return KeyEventResult.ignored;
+      }
 
       final nodes = editorState.getNodesInSelection(selection);
       if (nodes.isEmpty) return KeyEventResult.ignored;
@@ -701,7 +713,8 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         return a.path.length.compareTo(b.path.length);
       });
 
-      if (nodes.length <= 1) {
+      // 한 줄 안의 일부 텍스트 복사는 기본 복사(인라인 서식 유지)에 맡김
+      if (!_shouldCopyAsBlocks(nodes, selection)) {
         _internalClipboard = null;
         _internalClipboardText = null;
         return KeyEventResult.ignored;
@@ -719,16 +732,20 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       }
 
       _internalClipboard = rootNodes.map((n) => n.toJson()).toList();
-      String plainText = _plainTextFromNodes(nodes);
-      _internalClipboardText = plainText;
-      if (plainText.isNotEmpty) {
-        Clipboard.setData(ClipboardData(text: plainText));
-      }
+      final plainText = _plainTextFromNodes(nodes);
+      _internalClipboardText = _normalizeClipboardText(plainText);
+      // 구분선만 복사해 텍스트가 비어도 클립보드를 갱신해야
+      // 이전에 외부에서 복사한 내용과 섞이지 않음
+      Clipboard.setData(ClipboardData(text: plainText));
 
       return KeyEventResult.handled;
     },
   );
 
+  // 붙여넣기 규칙: 클립보드에 "지금" 들어 있는 것만 붙여넣는다
+  // - 이미지 → 이미지 블록
+  // - 클립보드 텍스트 == 마지막 내부 복사본 → 서식 그대로(블록) 붙여넣기
+  // - 그 외(외부에서 새로 복사) → 기본 붙여넣기
   late final _pasteHandler = CommandShortcutEvent(
     key: 'paste with delta',
     getDescription: () => 'Paste with delta attributes',
@@ -740,57 +757,76 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         if (node?.type == localCodeType) return KeyEventResult.ignored;
       }
 
+      // 클립보드 확인은 비동기라, 기본 붙여넣기가 동시에 실행되지 않도록
+      // 여기서 처리 완료로 반환하고 필요한 경우에만 직접 호출
       () async {
         final imageBytes = await Pasteboard.image;
         if (imageBytes != null) {
-          _internalClipboard = null;
-          _internalClipboardText = null;
           await _handlePasteImage(editorState);
           return;
         }
 
         final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-        bool isMatched = (_internalClipboardText == clipboardData?.text);
-        if (isMatched) {
-          ClipboardData? clipboardText = await Clipboard.getData(
-            Clipboard.kTextPlain,
-          );
+        final internal = _internalClipboard;
+        final isInternalCopy =
+            internal != null &&
+            internal.isNotEmpty &&
+            _normalizeClipboardText(clipboardData?.text) ==
+                _internalClipboardText;
 
-          if (clipboardText?.text != null &&
-              clipboardText!.text!.trim().isNotEmpty) {
-            _internalClipboard = null;
-            _internalClipboardText = null;
-            return;
-          }
+        if (isInternalCopy) {
+          _pasteInternalClipboard(editorState, internal);
         } else {
-          if (_internalClipboard != null && _internalClipboard!.isNotEmpty) {
-            _pasteInternalClipboard(editorState);
-            return;
-          }
+          // 외부 복사로 내부 복사본은 더 이상 유효하지 않음
+          _internalClipboard = null;
+          _internalClipboardText = null;
+          pasteCommand.handler(editorState);
         }
       }();
 
-      return KeyEventResult.ignored;
+      return KeyEventResult.handled;
     },
   );
 
-  void _pasteInternalClipboard(EditorState editorState) {
+  void _pasteInternalClipboard(
+    EditorState editorState,
+    List<Map<String, dynamic>> clipboard,
+  ) {
     final selection = editorState.selection;
     if (selection == null) return;
 
-    final clipboard = _internalClipboard!;
+    final nodes = clipboard
+        .map((json) => Node.fromJson(json.cast<String, Object>()))
+        .toList();
+    if (nodes.isEmpty) return;
+
     final transaction = editorState.transaction;
     final basePath = selection.normalized.end.path;
+    final current = editorState.getNodeAtPath(basePath);
 
-    // 역순으로 삽입 (같은 path에 넣으면 앞으로 밀리므로 역순이 정순 결과)
-    for (int i = 0; i < clipboard.length; i++) {
-      final node = Node.fromJson(clipboard[i].cast<String, Object>());
-      final insertPath = [
-        ...basePath.sublist(0, basePath.length - 1),
-        basePath.last + 1,
-      ];
-      transaction.insertNode(insertPath, node);
-    }
+    // 빈 줄에서 붙여넣으면 그 줄을 대체, 아니면 현재 블록 다음에 삽입
+    final isEmptyLine =
+        current != null &&
+        current.type == 'paragraph' &&
+        current.children.isEmpty &&
+        (current.delta?.isEmpty ?? true);
+    final Path insertPath = isEmptyLine
+        ? basePath
+        : [...basePath.sublist(0, basePath.length - 1), basePath.last + 1];
+
+    // 순서대로 삽입
+    // (트랜잭션의 경로는 원본 문서 기준으로 자동 보정되므로 삽입 → 삭제 순서여야 함)
+    transaction.insertNodes(insertPath, nodes);
+    if (isEmptyLine) transaction.deleteNode(current);
+
+    // 커서를 마지막으로 붙여넣은 블록 끝으로
+    final lastPath = [
+      ...insertPath.sublist(0, insertPath.length - 1),
+      insertPath.last + nodes.length - 1,
+    ];
+    transaction.afterSelection = Selection.collapsed(
+      Position(path: lastPath, offset: nodes.last.delta?.length ?? 0),
+    );
 
     editorState.apply(transaction);
   }
@@ -1076,8 +1112,6 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
         .toList();
 
     final shortcutEvents = [
-      _copyHandler,
-      _findHandler,
       _findHandler,
       _replaceHandler,
       _strikethroughHandler,
@@ -1096,8 +1130,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       _dividerHandler,
       _checkboxHandler,
       ...standardPaste,
-      pasteCommand, // 표준 붙여넣기 다시 추가
-      pasteTextWithoutFormattingCommand,
+      pasteTextWithoutFormattingCommand, // ctrl+shift+v: 서식 없이 붙여넣기
       ..._textColorHandlers,
       ..._highlightHandlers,
       _alignLeftHandler,
@@ -1501,16 +1534,22 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       const SizedBox(width: 4),
                     ],
                     const Spacer(),
-                    if (_isSaving)
-                      const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else if (_saveSucceeded)
-                      const Icon(Icons.check, size: 14, color: Colors.blueGrey)
-                    else
-                      const SizedBox.shrink(),
+                    ValueListenableBuilder<_SaveStatus>(
+                      valueListenable: _saveStatus,
+                      builder: (context, status, _) => switch (status) {
+                        _SaveStatus.saving => const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        _SaveStatus.saved => const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Colors.blueGrey,
+                        ),
+                        _SaveStatus.idle => const SizedBox.shrink(),
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -1682,3 +1721,5 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     super.didChangeDependencies();
   }
 }
+
+enum _SaveStatus { idle, saving, saved }
