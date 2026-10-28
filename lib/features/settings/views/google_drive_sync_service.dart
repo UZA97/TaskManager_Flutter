@@ -24,6 +24,19 @@ class GoogleDriveSyncService {
     'Content-Type': 'application/json',
   };
 
+  // 실패 응답이면 예외 — 실패했는데 "완료"로 표시되는 것 방지
+  static void _check(http.Response res, String action) {
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    print('Drive $action 실패: ${res.statusCode} ${res.body}');
+    if (res.statusCode == 401) {
+      throw Exception('Google 인증이 만료되었습니다. 다시 연동해주세요');
+    }
+    if (res.statusCode == 403) {
+      throw Exception('Drive 권한이 없습니다. 설정에서 Google 계정을 다시 연동해주세요');
+    }
+    throw Exception('$action 실패 (${res.statusCode})');
+  }
+
   Future<String?> _getFileId(String name) async {
     final uri = Uri.parse(
       '$_driveApiBase/files'
@@ -32,7 +45,7 @@ class GoogleDriveSyncService {
       '&fields=files(id,name)',
     );
     final res = await http.get(uri, headers: _headers);
-    if (res.statusCode != 200) return null;
+    _check(res, '파일 조회');
     final data = jsonDecode(res.body);
     final files = data['files'] as List<dynamic>;
     if (files.isEmpty) return null;
@@ -45,7 +58,7 @@ class GoogleDriveSyncService {
 
     final uri = Uri.parse('$_driveApiBase/files/$fileId?alt=media');
     final res = await http.get(uri, headers: _headers);
-    if (res.statusCode != 200) return null;
+    _check(res, '메타데이터 다운로드');
 
     try {
       return SyncMeta.decode(res.body);
@@ -62,7 +75,7 @@ class GoogleDriveSyncService {
       final uri = Uri.parse(
         '$_driveUploadBase/files/$existingId?uploadType=media',
       );
-      await http.patch(
+      final res = await http.patch(
         uri,
         headers: {
           'Authorization': 'Bearer $accessToken',
@@ -70,6 +83,7 @@ class GoogleDriveSyncService {
         },
         body: bodyBytes,
       );
+      _check(res, '메타데이터 업로드');
     } else {
       await _multipartUpload(
         name: name,
@@ -114,7 +128,7 @@ class GoogleDriveSyncService {
       body: body,
     );
 
-    print('multipart upload 응답: ${res.statusCode} / ${res.body}'); // 추가
+    _check(res, '$name 업로드');
 
     final data = jsonDecode(res.body);
     return data['id'] as String? ?? ''; // null 안전하게
@@ -126,7 +140,7 @@ class GoogleDriveSyncService {
     String mimeType,
   ) async {
     final uri = Uri.parse('$_driveUploadBase/files/$fileId?uploadType=media');
-    await http.patch(
+    final res = await http.patch(
       uri,
       headers: {
         'Authorization': 'Bearer $accessToken',
@@ -134,18 +148,20 @@ class GoogleDriveSyncService {
       },
       body: bytes,
     );
+    _check(res, '파일 업데이트');
   }
 
   Future<List<int>?> _downloadFile(String fileId) async {
     final uri = Uri.parse('$_driveApiBase/files/$fileId?alt=media');
     final res = await http.get(uri, headers: _headers);
-    if (res.statusCode != 200) return null;
+    _check(res, '파일 다운로드');
     return res.bodyBytes;
   }
 
   Future<void> _deleteFile(String fileId) async {
     final uri = Uri.parse('$_driveApiBase/files/$fileId');
-    await http.delete(uri, headers: _headers);
+    final res = await http.delete(uri, headers: _headers);
+    if (res.statusCode != 404) _check(res, '파일 삭제');
   }
 
   Future<Map<String, String>> _listDriveAttachments() async {
@@ -162,7 +178,7 @@ class GoogleDriveSyncService {
       if (pageToken != null) url += '&pageToken=$pageToken';
 
       final res = await http.get(Uri.parse(url), headers: _headers);
-      if (res.statusCode != 200) break;
+      _check(res, '첨부파일 목록 조회');
 
       final data = jsonDecode(res.body);
       final files = data['files'] as List<dynamic>;
@@ -274,6 +290,11 @@ class GoogleDriveSyncService {
     onStatus?.call('첨부파일 동기화 중...');
     final validFiles = await _collectValidAttachments(db);
     final driveAttachments = await _listDriveAttachments();
+    final remoteMeta = await fetchRemoteMeta();
+    final remoteChecksums = {
+      for (final m in remoteMeta?.attachments ?? <AttachmentMeta>[])
+        m.relativePath: m.checksum,
+    };
     final newAttachmentMetas = <AttachmentMeta>[];
 
     for (final file in validFiles) {
@@ -286,7 +307,13 @@ class GoogleDriveSyncService {
         AttachmentMeta(relativePath: relPath, checksum: fileChecksum),
       );
 
-      if (driveAttachments.containsKey(driveKey)) continue;
+      final existingId = driveAttachments[driveKey];
+      if (existingId != null) {
+        if (remoteChecksums[relPath] != fileChecksum) {
+          await _updateFile(existingId, fileBytes, 'application/octet-stream');
+        }
+        continue;
+      }
 
       await _multipartUpload(
         name: driveKey,
@@ -337,9 +364,21 @@ class GoogleDriveSyncService {
 
     final dbBytes = await _downloadFile(dbFileId);
     if (dbBytes == null) throw Exception('DB 다운로드 실패');
+    if (!_isSqliteFile(dbBytes)) {
+      throw Exception('Drive의 DB 파일이 손상되었습니다');
+    }
+    if (remoteMeta.dbChecksum.isNotEmpty &&
+        _checksum(dbBytes) != remoteMeta.dbChecksum) {
+      throw Exception('DB 파일이 메타데이터와 일치하지 않습니다. 다시 업로드해주세요');
+    }
 
     await db.close();
-    dbFile.writeAsBytesSync(dbBytes);
+    // 이전 DB의 WAL/SHM이 남아 있으면 새 DB 위에 적용되므로 제거
+    for (final suffix in ['-wal', '-shm']) {
+      final f = File('${dbFile.path}$suffix');
+      if (f.existsSync()) f.deleteSync();
+    }
+    dbFile.writeAsBytesSync(dbBytes, flush: true);
 
     onStatus?.call('첨부파일 동기화 중...');
     final appDir = await _appSupportDir();
@@ -375,8 +414,27 @@ class GoogleDriveSyncService {
 
     onStatus?.call('다운로드 완료 — 앱을 재시작합니다');
     await Future.delayed(const Duration(seconds: 1)); // 메시지 보여주고
-    final executablePath = Platform.resolvedExecutable;
-    await Process.start(executablePath, [], mode: ProcessStartMode.detached);
+    await _restartApp();
+  }
+
+  static bool _isSqliteFile(List<int> bytes) {
+    const header = 'SQLite format 3';
+    if (bytes.length < header.length) return false;
+    return utf8.decode(bytes.sublist(0, header.length), allowMalformed: true) ==
+        header;
+  }
+
+  // 단일 인스턴스 mutex 때문에 현재 프로세스가 살아 있는 동안 새로 띄우면 바로 종료됨
+  // → 현재 프로세스 종료 2초 뒤 다시 실행하도록 예약
+  static Future<void> _restartApp() async {
+    final exe = Platform.resolvedExecutable.replaceAll("'", "''");
+    await Process.start('powershell', [
+      '-NoProfile',
+      '-WindowStyle',
+      'Hidden',
+      '-Command',
+      "Start-Sleep -Seconds 2; Start-Process -FilePath '$exe'",
+    ], mode: ProcessStartMode.detached);
     exit(0);
   }
 }

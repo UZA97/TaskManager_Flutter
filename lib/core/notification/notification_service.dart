@@ -43,14 +43,18 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
+    assert(_container != null, 'NotificationService.init()이 호출되지 않았습니다');
     final settings = _container?.read(settingsProvider).value;
-    if (settings == null) return;
+    if (settings == null) {
+      // 설정을 못 읽었다고 알림을 버리지 않음 (기본값: 알림 켜짐)
+      print('알림: 설정을 읽지 못해 기본값으로 표시합니다');
+    } else {
+      // 알림 비활성화 체크
+      if (!settings.notificationEnabled) return;
 
-    // 알림 비활성화 체크
-    if (!settings.notificationEnabled) return;
-
-    // 집중모드 체크
-    if (_isInFocusMode(settings)) return;
+      // 집중모드 체크
+      if (_isInFocusMode(settings)) return;
+    }
 
     final notification = LocalNotification(title: title, body: body);
     await notification.show();

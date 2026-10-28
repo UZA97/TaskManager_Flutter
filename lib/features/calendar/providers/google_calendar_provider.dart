@@ -1,29 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/auth/google_account_provider.dart';
 import '../../../core/database/database_provider.dart';
-import '../../mail/services/google_account_provider.dart';
-import '../../mail/services/google_auth_service.dart';
 import '../providers/event_provider.dart';
 
 class GoogleCalendarNotifier extends AsyncNotifier<bool> {
   @override
   Future<bool> build() async {
-    final db = ref.watch(databaseProvider);
-    final email = await GoogleAuthService.getSavedEmail(db);
-    return email != null;
+    final account = await ref.watch(googleAccountProvider.future);
+    return account != null;
   }
 
+  // 구글 로그인은 googleAccountProvider에서만 처리
   Future<void> connect() async {
-    // 이미 구글 로그인 되어있으면 바로 연동
-    final account = ref.read(googleAccountProvider).value;
-    if (account != null) {
-      state = const AsyncData(true);
-      ref.invalidate(eventListProvider);
-      return;
-    }
-    // 안되어있으면 로그인 요청
-    await ref.read(googleAccountProvider.notifier).signIn();
-    state = const AsyncData(true);
-    ref.invalidate(eventListProvider);
+    final ok = await ref.read(googleAccountProvider.notifier).ensureSignedIn();
+    state = AsyncData(ok);
+    if (ok) ref.invalidate(eventListProvider);
   }
 
   Future<void> disconnect() async {

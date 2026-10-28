@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'features/mail/services/google_account_provider.dart';
+import 'core/auth/google_account_provider.dart';
 import 'features/mail/widgets/google_login_dialog.dart';
 import 'features/memo/providers/note_provider.dart';
 import 'features/memo/providers/tab_provider.dart';
@@ -25,7 +25,8 @@ import 'features/map/views/map_sidebar_view.dart';
 import 'core/providers/navigation_provider.dart';
 import 'features/settings/views/settings_detail_view.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
-import 'features/mail/data/mail_repository.dart';
+import 'features/mail/providers/mail_provider.dart';
+import 'features/calendar/models/event.dart';
 import 'features/mail/services/mail_check_service.dart';
 import 'core/database/database_provider.dart';
 import 'core/update/update_service.dart';
@@ -51,7 +52,17 @@ void main() async {
   );
   await NotificationService.setup();
 
-  runApp(const ProviderScope(child: TaskManagerApp()));
+  // NotificationService가 설정(알림 on/off, 집중모드)을 읽을 수 있도록 컨테이너 연결
+  // (연결이 빠지면 show()가 조용히 무시되어 모든 알림이 울리지 않음)
+  final container = ProviderContainer();
+  NotificationService.init(container);
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const TaskManagerApp(),
+    ),
+  );
 }
 
 class TaskManagerApp extends ConsumerWidget {
@@ -121,7 +132,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   /// 앱 실행 중 트레이 동작과 창 표시/종료를 담당하는 서비스입니다.
   final _trayService = TrayService();
   bool _isLocked = false;
-  final Set<int> _notifiedEventIds = {};
+  final Set<String> _notifiedAlarmKeys = {};
 
   /// 메인 화면 좌측 네비게이션에 표시할 항목 목록입니다.
   static const List<NavigationRailDestination> _navigationDestinations = [
@@ -200,22 +211,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // 구글 로그인 여부 체크
-      final account = await ref.read(googleAccountProvider.future);
-      if (account == null) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const GoogleLoginDialog(),
-        );
-      }
-
-      final mailAccount = await ref.read(mailRepositoryProvider).getAccount();
-      if (mailAccount != null) {
-        ref.read(mailCheckServiceProvider).start(mailAccount);
-      }
-
-      // 알람 체커 시작
+      // 알람 체커는 로그인 팝업과 무관하게 먼저 시작
       _startAlarmChecker();
 
       // 앱 시작 시 잠금 체크
@@ -224,6 +220,31 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
         setState(() => _isLocked = true);
       }
       _checkForUpdate();
+
+      // 구글 로그인 여부 체크 — 오류가 나도 로그인 팝업은 띄움
+      GoogleAccount? account;
+      try {
+        account = await ref.read(googleAccountProvider.future);
+      } catch (e) {
+        print('구글 계정 상태 확인 실패: $e');
+      }
+      if (account == null && mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const GoogleLoginDialog(),
+        );
+      }
+
+      // 로그인 상태가 반영된 메일 계정으로 폴링 시작
+      try {
+        final mailAccount = await ref.read(mailAccountProvider.future);
+        if (mailAccount != null) {
+          ref.read(mailCheckServiceProvider).start(mailAccount);
+        }
+      } catch (e) {
+        print('메일 폴링 시작 실패: $e');
+      }
     });
 
     _startFocusModeChecker();
@@ -275,56 +296,56 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     _alarmTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       _checkAlarms();
     });
+    _checkAlarms();
   }
 
   Future<void> _checkAlarms() async {
     final settings = ref.read(settingsProvider).value;
-    if (!(settings?.notificationEnabled ?? true)) {
-      return;
-    }
+    if (!(settings?.notificationEnabled ?? true)) return;
 
     final db = ref.read(databaseProvider);
     final repo = EventRepository(db);
-    final events = await repo.getAllAlarmEvents();
-    print('알람 이벤트 수: ${events.length}');
-
     final now = DateTime.now();
+    // 알림은 시작 시각 이전에만 울리므로 오늘 이후 시작하는 일정만 조회
+    final today =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final events = await repo.getUpcomingAlarmEvents(today);
+
     for (final event in events) {
-      if (!event.alarmEnabled) continue;
-
-      final eventDate = DateTime.parse(event.eventDate);
-      final alarmMinutesBefore = event.alarmDaysBefore;
-
-      DateTime eventDateTime;
-      if (event.startTime != null) {
-        final parts = event.startTime!.split(':');
-        eventDateTime = DateTime(
-          eventDate.year,
-          eventDate.month,
-          eventDate.day,
-          int.parse(parts[0]),
-          int.parse(parts[1]),
-        );
-      } else {
-        eventDateTime = DateTime(
-          eventDate.year,
-          eventDate.month,
-          eventDate.day,
-          9,
-          0,
-        );
+      try {
+        await _checkEventAlarm(event, now);
+      } catch (e) {
+        // 한 일정의 잘못된 데이터가 전체 알림을 막지 않도록
+        print('알람 체크 실패 (${event.id}): $e');
       }
+    }
+  }
 
-      final alarmDateTime = eventDateTime.subtract(
-        Duration(minutes: alarmMinutesBefore),
-      );
-      final diff = alarmDateTime.difference(now).inMinutes;
-      // 알람 시각이 지났거나 1분 이내인 경우
-      if (diff <= 0 && diff >= -1) {
-        if (_notifiedEventIds.contains(event.id)) continue; // 중복 방지
-        _notifiedEventIds.add(event.id!);
-        await NotificationService.show(title: '📅 일정 알람', body: event.title);
-      }
+  Future<void> _checkEventAlarm(Event event, DateTime now) async {
+    final eventDate = DateTime.parse(event.eventDate);
+
+    // 시간 일정은 시작 시각, 하루종일 일정은 alarmTime(기본 09:00) 기준
+    final time = event.startTime ??
+        (event.alarmTime.isNotEmpty ? event.alarmTime : '09:00');
+    final parts = time.split(':');
+    final eventDateTime = DateTime(
+      eventDate.year,
+      eventDate.month,
+      eventDate.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
+
+    final alarmDateTime = eventDateTime.subtract(
+      Duration(minutes: event.alarmDaysBefore),
+    );
+
+    final diff = alarmDateTime.difference(now).inMinutes;
+    if (diff <= 0 && diff >= -1) {
+      // 일정 시간이 바뀌면 다시 울릴 수 있도록 알람 시각까지 포함해 중복 체크
+      final key = '${event.id}@${alarmDateTime.toIso8601String()}';
+      if (!_notifiedAlarmKeys.add(key)) return;
+      await NotificationService.show(title: '📅 일정 알람', body: event.title);
     }
   }
 

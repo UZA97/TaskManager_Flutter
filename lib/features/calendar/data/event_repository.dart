@@ -44,10 +44,13 @@ class EventRepository {
     );
   }
 
-  Future<List<Event>> getAllAlarmEvents() async {
+  // 알림이 켜져 있고 시작일이 fromDate(yyyy-MM-dd) 이후인 일정
+  Future<List<Event>> getUpcomingAlarmEvents(String fromDate) async {
     final rows =
         await (_db.select(_db.eventTable)..where(
-              (t) => t.alarmEnabled | t.alarmDaysBefore.isBiggerThanValue(0),
+              (t) =>
+                  t.alarmEnabled.equals(true) &
+                  t.eventDate.isBiggerOrEqualValue(fromDate),
             ))
             .get();
     return rows.map(_rowToEvent).toList();
@@ -81,27 +84,53 @@ class EventRepository {
         );
   }
 
-  Future<void> upsertGoogleEvent(Event event) async {
-    // googleEventId로 기존 이벤트 확인
-    final existing =
-        await (_db.select(_db.eventTable)
-              ..where((t) => t.googleEventId.equals(event.googleEventId ?? '')))
-            .getSingleOrNull();
+  Future<Event?> getEventById(int id) async {
+    final row = await (_db.select(
+      _db.eventTable,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
+    return row == null ? null : _rowToEvent(row);
+  }
 
-    if (existing != null) {
-      // 이미 있으면 업데이트
-      await (_db.update(
-        _db.eventTable,
-      )..where((t) => t.id.equals(existing.id))).write(
-        EventTableCompanion(
-          title: Value(event.title),
-          eventDate: Value(event.eventDate),
-        ),
-      );
-    } else {
-      // 없으면 새로 추가
+  Future<void> upsertGoogleEvent(Event event) async {
+    final googleEventId = event.googleEventId;
+    if (googleEventId == null || googleEventId.isEmpty) return;
+
+    // googleEventId로 기존 이벤트 확인 (중복 행이 있으면 첫 행만 남김)
+    final rows = await (_db.select(
+      _db.eventTable,
+    )..where((t) => t.googleEventId.equals(googleEventId))).get();
+
+    if (rows.isEmpty) {
       await addEvent(event);
+      return;
     }
+
+    for (final dup in rows.skip(1)) {
+      await deleteEvent(dup.id);
+    }
+
+    // 구글에서 관리되는 필드만 갱신 (알람/우선순위/완료/태그/좌표는 로컬 값 유지)
+    await (_db.update(
+      _db.eventTable,
+    )..where((t) => t.id.equals(rows.first.id))).write(
+      EventTableCompanion(
+        title: Value(event.title),
+        eventDate: Value(event.eventDate),
+        startDate: Value(event.startDate),
+        endDate: Value(event.endDate),
+        startTime: Value(event.startTime),
+        endTime: Value(event.endTime),
+        isAllDay: Value(event.isAllDay),
+        content: Value(event.content),
+        locationName: Value(event.locationName),
+      ),
+    );
+  }
+
+  Future<void> setGoogleEventId(int id, String googleEventId) async {
+    await (_db.update(_db.eventTable)..where((t) => t.id.equals(id))).write(
+      EventTableCompanion(googleEventId: Value(googleEventId)),
+    );
   }
 
   Future<void> deleteEvent(int id) async {

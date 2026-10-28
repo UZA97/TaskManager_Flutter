@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
-import '../services/google_auth_service.dart';
+import '../../../core/auth/google_account_provider.dart';
 import '../models/mail_account.dart';
 import '../services/outlook_auth_service.dart';
 
@@ -20,20 +20,13 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
     setState(() => _isGoogleLoading = true);
 
     try {
-      final result = await GoogleAuthService().signIn();
-      if (result == null) {
+      // 구글 로그인은 googleAccountProvider에서 일괄 관리 (이미 로그인 상태면 바로 연결)
+      final google = ref.read(googleAccountProvider.notifier);
+      if (!await google.ensureSignedIn()) {
         if (mounted) _showSnackBar('로그인 실패', isError: true);
         return;
       }
-
-      final account = TaskMailAccount(
-        email: result.email,
-        imapServer: 'imap.gmail.com',
-        imapPort: 993,
-        pollIntervalMinutes: 5,
-      );
-
-      await ref.read(mailAccountProvider.notifier).saveAccount(account);
+      await google.linkGmail();
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {

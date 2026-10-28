@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/google_account_provider.dart';
+import '../../../core/auth/google_account_provider.dart';
 
 class GoogleLoginDialog extends ConsumerStatefulWidget {
   const GoogleLoginDialog({super.key});
@@ -14,9 +14,25 @@ class _GoogleLoginDialogState extends ConsumerState<GoogleLoginDialog> {
 
   Future<void> _signIn() async {
     setState(() => _isLoading = true);
-    await ref.read(googleAccountProvider.notifier).signIn();
-    if (mounted) Navigator.pop(context, true);
+    String? error;
+    try {
+      final ok = await ref.read(googleAccountProvider.notifier).signIn();
+      if (!ok) error = 'Google 로그인에 실패했습니다. 다시 시도해주세요';
+    } catch (e, st) {
+      // 예외가 나도 스피너가 멈춰 있지 않도록
+      print('[GoogleLogin] 팝업 로그인 예외: $e\n$st');
+      error = 'Google 로그인 중 오류가 발생했습니다: $e';
+    }
+    if (!mounted) return;
+
+    if (error == null) {
+      Navigator.of(context).pop(true);
+      return;
+    }
     setState(() => _isLoading = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
   }
 
   @override

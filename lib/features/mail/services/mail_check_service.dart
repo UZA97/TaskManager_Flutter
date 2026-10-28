@@ -6,17 +6,17 @@ import '../../../core/notification/notification_service.dart';
 import '../data/mail_repository.dart';
 import '../models/mail_account.dart';
 import '../models/mail_message.dart';
-import 'google_auth_service.dart';
+import '../../../core/auth/google_account_provider.dart';
 
 class MailCheckService {
   Timer? _timer;
   final MailRepository _repo;
-  final GoogleAuthService _authService = GoogleAuthService();
+  final Future<String?> Function() _getGoogleAccessToken;
   String? _lastMessageId;
   String? _nextPageToken;
   String? get nextPageToken => _nextPageToken;
 
-  MailCheckService(this._repo);
+  MailCheckService(this._repo, this._getGoogleAccessToken);
 
   Future<void> start(TaskMailAccount account) async {
     stop();
@@ -107,17 +107,8 @@ class MailCheckService {
     }
   }
 
-  Future<String?> _getValidAccessToken(TaskMailAccount account) async {
-    final refreshRow = await _repo.getGoogleRefreshToken();
-    if (refreshRow == null) return null;
-
-    final newToken = await _authService.refreshAccessToken(refreshRow);
-    if (newToken != null) {
-      await _repo.saveGoogleAccessToken(newToken);
-      return newToken;
-    }
-    return null; // fallback 제거
-  }
+  Future<String?> _getValidAccessToken(TaskMailAccount account) =>
+      _getGoogleAccessToken();
 
   Future<MailMessage?> _fetchMessageDetail(
     String accessToken,
@@ -333,5 +324,8 @@ class MailCheckService {
 
 final mailCheckServiceProvider = Provider<MailCheckService>((ref) {
   final repo = ref.watch(mailRepositoryProvider);
-  return MailCheckService(repo);
+  return MailCheckService(
+    repo,
+    () => ref.read(googleAccountProvider.notifier).getAccessToken(),
+  );
 });

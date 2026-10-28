@@ -6,7 +6,7 @@ import '../../../core/settings/settings_provider.dart';
 import '../../../core/update/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/settings/app_settings.dart';
-import '../../mail/services/google_account_provider.dart';
+import '../../../core/auth/google_account_provider.dart';
 import '../../memo/providers/note_provider.dart';
 import '../../../core/database/database_provider.dart';
 import '../views/google_drive_sync_service.dart';
@@ -169,7 +169,14 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
     });
     try {
       final db = ref.read(databaseProvider);
-      final service = GoogleDriveSyncService(accessToken: account.accessToken);
+      final accessToken = await ref
+          .read(googleAccountProvider.notifier)
+          .getAccessToken();
+      if (accessToken == null) {
+        setState(() => _statusMessage = 'Google 인증이 만료되었습니다. 다시 연동해주세요');
+        return;
+      }
+      final service = GoogleDriveSyncService(accessToken: accessToken);
       await service.upload(
         db,
         onStatus: (s) => setState(() => _statusMessage = s),
@@ -193,7 +200,14 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
     });
     try {
       final db = ref.read(databaseProvider);
-      final service = GoogleDriveSyncService(accessToken: account.accessToken);
+      final accessToken = await ref
+          .read(googleAccountProvider.notifier)
+          .getAccessToken();
+      if (accessToken == null) {
+        setState(() => _statusMessage = 'Google 인증이 만료되었습니다. 다시 연동해주세요');
+        return;
+      }
+      final service = GoogleDriveSyncService(accessToken: accessToken);
       await service.download(
         db,
         onStatus: (s) => setState(() => _statusMessage = s),

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/auth/google_account_provider.dart';
 import '../data/mail_repository.dart';
 import '../models/mail_account.dart';
 import '../models/mail_message.dart';
@@ -8,7 +9,13 @@ class MailAccountNotifier extends AsyncNotifier<TaskMailAccount?> {
   @override
   Future<TaskMailAccount?> build() async {
     final repo = ref.watch(mailRepositoryProvider);
-    return repo.getAccount();
+    final account = await repo.getAccount();
+    if (account == null || account.isOutlook) return account;
+
+    // Gmail은 구글 로그인 상태를 따름 (토큰 없이 남은 계정 정보는 무시)
+    final google = await ref.watch(googleAccountProvider.future);
+    if (google == null || google.email != account.email) return null;
+    return account;
   }
 
   Future<void> saveAccount(TaskMailAccount account) async {

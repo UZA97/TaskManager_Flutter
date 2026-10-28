@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 final json = jsonDecode(File('config/gemini_service.json').readAsStringSync());
+
 final _apiKey = json['installed']['_apiKey'];
 final _baseUrl = json['installed']['_baseUrl'];
 

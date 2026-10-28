@@ -499,7 +499,11 @@ class _EventDialogState extends ConsumerState<EventDialog> {
       createdAt: widget.event?.createdAt ?? DateTime.now().toIso8601String(),
       alarmEnabled: _alarmMinutesBefore != null,
       alarmDaysBefore: _alarmMinutesBefore ?? 0,
-      alarmTime: '09:00',
+      alarmTime: _isAllDay
+          ? '09:00' // 하루종일이면 알람 울릴 시간 직접 지정 필요
+          : _startTime != null
+          ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
+          : '09:00',
       isAllDay: _isAllDay,
       eventDate: startDateStr,
       startDate: startDateStr,

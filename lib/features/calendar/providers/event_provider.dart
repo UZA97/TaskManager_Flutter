@@ -3,9 +3,7 @@ import '../data/event_repository.dart';
 import '../models/event.dart';
 import '../models/event_tag.dart';
 import '../services/google_calendar_service.dart';
-import '../../../core/database/database_provider.dart';
-import '../../mail/services/google_auth_service.dart';
-import '../../../core/database/database.dart';
+import '../../../core/auth/google_account_provider.dart';
 
 // 태그 provider 추가
 class EventTagNotifier extends AsyncNotifier<List<EventTag>> {
@@ -85,7 +83,6 @@ final selectedDateProvider = NotifierProvider<SelectedDateNotifier, DateTime>(
 // 이벤트 목록
 class EventListNotifier extends AsyncNotifier<List<Event>> {
   final _calendarService = GoogleCalendarService();
-  // final _authService = GoogleAuthService();
 
   @override
   Future<List<Event>> build() async {
@@ -115,28 +112,8 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
     return events;
   }
 
-  Future<String?> _getAccessToken() async {
-    final db = ref.read(databaseProvider);
-
-    final refreshRow = await (db.select(
-      db.settingTable,
-    )..where((t) => t.key.equals('google_refresh_token'))).getSingleOrNull();
-    if (refreshRow == null) return null;
-
-    final authService = GoogleAuthService();
-    final newToken = await authService.refreshAccessToken(refreshRow.value);
-    if (newToken == null) return null;
-
-    await db
-        .into(db.settingTable)
-        .insertOnConflictUpdate(
-          SettingTableCompanion.insert(
-            key: 'google_access_token',
-            value: newToken,
-          ),
-        );
-    return newToken;
-  }
+  Future<String?> _getAccessToken() =>
+      ref.read(googleAccountProvider.notifier).getAccessToken();
 
   Future<void> _syncGoogleCalendar(int year, int month) async {
     try {
@@ -144,36 +121,64 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       if (accessToken == null) return;
 
       final repo = ref.read(eventRepositoryProvider);
+      final localEvents = await repo.getEventsByMonth(year, month);
+
+      // 1. 구글에 아직 없는 로컬 일정 업로드 (오프라인/게스트 때 만든 일정 포함)
+      for (final event in localEvents) {
+        if (event.id == null || event.googleEventId != null) continue;
+        final googleEventId = await _calendarService.addEvent(
+          accessToken,
+          event,
+        );
+        if (googleEventId != null) {
+          await repo.setGoogleEventId(event.id!, googleEventId);
+        }
+      }
+
+      // 2. 구글 → 로컬
       final googleEvents = await _calendarService.getEvents(
         accessToken,
         year,
         month,
       );
+      if (googleEvents == null) return; // 조회 실패 시 로컬 삭제 단계로 가지 않음
 
       for (final event in googleEvents) {
         await repo.upsertGoogleEvent(event);
       }
+
+      // 3. 구글에서 삭제된 일정은 로컬에서도 삭제
+      //    (이번 달에 시작하는 일정만 — 조회 범위 경계에 걸친 일정 오삭제 방지)
+      final monthPrefix =
+          '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
+      final googleIds = googleEvents.map((e) => e.googleEventId).toSet();
+      for (final event in localEvents) {
+        if (event.id == null || event.googleEventId == null) continue;
+        final start = event.startDate ?? event.eventDate;
+        if (!start.startsWith(monthPrefix)) continue;
+        if (!googleIds.contains(event.googleEventId)) {
+          await repo.deleteEvent(event.id!);
+        }
+      }
     } catch (e) {
-      // Google Calendar 동기화 오류는 사용자 인터페이스에 영향을 주지 않도록 로그 없이 무시
+      print('구글 캘린더 동기화 오류: $e');
     }
   }
 
   Future<int> addEvent(Event event) async {
     final repo = ref.read(eventRepositoryProvider);
-    // Google Calendar에도 추가
+    // Google Calendar에도 추가 (실패하면 다음 동기화 때 재시도)
     final accessToken = await _getAccessToken();
+    String? googleEventId;
     if (accessToken != null) {
-      final googleEventId = await _calendarService.addEvent(accessToken, event);
-      if (googleEventId != null) {
-        final id = await repo.addEvent(
-          event.copyWith(googleEventId: googleEventId),
-        );
-        ref.invalidateSelf();
-        return id;
-      }
+      googleEventId = await _calendarService.addEvent(accessToken, event);
     }
 
-    final id = await repo.addEvent(event);
+    final id = await repo.addEvent(
+      googleEventId != null
+          ? event.copyWith(googleEventId: googleEventId)
+          : event,
+    );
     ref.invalidateSelf();
     return id;
   }
@@ -181,19 +186,35 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
   Future<void> updateEvent(Event event) async {
     final repo = ref.read(eventRepositoryProvider);
     await repo.updateEvent(event);
+
+    // Google Calendar에도 반영
+    final accessToken = await _getAccessToken();
+    if (accessToken != null) {
+      if (event.googleEventId != null) {
+        await _calendarService.updateEvent(accessToken, event);
+      } else if (event.id != null) {
+        final googleEventId = await _calendarService.addEvent(
+          accessToken,
+          event,
+        );
+        if (googleEventId != null) {
+          await repo.setGoogleEventId(event.id!, googleEventId);
+        }
+      }
+    }
     ref.invalidateSelf();
   }
 
   Future<void> deleteEvent(int id) async {
     final repo = ref.read(eventRepositoryProvider);
-    final events = state.value ?? [];
-    final event = events.firstWhere((e) => e.id == id);
+    final event = await repo.getEventById(id);
 
     // Google Calendar에서도 삭제
-    if (event.googleEventId != null && event.googleEventId!.isNotEmpty) {
+    final googleEventId = event?.googleEventId;
+    if (googleEventId != null) {
       final accessToken = await _getAccessToken();
       if (accessToken != null) {
-        await _calendarService.deleteEvent(accessToken, event.googleEventId!);
+        await _calendarService.deleteEvent(accessToken, googleEventId);
       }
     }
 

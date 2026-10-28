@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/mail_account.dart';
 import '../providers/mail_provider.dart';
-import '../services/google_auth_service.dart';
+import '../../../core/auth/google_account_provider.dart';
 
 enum MailPlatform { gmail, outlook }
 
@@ -33,27 +33,23 @@ class _MailSettingsViewState extends ConsumerState<MailSettingsView> {
       ? 'example@gmail.com'
       : 'example@outlook.com';
 
-  final _authService = GoogleAuthService();
   Future<void> _signInWithGoogle() async {
     setState(() => _isSaving = true);
 
     try {
-      final result = await _authService.signIn();
-
-      if (result == null) {
+      final google = ref.read(googleAccountProvider.notifier);
+      if (!await google.ensureSignedIn()) {
         setState(() => _isSaving = false);
         _showSnackBar('로그인 실패', isError: true);
         return;
       }
-
-      final account = TaskMailAccount(
-        email: result.email,
-        imapServer: 'imap.gmail.com',
-        imapPort: 993,
-        pollIntervalMinutes: _pollInterval,
-      );
-
-      await ref.read(mailAccountProvider.notifier).saveAccount(account);
+      await google.linkGmail();
+      final account = ref.read(mailAccountProvider).value;
+      if (account != null && account.pollIntervalMinutes != _pollInterval) {
+        await ref
+            .read(mailAccountProvider.notifier)
+            .saveAccount(account.copyWith(pollIntervalMinutes: _pollInterval));
+      }
       setState(() => _isSaving = false);
     } catch (e) {
       setState(() => _isSaving = false);
