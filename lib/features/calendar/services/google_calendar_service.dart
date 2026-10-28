@@ -1,10 +1,36 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/event.dart';
+import '../models/recurrence.dart';
 
 class GoogleCalendarService {
   static const _host = 'www.googleapis.com';
   static const _eventsPath = '/calendar/v3/calendars/primary/events';
+
+  // 사용자 기본 캘린더의 시간대 (예: Asia/Seoul) — 반복 시간 일정에 필요
+  static String? _calendarTimeZone;
+
+  Future<String?> _getCalendarTimeZone(String accessToken) async {
+    if (_calendarTimeZone != null) return _calendarTimeZone;
+    final response = await http.get(
+      Uri.https(_host, '/calendar/v3/calendars/primary'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode != 200) {
+      print('구글 캘린더 시간대 조회 실패: ${response.statusCode} ${response.body}');
+      return null;
+    }
+    return _calendarTimeZone = jsonDecode(response.body)['timeZone'] as String?;
+  }
+
+  // 반복 시간 일정은 구글이 시간대를 요구함
+  Future<Map<String, dynamic>> _buildBody(String accessToken, Event event) async {
+    final needsTimeZone = event.isRecurring && !event.isAllDay;
+    final timeZone = needsTimeZone
+        ? await _getCalendarTimeZone(accessToken)
+        : null;
+    return _eventToGoogle(event, timeZone: timeZone);
+  }
 
   // 이번 달 일정 가져오기. 요청 실패 시 null (빈 목록과 구분)
   Future<List<Event>?> getEvents(
@@ -55,7 +81,7 @@ class GoogleCalendarService {
         'Authorization': 'Bearer $accessToken',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode(_eventToGoogle(event)),
+      body: jsonEncode(await _buildBody(accessToken, event)),
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) {
@@ -76,7 +102,7 @@ class GoogleCalendarService {
         'Authorization': 'Bearer $accessToken',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode(_eventToGoogle(event)),
+      body: jsonEncode(await _buildBody(accessToken, event)),
     );
 
     if (response.statusCode != 200) {
@@ -104,7 +130,7 @@ class GoogleCalendarService {
   }
 
   // 우리 포맷 → Google 포맷
-  Map<String, dynamic> _eventToGoogle(Event event) {
+  Map<String, dynamic> _eventToGoogle(Event event, {String? timeZone}) {
     final startDate = event.startDate ?? event.eventDate;
     final endDate = event.endDate ?? startDate;
 
@@ -125,16 +151,25 @@ class GoogleCalendarService {
           : startAt.add(const Duration(hours: 1));
       if (!endAt.isAfter(startAt))
         endAt = startAt.add(const Duration(hours: 1));
-      start = {'dateTime': startAt.toUtc().toIso8601String()};
-      end = {'dateTime': endAt.toUtc().toIso8601String()};
+      if (timeZone != null) {
+        // 반복 일정: 현지 시각 + 시간대 (회차마다 같은 현지 시각 유지)
+        start = {'dateTime': _formatLocalDateTime(startAt), 'timeZone': timeZone};
+        end = {'dateTime': _formatLocalDateTime(endAt), 'timeZone': timeZone};
+      } else {
+        start = {'dateTime': startAt.toUtc().toIso8601String()};
+        end = {'dateTime': endAt.toUtc().toIso8601String()};
+      }
     }
 
+    final rrule = toRRule(event);
     return {
       'summary': event.title,
       'description': event.content,
       'location': event.locationName,
       'start': start,
       'end': end,
+      // 수정 시 null을 보내면 반복이 해제됨
+      'recurrence': rrule == null ? null : [rrule],
     };
   }
 
@@ -182,6 +217,7 @@ class GoogleCalendarService {
       locationName: item['location'] as String?,
       createdAt: DateTime.now().toIso8601String(),
       googleEventId: item['id'] as String?,
+      googleRecurringEventId: item['recurringEventId'] as String?,
     );
   }
 
@@ -199,6 +235,9 @@ class GoogleCalendarService {
 
   static String _formatDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static String _formatLocalDateTime(DateTime d) =>
+      '${_formatDate(d)}T${_formatTime(d)}:00';
 
   static String _formatTime(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';

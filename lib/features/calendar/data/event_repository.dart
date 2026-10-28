@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database.dart';
 import '../../../core/database/database_provider.dart';
 import '../models/event.dart';
+import '../models/recurrence.dart';
 import '../models/event_tag.dart';
 
 class EventRepository {
@@ -10,47 +11,73 @@ class EventRepository {
 
   EventRepository(this._db);
 
-  Future<List<Event>> getEventsByMonth(int year, int month) async {
-    final yearStr = year.toString().padLeft(4, '0');
-    final monthStr = month.toString().padLeft(2, '0');
-    final monthStart = '$yearStr-$monthStr-01';
-    final monthEnd = '$yearStr-$monthStr-31';
+  Future<List<Event>> getEventsByMonth(int year, int month) =>
+      getEventsInRange(DateTime(year, month, 1), DateTime(year, month + 1, 0));
+
+  /// [from]~[to] (날짜 기준, 양끝 포함)에 걸치는 일정.
+  /// 반복 일정은 범위 안의 회차들로 펼쳐서 반환 (회차는 원본과 같은 id).
+  Future<List<Event>> getEventsInRange(DateTime from, DateTime to) async {
+    final fromStr = formatDate(from);
+    final toStr = formatDate(to);
 
     final rows =
-        await (_db.select(_db.eventTable)
-              ..where(
-                (t) =>
-                    // 시작일이 이번달 안에 있거나
-                    t.eventDate.isBetweenValues(monthStart, monthEnd) |
-                    // 기간이 있는 경우 시작~종료가 이번달에 걸치는 경우
-                    (t.startDate.isSmallerOrEqualValue(monthEnd) &
-                        t.endDate.isBiggerOrEqualValue(monthStart)),
-              )
-              ..orderBy([
-                (t) => OrderingTerm.desc(t.priority),
-                (t) => OrderingTerm.asc(t.eventDate),
-              ]))
+        await (_db.select(_db.eventTable)..where(
+              (t) =>
+                  (t.recurrence.equals('') &
+                      (
+                      // 시작일이 범위 안에 있거나
+                      t.eventDate.isBetweenValues(fromStr, toStr) |
+                          // 기간이 있는 경우 시작~종료가 범위에 걸치는 경우
+                          (t.startDate.isSmallerOrEqualValue(toStr) &
+                              t.endDate.isBiggerOrEqualValue(fromStr)))) |
+                  // 반복 일정: 범위 끝 이전에 시작했고 종료일이 범위 시작 이후
+                  (t.recurrence.equals('').not() &
+                      t.eventDate.isSmallerOrEqualValue(toStr) &
+                      (t.recurrenceUntil.isNull() |
+                          t.recurrenceUntil.isBiggerOrEqualValue(fromStr))),
+            ))
             .get();
 
-    final events = rows.map(_rowToEvent).toList();
+    final events = <Event>[];
+    for (final event in rows.map(_rowToEvent)) {
+      if (event.isRecurring) {
+        events.addAll(expandOccurrences(event, from, to));
+      } else {
+        events.add(event);
+      }
+    }
+    events.sort((a, b) {
+      final byPriority = b.priority.compareTo(a.priority);
+      return byPriority != 0 ? byPriority : a.eventDate.compareTo(b.eventDate);
+    });
 
-    return Future.wait(
-      events.map((event) async {
-        if (event.id == null) return event;
-        final tags = await getEventTags(event.id!);
-        if (tags.isEmpty) return event;
-        return event.copyWith(tagColor: tags.first.color);
-      }),
-    );
+    // 태그 색상은 일정(id)당 한 번만 조회
+    final tagColors = <int, String?>{};
+    for (final id in events.map((e) => e.id).whereType<int>().toSet()) {
+      final tags = await getEventTags(id);
+      tagColors[id] = tags.isEmpty ? null : tags.first.color;
+    }
+    return events
+        .map(
+          (e) => tagColors[e.id] == null
+              ? e
+              : e.copyWith(tagColor: tagColors[e.id]),
+        )
+        .toList();
   }
 
-  // 알림이 켜져 있고 시작일이 fromDate(yyyy-MM-dd) 이후인 일정
+  // 알림이 켜져 있고 시작일이 fromDate(yyyy-MM-dd) 이후인 일정 + 반복 일정(원본)
   Future<List<Event>> getUpcomingAlarmEvents(String fromDate) async {
     final rows =
         await (_db.select(_db.eventTable)..where(
               (t) =>
                   t.alarmEnabled.equals(true) &
-                  t.eventDate.isBiggerOrEqualValue(fromDate),
+                  (t.eventDate.isBiggerOrEqualValue(fromDate) |
+                      (t.recurrence.equals('').not() &
+                          (t.recurrenceUntil.isNull() |
+                              t.recurrenceUntil.isBiggerOrEqualValue(
+                                fromDate,
+                              )))),
             ))
             .get();
     return rows.map(_rowToEvent).toList();
@@ -80,6 +107,8 @@ class EventRepository {
             endTime: Value(event.endTime),
             isAllDay: Value(event.isAllDay),
             content: Value(event.content),
+            recurrence: Value(event.recurrence),
+            recurrenceUntil: Value(event.recurrenceUntil),
           ),
         );
   }
@@ -127,6 +156,18 @@ class EventRepository {
     );
   }
 
+  // 앱에서 만든 반복 일정(원본)의 구글 ID — 구글이 돌려주는 회차 사본 중복 방지용
+  Future<Set<String>> getRecurringGoogleEventIds() async {
+    final rows =
+        await (_db.select(_db.eventTable)..where(
+              (t) =>
+                  t.recurrence.equals('').not() &
+                  t.googleEventId.equals('').not(),
+            ))
+            .get();
+    return rows.map((r) => r.googleEventId).toSet();
+  }
+
   Future<void> setGoogleEventId(int id, String googleEventId) async {
     await (_db.update(_db.eventTable)..where((t) => t.id.equals(id))).write(
       EventTableCompanion(googleEventId: Value(googleEventId)),
@@ -166,6 +207,8 @@ class EventRepository {
         locationName: Value(event.locationName),
         locationLat: Value(event.locationLat),
         locationLng: Value(event.locationLng),
+        recurrence: Value(event.recurrence),
+        recurrenceUntil: Value(event.recurrenceUntil),
       ),
     );
   }
@@ -227,7 +270,6 @@ class EventRepository {
   }
 
   Event _rowToEvent(EventTableData row) {
-    print("Start :${row.startDate} /End : ${row.endDate}");
     return Event(
       id: row.id,
       title: row.title,
@@ -248,6 +290,8 @@ class EventRepository {
       endTime: row.endTime,
       isAllDay: row.isAllDay,
       content: row.content,
+      recurrence: row.recurrence,
+      recurrenceUntil: row.recurrenceUntil,
     );
   }
 }

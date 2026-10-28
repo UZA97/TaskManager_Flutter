@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taskmanager/features/map/services/location_search_result.dart';
 import '../providers/event_provider.dart';
 import '../models/event.dart';
+import '../models/recurrence.dart';
 import '../data/event_repository.dart';
 import '../../map/widgets/location_search_dialog.dart';
+import '../../map/providers/map_provider.dart';
+import '../../../core/providers/navigation_provider.dart';
+import 'package:latlong2/latlong.dart';
 
 class CalendarEditorView extends ConsumerWidget {
   const CalendarEditorView({super.key});
@@ -375,6 +379,8 @@ class _EventDialogState extends ConsumerState<EventDialog> {
   double? _locationLat;
   double? _locationLng;
   int? _alarmMinutesBefore; // null = 알림 없음
+  Recurrence _recurrence = Recurrence.none;
+  DateTime? _recurrenceUntil; // null = 무기한
 
   @override
   void initState() {
@@ -388,6 +394,10 @@ class _EventDialogState extends ConsumerState<EventDialog> {
       _locationLng = e.locationLng;
       _isAllDay = e.isAllDay;
       _alarmEnabled = e.alarmEnabled;
+      _recurrence = Recurrence.fromKey(e.recurrence);
+      _recurrenceUntil = e.recurrenceUntil != null
+          ? DateTime.parse(e.recurrenceUntil!)
+          : null;
       if (e.alarmEnabled) {
         _alarmMinutesBefore = e.alarmDaysBefore > 0 ? e.alarmDaysBefore : 30;
       }
@@ -421,7 +431,22 @@ class _EventDialogState extends ConsumerState<EventDialog> {
       if (widget.event?.id != null) {
         final repo = ref.read(eventRepositoryProvider);
         final tags = await repo.getEventTags(widget.event!.id!);
-        setState(() => _selectedTagId = tags.isNotEmpty ? tags.first.id : null);
+        // 반복 일정의 회차를 연 경우 → 원본(시리즈) 날짜로 편집
+        final master = widget.event!.isRecurring
+            ? await repo.getEventById(widget.event!.id!)
+            : null;
+        if (!mounted) return;
+        setState(() {
+          _selectedTagId = tags.isNotEmpty ? tags.first.id : null;
+          if (master != null) {
+            if (master.startDate != null) {
+              _startDate = DateTime.parse(master.startDate!);
+            }
+            if (master.endDate != null) {
+              _endDate = DateTime.parse(master.endDate!);
+            }
+          }
+        });
       }
     });
   }
@@ -472,6 +497,32 @@ class _EventDialogState extends ConsumerState<EventDialog> {
       else
         _endTime = picked;
     });
+  }
+
+  Future<void> _pickRecurrenceUntil() async {
+    final start = _startDate ?? widget.initialDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _recurrenceUntil ?? start.add(const Duration(days: 30)),
+      firstDate: start,
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    setState(() => _recurrenceUntil = picked);
+  }
+
+  // 지도 탭에서 이 일정의 장소 보기 (지도는 선택된 위치를 중심으로 열림)
+  void _showOnMap() {
+    ref
+        .read(selectedLocationProvider.notifier)
+        .select(
+          SelectedLocation(
+            name: _locationController.text,
+            position: LatLng(_locationLat!, _locationLng!),
+          ),
+        );
+    ref.read(navigationProvider.notifier).navigateTo(3); // 지도 탭
+    Navigator.pop(context);
   }
 
   Future<void> _pickLocation() async {
@@ -528,6 +579,10 @@ class _EventDialogState extends ConsumerState<EventDialog> {
       priority: widget.event?.priority ?? 1,
       isCompleted: widget.event?.isCompleted ?? false,
       tagColor: widget.event?.tagColor,
+      recurrence: _recurrence.key,
+      recurrenceUntil: _recurrence == Recurrence.none || _recurrenceUntil == null
+          ? null
+          : _formatDate(_recurrenceUntil!),
     );
 
     final notifier = ref.read(eventListProvider.notifier);
@@ -767,6 +822,12 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                       onTap: _pickLocation,
                     ),
                   ),
+                  if (_locationLat != null && _locationLng != null)
+                    IconButton(
+                      tooltip: '지도에서 보기',
+                      icon: const Icon(Icons.map_outlined, size: 18),
+                      onPressed: _showOnMap,
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -836,6 +897,49 @@ class _EventDialogState extends ConsumerState<EventDialog> {
               ),
               const SizedBox(height: 12),
 
+              // 반복
+              Row(
+                children: [
+                  const Text('반복', style: TextStyle(fontSize: 13)),
+                  const Spacer(),
+                  DropdownButton<Recurrence>(
+                    value: _recurrence,
+                    isDense: true,
+                    items: [
+                      for (final r in Recurrence.values)
+                        DropdownMenuItem(value: r, child: Text(r.label)),
+                    ],
+                    onChanged: (v) =>
+                        setState(() => _recurrence = v ?? Recurrence.none),
+                  ),
+                ],
+              ),
+              if (_recurrence != Recurrence.none) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Text('반복 종료', style: TextStyle(fontSize: 13)),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _pickRecurrenceUntil,
+                      child: Text(
+                        _recurrenceUntil == null
+                            ? '계속 반복'
+                            : '${_formatDate(_recurrenceUntil!)}까지',
+                      ),
+                    ),
+                    if (_recurrenceUntil != null)
+                      IconButton(
+                        tooltip: '종료일 없음',
+                        icon: const Icon(Icons.close, size: 16),
+                        onPressed: () =>
+                            setState(() => _recurrenceUntil = null),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+
               // 알림
               Row(
                 children: [
@@ -885,9 +989,9 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                         size: 16,
                         color: Colors.red,
                       ),
-                      label: const Text(
-                        '삭제',
-                        style: TextStyle(color: Colors.red),
+                      label: Text(
+                        widget.event!.isRecurring ? '반복 일정 전체 삭제' : '삭제',
+                        style: const TextStyle(color: Colors.red),
                       ),
                     ),
                   const Spacer(),

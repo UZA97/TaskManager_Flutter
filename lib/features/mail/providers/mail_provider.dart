@@ -10,7 +10,7 @@ class MailAccountNotifier extends AsyncNotifier<TaskMailAccount?> {
   Future<TaskMailAccount?> build() async {
     final repo = ref.watch(mailRepositoryProvider);
     final account = await repo.getAccount();
-    if (account == null || account.isOutlook) return account;
+    if (account == null || !account.isGmail) return null;
 
     // Gmail은 구글 로그인 상태를 따름 (토큰 없이 남은 계정 정보는 무시)
     final google = await ref.watch(googleAccountProvider.future);
@@ -63,6 +63,44 @@ class MailMessagesNotifier extends AsyncNotifier<List<MailMessage>> {
       final service = ref.read(mailCheckServiceProvider);
       return service.fetchMessages();
     });
+  }
+
+  /// 선택한 메일을 Gmail 휴지통으로 이동. 실제로 삭제된 개수 반환
+  Future<int> trash(Set<String> ids) async {
+    final trashed = await ref
+        .read(mailCheckServiceProvider)
+        .trashMessages(ids.toList());
+    if (trashed.isEmpty) return 0;
+
+    state = AsyncData([
+      for (final m in state.value ?? <MailMessage>[])
+        if (!trashed.contains(m.id)) m,
+    ]);
+    if (trashed.contains(ref.read(selectedMailProvider)?.id)) {
+      ref.read(selectedMailProvider.notifier).select(null);
+    }
+    return trashed.length;
+  }
+
+  /// 받은편지함 전체 읽음 처리. 처리한 개수 (실패 시 null)
+  Future<int?> markAllAsRead() async {
+    final count = await ref.read(mailCheckServiceProvider).markAllAsRead();
+    if (count == null) return null;
+    final current = state.value ?? [];
+    state = AsyncData([
+      for (final m in current)
+        m.isRead
+            ? m
+            : MailMessage(
+                id: m.id,
+                subject: m.subject,
+                from: m.from,
+                preview: m.preview,
+                date: m.date,
+                isRead: true,
+              ),
+    ]);
+    return count;
   }
 
   Future<void> markAsRead(String messageId) async {

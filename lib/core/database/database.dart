@@ -147,6 +147,11 @@ class EventTable extends Table {
   TextColumn get endTime => text().nullable()();
   BoolColumn get isAllDay => boolean().withDefault(const Constant(true))();
   TextColumn get content => text().nullable()();
+
+  // 반복: '' (없음) / daily / weekly / monthly / yearly
+  TextColumn get recurrence => text().withDefault(const Constant(''))();
+  // 반복 종료일 (yyyy-MM-dd, 포함). null이면 무기한
+  TextColumn get recurrenceUntil => text().nullable()();
 }
 
 @DriftDatabase(
@@ -168,7 +173,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   /// 신규 설치와 기존 데이터베이스 업그레이드 모두에서 공통으로 쓰이는
   /// 기본 폴더를 생성하고, 폴더가 비어 있는 메모에 자동으로 연결합니다.
@@ -251,8 +256,34 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(mapTagTable);
         await m.createTable(mapPlaceTable);
       }
+      if (from < 10) {
+        await _addColumnIfMissing(
+          m,
+          eventTable,
+          eventTable.recurrence as GeneratedColumn,
+        );
+        await _addColumnIfMissing(
+          m,
+          eventTable,
+          eventTable.recurrenceUntil as GeneratedColumn,
+        );
+      }
     },
   );
+
+  /// 이전 버전 앱으로 DB를 열면 user_version만 내려가고 컬럼은 남아 있어,
+  /// 다시 업그레이드할 때 같은 컬럼을 추가하다 실패하지 않도록 확인 후 추가
+  Future<void> _addColumnIfMissing(
+    Migrator m,
+    TableInfo table,
+    GeneratedColumn column,
+  ) async {
+    final columns = await customSelect(
+      'PRAGMA table_info("${table.actualTableName}")',
+    ).get();
+    if (columns.any((row) => row.read<String>('name') == column.name)) return;
+    await m.addColumn(table, column);
+  }
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {
       final dir = await getApplicationSupportDirectory();

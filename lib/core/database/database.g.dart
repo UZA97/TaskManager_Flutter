@@ -2418,6 +2418,29 @@ class $EventTableTable extends EventTable
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _recurrenceMeta = const VerificationMeta(
+    'recurrence',
+  );
+  @override
+  late final GeneratedColumn<String> recurrence = GeneratedColumn<String>(
+    'recurrence',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _recurrenceUntilMeta = const VerificationMeta(
+    'recurrenceUntil',
+  );
+  @override
+  late final GeneratedColumn<String> recurrenceUntil = GeneratedColumn<String>(
+    'recurrence_until',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2439,6 +2462,8 @@ class $EventTableTable extends EventTable
     endTime,
     isAllDay,
     content,
+    recurrence,
+    recurrenceUntil,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2588,6 +2613,21 @@ class $EventTableTable extends EventTable
         content.isAcceptableOrUnknown(data['content']!, _contentMeta),
       );
     }
+    if (data.containsKey('recurrence')) {
+      context.handle(
+        _recurrenceMeta,
+        recurrence.isAcceptableOrUnknown(data['recurrence']!, _recurrenceMeta),
+      );
+    }
+    if (data.containsKey('recurrence_until')) {
+      context.handle(
+        _recurrenceUntilMeta,
+        recurrenceUntil.isAcceptableOrUnknown(
+          data['recurrence_until']!,
+          _recurrenceUntilMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2673,6 +2713,14 @@ class $EventTableTable extends EventTable
         DriftSqlType.string,
         data['${effectivePrefix}content'],
       ),
+      recurrence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence'],
+      )!,
+      recurrenceUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence_until'],
+      ),
     );
   }
 
@@ -2702,6 +2750,8 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
   final String? endTime;
   final bool isAllDay;
   final String? content;
+  final String recurrence;
+  final String? recurrenceUntil;
   const EventTableData({
     required this.id,
     required this.title,
@@ -2722,6 +2772,8 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     this.endTime,
     required this.isAllDay,
     this.content,
+    required this.recurrence,
+    this.recurrenceUntil,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2760,6 +2812,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     map['is_all_day'] = Variable<bool>(isAllDay);
     if (!nullToAbsent || content != null) {
       map['content'] = Variable<String>(content);
+    }
+    map['recurrence'] = Variable<String>(recurrence);
+    if (!nullToAbsent || recurrenceUntil != null) {
+      map['recurrence_until'] = Variable<String>(recurrenceUntil);
     }
     return map;
   }
@@ -2801,6 +2857,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       content: content == null && nullToAbsent
           ? const Value.absent()
           : Value(content),
+      recurrence: Value(recurrence),
+      recurrenceUntil: recurrenceUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceUntil),
     );
   }
 
@@ -2829,6 +2889,8 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       endTime: serializer.fromJson<String?>(json['endTime']),
       isAllDay: serializer.fromJson<bool>(json['isAllDay']),
       content: serializer.fromJson<String?>(json['content']),
+      recurrence: serializer.fromJson<String>(json['recurrence']),
+      recurrenceUntil: serializer.fromJson<String?>(json['recurrenceUntil']),
     );
   }
   @override
@@ -2854,6 +2916,8 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       'endTime': serializer.toJson<String?>(endTime),
       'isAllDay': serializer.toJson<bool>(isAllDay),
       'content': serializer.toJson<String?>(content),
+      'recurrence': serializer.toJson<String>(recurrence),
+      'recurrenceUntil': serializer.toJson<String?>(recurrenceUntil),
     };
   }
 
@@ -2877,6 +2941,8 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     Value<String?> endTime = const Value.absent(),
     bool? isAllDay,
     Value<String?> content = const Value.absent(),
+    String? recurrence,
+    Value<String?> recurrenceUntil = const Value.absent(),
   }) => EventTableData(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -2897,6 +2963,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     endTime: endTime.present ? endTime.value : this.endTime,
     isAllDay: isAllDay ?? this.isAllDay,
     content: content.present ? content.value : this.content,
+    recurrence: recurrence ?? this.recurrence,
+    recurrenceUntil: recurrenceUntil.present
+        ? recurrenceUntil.value
+        : this.recurrenceUntil,
   );
   EventTableData copyWithCompanion(EventTableCompanion data) {
     return EventTableData(
@@ -2933,6 +3003,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       endTime: data.endTime.present ? data.endTime.value : this.endTime,
       isAllDay: data.isAllDay.present ? data.isAllDay.value : this.isAllDay,
       content: data.content.present ? data.content.value : this.content,
+      recurrence: data.recurrence.present
+          ? data.recurrence.value
+          : this.recurrence,
+      recurrenceUntil: data.recurrenceUntil.present
+          ? data.recurrenceUntil.value
+          : this.recurrenceUntil,
     );
   }
 
@@ -2957,13 +3033,15 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
           ..write('isAllDay: $isAllDay, ')
-          ..write('content: $content')
+          ..write('content: $content, ')
+          ..write('recurrence: $recurrence, ')
+          ..write('recurrenceUntil: $recurrenceUntil')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     title,
     eventDate,
@@ -2983,7 +3061,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     endTime,
     isAllDay,
     content,
-  );
+    recurrence,
+    recurrenceUntil,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3006,7 +3086,9 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           other.startTime == this.startTime &&
           other.endTime == this.endTime &&
           other.isAllDay == this.isAllDay &&
-          other.content == this.content);
+          other.content == this.content &&
+          other.recurrence == this.recurrence &&
+          other.recurrenceUntil == this.recurrenceUntil);
 }
 
 class EventTableCompanion extends UpdateCompanion<EventTableData> {
@@ -3029,6 +3111,8 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
   final Value<String?> endTime;
   final Value<bool> isAllDay;
   final Value<String?> content;
+  final Value<String> recurrence;
+  final Value<String?> recurrenceUntil;
   const EventTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -3049,6 +3133,8 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.endTime = const Value.absent(),
     this.isAllDay = const Value.absent(),
     this.content = const Value.absent(),
+    this.recurrence = const Value.absent(),
+    this.recurrenceUntil = const Value.absent(),
   });
   EventTableCompanion.insert({
     this.id = const Value.absent(),
@@ -3070,6 +3156,8 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.endTime = const Value.absent(),
     this.isAllDay = const Value.absent(),
     this.content = const Value.absent(),
+    this.recurrence = const Value.absent(),
+    this.recurrenceUntil = const Value.absent(),
   }) : eventDate = Value(eventDate),
        createdAt = Value(createdAt);
   static Insertable<EventTableData> custom({
@@ -3092,6 +3180,8 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Expression<String>? endTime,
     Expression<bool>? isAllDay,
     Expression<String>? content,
+    Expression<String>? recurrence,
+    Expression<String>? recurrenceUntil,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3113,6 +3203,8 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       if (endTime != null) 'end_time': endTime,
       if (isAllDay != null) 'is_all_day': isAllDay,
       if (content != null) 'content': content,
+      if (recurrence != null) 'recurrence': recurrence,
+      if (recurrenceUntil != null) 'recurrence_until': recurrenceUntil,
     });
   }
 
@@ -3136,6 +3228,8 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Value<String?>? endTime,
     Value<bool>? isAllDay,
     Value<String?>? content,
+    Value<String>? recurrence,
+    Value<String?>? recurrenceUntil,
   }) {
     return EventTableCompanion(
       id: id ?? this.id,
@@ -3157,6 +3251,8 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       endTime: endTime ?? this.endTime,
       isAllDay: isAllDay ?? this.isAllDay,
       content: content ?? this.content,
+      recurrence: recurrence ?? this.recurrence,
+      recurrenceUntil: recurrenceUntil ?? this.recurrenceUntil,
     );
   }
 
@@ -3220,6 +3316,12 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     if (content.present) {
       map['content'] = Variable<String>(content.value);
     }
+    if (recurrence.present) {
+      map['recurrence'] = Variable<String>(recurrence.value);
+    }
+    if (recurrenceUntil.present) {
+      map['recurrence_until'] = Variable<String>(recurrenceUntil.value);
+    }
     return map;
   }
 
@@ -3244,7 +3346,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
           ..write('isAllDay: $isAllDay, ')
-          ..write('content: $content')
+          ..write('content: $content, ')
+          ..write('recurrence: $recurrence, ')
+          ..write('recurrenceUntil: $recurrenceUntil')
           ..write(')'))
         .toString();
   }
@@ -6616,6 +6720,8 @@ typedef $$EventTableTableCreateCompanionBuilder =
       Value<String?> endTime,
       Value<bool> isAllDay,
       Value<String?> content,
+      Value<String> recurrence,
+      Value<String?> recurrenceUntil,
     });
 typedef $$EventTableTableUpdateCompanionBuilder =
     EventTableCompanion Function({
@@ -6638,6 +6744,8 @@ typedef $$EventTableTableUpdateCompanionBuilder =
       Value<String?> endTime,
       Value<bool> isAllDay,
       Value<String?> content,
+      Value<String> recurrence,
+      Value<String?> recurrenceUntil,
     });
 
 final class $$EventTableTableReferences
@@ -6777,6 +6885,16 @@ class $$EventTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recurrenceUntil => $composableBuilder(
+    column: $table.recurrenceUntil,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> eventTagRelationTableRefs(
     Expression<bool> Function($$EventTagRelationTableTableFilterComposer f) f,
   ) {
@@ -6907,6 +7025,16 @@ class $$EventTableTableOrderingComposer
     column: $table.content,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recurrenceUntil => $composableBuilder(
+    column: $table.recurrenceUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EventTableTableAnnotationComposer
@@ -6989,6 +7117,16 @@ class $$EventTableTableAnnotationComposer
   GeneratedColumn<String> get content =>
       $composableBuilder(column: $table.content, builder: (column) => column);
 
+  GeneratedColumn<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get recurrenceUntil => $composableBuilder(
+    column: $table.recurrenceUntil,
+    builder: (column) => column,
+  );
+
   Expression<T> eventTagRelationTableRefs<T extends Object>(
     Expression<T> Function($$EventTagRelationTableTableAnnotationComposer a) f,
   ) {
@@ -7063,6 +7201,8 @@ class $$EventTableTableTableManager
                 Value<String?> endTime = const Value.absent(),
                 Value<bool> isAllDay = const Value.absent(),
                 Value<String?> content = const Value.absent(),
+                Value<String> recurrence = const Value.absent(),
+                Value<String?> recurrenceUntil = const Value.absent(),
               }) => EventTableCompanion(
                 id: id,
                 title: title,
@@ -7083,6 +7223,8 @@ class $$EventTableTableTableManager
                 endTime: endTime,
                 isAllDay: isAllDay,
                 content: content,
+                recurrence: recurrence,
+                recurrenceUntil: recurrenceUntil,
               ),
           createCompanionCallback:
               ({
@@ -7105,6 +7247,8 @@ class $$EventTableTableTableManager
                 Value<String?> endTime = const Value.absent(),
                 Value<bool> isAllDay = const Value.absent(),
                 Value<String?> content = const Value.absent(),
+                Value<String> recurrence = const Value.absent(),
+                Value<String?> recurrenceUntil = const Value.absent(),
               }) => EventTableCompanion.insert(
                 id: id,
                 title: title,
@@ -7125,6 +7269,8 @@ class $$EventTableTableTableManager
                 endTime: endTime,
                 isAllDay: isAllDay,
                 content: content,
+                recurrence: recurrence,
+                recurrenceUntil: recurrenceUntil,
               ),
           withReferenceMapper: (p0) => p0
               .map(

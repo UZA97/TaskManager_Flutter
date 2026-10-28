@@ -65,12 +65,11 @@ class GoogleAccountNotifier extends AsyncNotifier<GoogleAccount?> {
     return signIn();
   }
 
-  // 로그인된 구글 계정을 메일 계정으로 연결 (Outlook 연결 중이면 유지)
+  // 로그인된 구글 계정을 메일 계정으로 연결
   Future<void> linkGmail() async {
     final account = state.value;
     if (account == null) return;
     final mailAccount = await ref.read(mailAccountProvider.future);
-    if (mailAccount != null && mailAccount.isOutlook) return;
     if (mailAccount?.email == account.email) return;
 
     await ref
@@ -99,7 +98,7 @@ class GoogleAccountNotifier extends AsyncNotifier<GoogleAccount?> {
     }
 
     final mailAccount = await ref.read(mailAccountProvider.future);
-    if (mailAccount != null && !mailAccount.isOutlook) {
+    if (mailAccount != null) {
       await ref.read(mailAccountProvider.notifier).deleteAccount();
     }
 

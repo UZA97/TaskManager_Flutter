@@ -22,6 +22,16 @@ class Event {
   final String? content;
   final String? tagColor;
 
+  // 반복: '' (없음) / daily / weekly / monthly / yearly — recurrence.dart 참고
+  final String recurrence;
+  // 반복 종료일 (yyyy-MM-dd, 포함). null이면 무기한
+  final String? recurrenceUntil;
+
+  // 구글에서 가져온 반복 일정의 회차일 때, 원본 일정의 구글 ID (DB에 저장 안 함)
+  final String? googleRecurringEventId;
+
+  bool get isRecurring => recurrence.isNotEmpty;
+
   const Event({
     this.id,
     required this.title,
@@ -43,6 +53,9 @@ class Event {
     this.isAllDay = true,
     this.content,
     this.tagColor,
+    this.recurrence = '',
+    this.recurrenceUntil,
+    this.googleRecurringEventId,
   });
 
   Event copyWith({
@@ -63,7 +76,9 @@ class Event {
     String? endTime,
     bool? isAllDay,
     String? content,
-    // 위치 필드만 Value<T> 패턴
+    String? recurrence,
+    // 위치·반복 종료일은 null로 지울 수 있도록 Value<T> 패턴
+    Value<String?> recurrenceUntil = const Value.absent(),
     Value<String?> locationName = const Value.absent(),
     Value<double?> locationLat = const Value.absent(),
     Value<double?> locationLng = const Value.absent(),
@@ -91,6 +106,11 @@ class Event {
       endTime: endTime ?? this.endTime,
       isAllDay: isAllDay ?? this.isAllDay,
       content: content ?? this.content,
+      recurrence: recurrence ?? this.recurrence,
+      recurrenceUntil: recurrenceUntil.present
+          ? recurrenceUntil.value
+          : this.recurrenceUntil,
+      googleRecurringEventId: googleRecurringEventId,
     );
   }
 }

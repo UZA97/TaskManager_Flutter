@@ -28,6 +28,21 @@ final selectedNoteProvider = NotifierProvider<SelectedNoteNotifier, Note?>(
   SelectedNoteNotifier.new,
 );
 
+// 메모를 연 뒤 커서를 옮길 체크리스트 항목 (오늘 브리핑에서 이동할 때)
+typedef MemoFocusRequest = ({int noteId, List<int> path, String text});
+
+class MemoFocusRequestNotifier extends Notifier<MemoFocusRequest?> {
+  @override
+  MemoFocusRequest? build() => null;
+
+  void request(MemoFocusRequest? value) => state = value;
+}
+
+final memoFocusRequestProvider =
+    NotifierProvider<MemoFocusRequestNotifier, MemoFocusRequest?>(
+      MemoFocusRequestNotifier.new,
+    );
+
 // 메모 목록 상태
 class NoteListNotifier extends AsyncNotifier<List<Note>> {
   @override

@@ -30,8 +30,6 @@ class MailDetailView extends ConsumerWidget {
       });
     }
 
-    final account = accountAsync.value!;
-    final isOutlook = account.isOutlook;
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -79,12 +77,53 @@ class MailDetailView extends ConsumerWidget {
                   ],
                 ),
               ),
+              // 삭제 (Gmail 휴지통으로 이동)
+              IconButton(
+                tooltip: '삭제',
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('메일 삭제'),
+                      content: const Text(
+                        '이 메일을 삭제할까요?\n'
+                        'Gmail 휴지통으로 이동하며, 30일 안에는 Gmail에서 복구할 수 있습니다.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('취소'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                          child: const Text('삭제'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                  final deleted = await ref
+                      .read(mailMessagesProvider.notifier)
+                      .trash({selectedMail.id});
+                  if (deleted == 0 && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('메일 삭제에 실패했습니다'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(width: 4),
               // 답장 버튼
               ElevatedButton.icon(
                 onPressed: () async {
-                  final url = isOutlook
-                      ? Uri.parse('https://outlook.live.com/mail/0/')
-                      : Uri.parse('https://mail.google.com/');
+                  final url = Uri.parse('https://mail.google.com/');
                   if (await canLaunchUrl(url)) {
                     await launchUrl(url, mode: LaunchMode.externalApplication);
                   }

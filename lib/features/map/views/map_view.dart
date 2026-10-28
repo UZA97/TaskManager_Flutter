@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../core/providers/navigation_provider.dart';
+import '../../calendar/providers/event_provider.dart';
+import '../providers/map_event_provider.dart';
 import '../providers/map_provider.dart';
 import '../data/map_repository.dart';
 import '../services/kakao_local_service.dart';
@@ -112,6 +115,10 @@ class _MapViewState extends ConsumerState<MapView> {
   static const _maxZoom = 19.0;
   bool _isLoadingCategory = false;
 
+  // 메인 탭 순서 (main.dart의 _navigationDestinations)
+  static const _calendarTab = 1;
+  static const _eventColor = Color(0xFF7E57C2);
+
   @override
   void dispose() {
     _mapController.dispose();
@@ -147,9 +154,50 @@ class _MapViewState extends ConsumerState<MapView> {
     }
   }
 
+  void _toggleEvents(List<EventPlace> places) {
+    final willShow = !ref.read(showEventsOnMapProvider);
+    ref.read(showEventsOnMapProvider.notifier).toggle();
+    if (!willShow || places.isEmpty) return;
+    if (places.length == 1) {
+      _mapController.move(places.first.position, 16);
+      return;
+    }
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: places.map((p) => p.position).toList(),
+        padding: const EdgeInsets.all(64),
+        maxZoom: 16,
+      ),
+    );
+  }
+
+  void _openEventDate(String date) {
+    final d = DateTime.parse(date);
+    ref.read(currentMonthProvider.notifier)
+      ..setYear(d.year)
+      ..setMonth(d.month);
+    ref.read(selectedDateProvider.notifier).select(d);
+    ref.read(navigationProvider.notifier).navigateTo(_calendarTab);
+  }
+
+  String _eventTooltip(EventPlace place) {
+    final lines = <String>[if (place.name != null) place.name!];
+    for (final e in place.events.take(5)) {
+      final d = DateTime.parse(e.eventDate);
+      final time = e.isAllDay ? '' : ' ${e.startTime ?? ''}';
+      lines.add('${d.month}/${d.day}$time  ${e.title}');
+    }
+    if (place.events.length > 5) {
+      lines.add('외 ${place.events.length - 5}개');
+    }
+    return lines.join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeTags = ref.watch(activeMapTagsProvider);
+    final showEvents = ref.watch(showEventsOnMapProvider);
+    final eventPlaces = ref.watch(mapEventPlacesProvider).value ?? [];
     final placesAsync = ref.watch(mapPlaceProvider);
     final tagsAsync = ref.watch(mapTagProvider);
     // final selectedLocation = ref.watch(selectedLocationProvider);
@@ -174,8 +222,11 @@ class _MapViewState extends ConsumerState<MapView> {
         FlutterMap(
           mapController: _mapController,
           options: MapOptions(
-            initialCenter: _defaultCenter,
-            initialZoom: _defaultZoom,
+            initialCenter:
+                ref.read(selectedLocationProvider)?.position ?? _defaultCenter,
+            initialZoom: ref.read(selectedLocationProvider) != null
+                ? 16
+                : _defaultZoom,
             minZoom: _minZoom,
             maxZoom: _maxZoom,
             cameraConstraint: CameraConstraint.containCenter(
@@ -191,6 +242,53 @@ class _MapViewState extends ConsumerState<MapView> {
                   'https://api.vworld.kr/req/wmts/1.0.0/8301697C-80F6-35C7-BCB2-F890D4B0409B/Base/{z}/{y}/{x}.png',
               userAgentPackageName: 'com.JH.taskmanager',
             ),
+
+            // 일정 장소 마커 (앞으로 30일)
+            if (showEvents && eventPlaces.isNotEmpty)
+              MarkerLayer(
+                markers: eventPlaces.map((place) {
+                  return Marker(
+                    point: place.position,
+                    width: 30,
+                    height: 30,
+                    child: _HoverMarker(
+                      tooltip: _eventTooltip(place),
+                      size: 30,
+                      onTap: () => _openEventDate(place.events.first.eventDate),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(
+                            Icons.event_available,
+                            color: _eventColor,
+                            size: 26,
+                          ),
+                          if (place.events.length > 1)
+                            Positioned(
+                              right: -4,
+                              top: -4,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: _eventColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '${place.events.length}',
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
 
             // 저장된 장소 마커
             if (filteredPlaces.isNotEmpty)
@@ -363,64 +461,137 @@ class _MapViewState extends ConsumerState<MapView> {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: _categories.map((cat) {
-                final isActive = activeCategory == cat.code;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: GestureDetector(
-                    onTap: _isLoadingCategory
-                        ? null
-                        : () => _toggleCategory(cat.code),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive ? cat.color : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_isLoadingCategory && isActive)
-                            const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else
-                            Icon(
-                              cat.icon,
-                              size: 13,
-                              color: isActive ? Colors.white : cat.color,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: _MapChip(
+                    icon: Icons.event_available,
+                    label:
+                        '일정 ${eventPlaces.fold<int>(0, (n, p) => n + p.events.length)}',
+                    color: _eventColor,
+                    isActive: showEvents,
+                    tooltip: '앞으로 $mapEventDays일 동안 장소가 있는 일정',
+                    onTap: () => _toggleEvents(eventPlaces),
+                  ),
+                ),
+                ..._categories.map((cat) {
+                  final isActive = activeCategory == cat.code;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: GestureDetector(
+                      onTap: _isLoadingCategory
+                          ? null
+                          : () => _toggleCategory(cat.code),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isActive ? cat.color : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
                             ),
-                          const SizedBox(width: 4),
-                          Text(
-                            cat.label,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: isActive ? Colors.white : cat.color,
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_isLoadingCategory && isActive)
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            else
+                              Icon(
+                                cat.icon,
+                                size: 13,
+                                color: isActive ? Colors.white : cat.color,
+                              ),
+                            const SizedBox(width: 4),
+                            Text(
+                              cat.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isActive ? Colors.white : cat.color,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }),
+              ],
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MapChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isActive;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _MapChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isActive,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isActive ? color : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 13, color: isActive ? Colors.white : color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isActive ? Colors.white : color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

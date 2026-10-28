@@ -27,9 +27,13 @@ import 'features/settings/views/settings_detail_view.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'features/mail/providers/mail_provider.dart';
 import 'features/calendar/models/event.dart';
+import 'features/calendar/models/recurrence.dart';
+import 'features/calendar/providers/event_provider.dart';
 import 'features/mail/services/mail_check_service.dart';
 import 'core/database/database_provider.dart';
 import 'core/update/update_service.dart';
+import 'features/briefing/briefing_dialog.dart';
+import 'features/briefing/briefing_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -194,11 +198,25 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   // 트레이에서 복귀할 때 잠금 체크
   Future<void> _showWindow() async {
     final settings = ref.read(settingsProvider).value;
-    if (settings?.lockEnabled ?? false) {
+    // 이미 화면에 떠 있는 창(알림 클릭 등)은 다시 잠그지 않음
+    if ((settings?.lockEnabled ?? false) && !await windowManager.isVisible()) {
       setState(() => _isLocked = true);
     }
+    if (await windowManager.isMinimized()) await windowManager.restore();
     await windowManager.show();
     await windowManager.focus();
+  }
+
+  // 알람 알림 클릭: 트레이/최소화 상태에서도 창을 띄우고 해당 날짜의 캘린더로 이동
+  // (잠금 중이면 잠금 해제 후 그 화면이 보임)
+  Future<void> _openCalendarAt(DateTime date) async {
+    if (!mounted) return;
+    ref.read(currentMonthProvider.notifier)
+      ..setYear(date.year)
+      ..setMonth(date.month);
+    ref.read(selectedDateProvider.notifier).select(date);
+    ref.read(navigationProvider.notifier).navigateTo(1); // 캘린더 탭
+    await _showWindow();
   }
 
   Timer? _alarmTimer;
@@ -211,6 +229,8 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 첫 프레임 전에 화면이 교체(예: DB 오류 화면)됐으면 중단
+      if (!mounted) return;
       // 알람 체커는 로그인 팝업과 무관하게 먼저 시작
       _startAlarmChecker();
 
@@ -245,9 +265,19 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       } catch (e) {
         print('메일 폴링 시작 실패: $e');
       }
+
+      await _maybeShowDailyBriefing();
     });
 
     _startFocusModeChecker();
+  }
+
+  // 하루 첫 실행 때 오늘 브리핑 표시 (잠금 중이면 잠금 해제 후)
+  Future<void> _maybeShowDailyBriefing() async {
+    if (!mounted || _isLocked) return;
+    final db = ref.read(databaseProvider);
+    if (!await claimDailyBriefing(db)) return;
+    if (mounted) await showBriefingDialog(context);
   }
 
   void _startFocusModeChecker() {
@@ -270,6 +300,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       NotificationService.show(
         title: '집중모드 종료',
         body: '집중모드가 종료되었습니다. 알림이 다시 활성화됩니다.',
+        onClick: _showWindow,
       );
     }
   }
@@ -310,8 +341,16 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     final today =
         '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final events = await repo.getUpcomingAlarmEvents(today);
+    // 반복 일정은 알림이 울릴 수 있는 회차(오늘~모레, 최대 1일 전 알림)만 펼침
+    final candidates = [
+      for (final event in events)
+        if (event.isRecurring)
+          ...expandOccurrences(event, now, now.add(const Duration(days: 2)))
+        else
+          event,
+    ];
 
-    for (final event in events) {
+    for (final event in candidates) {
       try {
         await _checkEventAlarm(event, now);
       } catch (e) {
@@ -345,7 +384,11 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       // 일정 시간이 바뀌면 다시 울릴 수 있도록 알람 시각까지 포함해 중복 체크
       final key = '${event.id}@${alarmDateTime.toIso8601String()}';
       if (!_notifiedAlarmKeys.add(key)) return;
-      await NotificationService.show(title: '📅 일정 알람', body: event.title);
+      await NotificationService.show(
+        title: '📅 일정 알람',
+        body: event.title,
+        onClick: () => _openCalendarAt(eventDate),
+      );
     }
   }
 
@@ -362,7 +405,15 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   Widget build(BuildContext context) {
     // 잠금 화면
     if (_isLocked) {
-      return LockScreen(onUnlocked: () => setState(() => _isLocked = false));
+      return LockScreen(
+        onUnlocked: () {
+          setState(() => _isLocked = false);
+          // 잠금 때문에 미뤄둔 오늘 브리핑
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _maybeShowDailyBriefing(),
+          );
+        },
+      );
     }
 
     return Scaffold(
@@ -376,6 +427,11 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
               ref.read(navigationProvider.notifier).navigateTo(index);
             },
             labelType: NavigationRailLabelType.none,
+            leading: IconButton(
+              tooltip: '오늘 브리핑',
+              icon: const Icon(Icons.wb_sunny_outlined, color: Colors.white),
+              onPressed: () => showBriefingDialog(context),
+            ),
             destinations: _navigationDestinations,
           ),
           Container(

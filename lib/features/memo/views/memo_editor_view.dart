@@ -26,6 +26,7 @@ import '../data/note_repository.dart';
 import '../services/pdf_export_service.dart';
 import 'memo_editor_widgets.dart';
 import '../../../core/providers/navigation_provider.dart';
+import '../../briefing/briefing_todos.dart';
 import 'package:appflowy_editor/src/editor/find_replace_menu/find_menu_service.dart';
 import '../widgets/ask_ai_dialog.dart';
 import '../services/gemini_service.dart';
@@ -180,6 +181,41 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
     editorState.selectionNotifier.addListener(_selectionListener!);
 
     setState(() => _editorState = editorState);
+    // 에디터가 그려진 뒤 대기 중인 체크리스트 이동 요청 처리
+    WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocusRequest());
+  }
+
+  /// 오늘 브리핑에서 고른 체크리스트로 스크롤하고 그 줄 끝에 커서를 둡니다.
+  void _applyFocusRequest() {
+    final request = ref.read(memoFocusRequestProvider);
+    final editorState = _editorState;
+    if (!mounted ||
+        request == null ||
+        editorState == null ||
+        request.noteId != _currentNote?.id) {
+      return;
+    }
+    ref.read(memoFocusRequestProvider.notifier).request(null);
+
+    final node = findUncheckedTodo(
+      editorState.document,
+      request.path,
+      request.text,
+    );
+    if (node == null) return;
+
+    // 화면 밖의 블록은 그려지지 않아 커서 자동 스크롤이 안 되므로 먼저 최상위 블록으로 이동
+    editorState.scrollService?.jumpTo(node.path.first);
+    // 브리핑 팝업이 닫히며 포커스가 되돌아간 뒤에 커서를 둬야 입력 포커스가 유지됨
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted || _editorState != editorState) return;
+      editorState.updateSelectionWithReason(
+        Selection.collapsed(
+          Position(path: node.path, offset: node.delta?.length ?? 0),
+        ),
+        reason: SelectionUpdateReason.uiEvent,
+      );
+    });
   }
 
   /// 에디터 변경 내용을 일정 시간 동안 모아서 저장합니다.
@@ -1067,6 +1103,15 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
       if (prev == 0 && next != 0) {
         _findReplaceService?.dismiss();
         _findReplaceService = null;
+      }
+    });
+
+    // 이미 열려 있는 메모의 체크리스트로 이동 (다른 메모면 _initEditor에서 처리)
+    ref.listen(memoFocusRequestProvider, (_, next) {
+      if (next != null && next.noteId == _currentNote?.id) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _applyFocusRequest(),
+        );
       }
     });
 

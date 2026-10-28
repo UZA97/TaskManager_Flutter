@@ -124,11 +124,18 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       final localEvents = await repo.getEventsByMonth(year, month);
 
       // 1. 구글에 아직 없는 로컬 일정 업로드 (오프라인/게스트 때 만든 일정 포함)
+      //    반복 일정은 회차가 아니라 원본을 한 번만 업로드
+      final pushedIds = <int>{};
       for (final event in localEvents) {
         if (event.id == null || event.googleEventId != null) continue;
+        if (!pushedIds.add(event.id!)) continue;
+        final source = event.isRecurring
+            ? await repo.getEventById(event.id!)
+            : event;
+        if (source == null) continue;
         final googleEventId = await _calendarService.addEvent(
           accessToken,
-          event,
+          source,
         );
         if (googleEventId != null) {
           await repo.setGoogleEventId(event.id!, googleEventId);
@@ -143,7 +150,10 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       );
       if (googleEvents == null) return; // 조회 실패 시 로컬 삭제 단계로 가지 않음
 
+      // 앱에서 만든 반복 일정의 회차는 로컬에서 펼쳐 보여주므로 가져오지 않음
+      final localRecurringIds = await repo.getRecurringGoogleEventIds();
       for (final event in googleEvents) {
+        if (localRecurringIds.contains(event.googleRecurringEventId)) continue;
         await repo.upsertGoogleEvent(event);
       }
 
@@ -154,6 +164,8 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       final googleIds = googleEvents.map((e) => e.googleEventId).toSet();
       for (final event in localEvents) {
         if (event.id == null || event.googleEventId == null) continue;
+        // 반복 일정은 한 달 조회 결과만으로 삭제 여부를 판단할 수 없음
+        if (event.isRecurring) continue;
         final start = event.startDate ?? event.eventDate;
         if (!start.startsWith(monthPrefix)) continue;
         if (!googleIds.contains(event.googleEventId)) {

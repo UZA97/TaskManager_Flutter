@@ -42,6 +42,7 @@ class NotificationService {
   static Future<void> show({
     required String title,
     required String body,
+    VoidCallback? onClick,
   }) async {
     assert(_container != null, 'NotificationService.init()이 호출되지 않았습니다');
     final settings = _container?.read(settingsProvider).value;
@@ -56,7 +57,8 @@ class NotificationService {
       if (_isInFocusMode(settings)) return;
     }
 
-    final notification = LocalNotification(title: title, body: body);
+    final notification = LocalNotification(title: title, body: body)
+      ..onClick = onClick;
     await notification.show();
   }
 

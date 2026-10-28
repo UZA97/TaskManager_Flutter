@@ -11,7 +11,7 @@ class TaskMailAccount {
     this.pollIntervalMinutes = 1,
   });
 
-  bool get isOutlook => imapServer == 'outlook';
+  bool get isGmail => imapServer == 'imap.gmail.com';
 
   // password 제거, token 기반으로 변경
   factory TaskMailAccount.fromJson(Map<String, dynamic> json) {

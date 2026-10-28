@@ -166,33 +166,20 @@ class MailCheckService {
     final accessToken = await _getValidAccessToken(account);
     if (accessToken == null) return;
 
-    if (account.isOutlook) {
-      await http.patch(
-        Uri.parse('https://graph.microsoft.com/v1.0/me/messages/$messageId'),
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'isRead': true}),
-      );
-    } else {
-      final response = await http.post(
-        Uri.parse(
-          'https://gmail.googleapis.com/gmail/v1/users/me/messages/$messageId/modify',
-        ),
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'removeLabelIds': ['UNREAD'],
-        }),
-      );
-      if (response.statusCode == 200) {
-        print('읽음 처리 성공!');
-      } else {
-        print('실패: ${response.statusCode} - ${response.body}');
-      }
+    final response = await http.post(
+      Uri.parse(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/$messageId/modify',
+      ),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'removeLabelIds': ['UNREAD'],
+      }),
+    );
+    if (response.statusCode != 200) {
+      print('읽음 처리 실패: ${response.statusCode} - ${response.body}');
     }
   }
 
@@ -206,10 +193,133 @@ class MailCheckService {
     final accessToken = await _getValidAccessToken(account);
     if (accessToken == null) return [];
 
-    if (account.isOutlook) {
-      return _fetchOutlookMessages(accessToken, count, pageToken);
-    } else {
-      return _fetchGmailMessages(accessToken, count, pageToken);
+    return _fetchGmailMessages(accessToken, count, pageToken);
+  }
+
+  /// 메일을 Gmail 휴지통으로 이동 (30일 후 Gmail이 영구 삭제, 그 전엔 복구 가능).
+  /// 성공한 메일 ID 반환. 메일 계정이 없으면 빈 집합.
+  Future<Set<String>> trashMessages(List<String> ids) async {
+    final account = await _repo.getAccount();
+    if (account == null) return {};
+    final accessToken = await _getValidAccessToken(account);
+    if (accessToken == null) return {};
+
+    final trashed = <String>{};
+    for (final id in ids) {
+      try {
+        final response = await http.post(
+          Uri.https(
+            'gmail.googleapis.com',
+            '/gmail/v1/users/me/messages/$id/trash',
+          ),
+          headers: {'Authorization': 'Bearer $accessToken'},
+        );
+        if (response.statusCode == 200) {
+          trashed.add(id);
+        } else {
+          print('메일 삭제 실패($id): ${response.statusCode} ${response.body}');
+        }
+      } catch (e) {
+        print('메일 삭제 오류($id): $e');
+      }
+    }
+    return trashed;
+  }
+
+  /// 받은편지함의 안 읽은 메일을 모두 읽음 처리 (Gmail에도 반영).
+  /// 처리한 개수를 반환. 메일 계정이 없거나 실패하면 null.
+  Future<int?> markAllAsRead() async {
+    final account = await _repo.getAccount();
+    if (account == null) return null;
+    final accessToken = await _getValidAccessToken(account);
+    if (accessToken == null) return null;
+    final headers = {'Authorization': 'Bearer $accessToken'};
+
+    try {
+      // 1. 안 읽은 메일 ID 수집 (페이지당 최대 500)
+      final ids = <String>[];
+      String? pageToken;
+      do {
+        final response = await http.get(
+          Uri.https('gmail.googleapis.com', '/gmail/v1/users/me/messages', {
+            'q': 'is:unread in:inbox',
+            'maxResults': '500',
+            if (pageToken != null) 'pageToken': pageToken,
+          }),
+          headers: headers,
+        );
+        if (response.statusCode != 200) {
+          print('안 읽은 메일 조회 실패: ${response.statusCode} ${response.body}');
+          return null;
+        }
+        final json = jsonDecode(response.body);
+        for (final msg in json['messages'] as List<dynamic>? ?? []) {
+          ids.add(msg['id'] as String);
+        }
+        pageToken = json['nextPageToken'] as String?;
+      } while (pageToken != null);
+
+      // 2. batchModify는 요청당 최대 1000개
+      for (var i = 0; i < ids.length; i += 1000) {
+        final chunk = ids.sublist(i, (i + 1000).clamp(0, ids.length));
+        final response = await http.post(
+          Uri.https(
+            'gmail.googleapis.com',
+            '/gmail/v1/users/me/messages/batchModify',
+          ),
+          headers: {...headers, 'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'ids': chunk,
+            'removeLabelIds': ['UNREAD'],
+          }),
+        );
+        // 성공 시 204 (빈 응답)
+        if (response.statusCode != 204 && response.statusCode != 200) {
+          print('모두 읽음 처리 실패: ${response.statusCode} ${response.body}');
+          return null;
+        }
+      }
+      return ids.length;
+    } catch (e) {
+      print('모두 읽음 처리 오류: $e');
+      return null;
+    }
+  }
+
+  /// 받은편지함의 안 읽은 메일 (최신 [count]개)과 전체 안 읽은 개수(추정치).
+  /// 메일 계정이 없거나 실패하면 null.
+  Future<({List<MailMessage> messages, int total})?> fetchUnread({
+    int count = 5,
+  }) async {
+    final account = await _repo.getAccount();
+    if (account == null) return null;
+    final accessToken = await _getValidAccessToken(account);
+    if (accessToken == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.https('gmail.googleapis.com', '/gmail/v1/users/me/messages', {
+          'q': 'is:unread in:inbox',
+          'maxResults': '$count',
+        }),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+      if (response.statusCode != 200) return null;
+
+      final json = jsonDecode(response.body);
+      final ids = json['messages'] as List<dynamic>? ?? [];
+      final messages = <MailMessage>[];
+      for (final msg in ids) {
+        final detail = await _fetchMessageDetail(
+          accessToken,
+          msg['id'] as String,
+        );
+        if (detail != null) messages.add(detail);
+      }
+      final total = json['resultSizeEstimate'] as int? ?? messages.length;
+      return (messages: messages, total: total);
+    } catch (e) {
+      return null;
     }
   }
 
@@ -226,55 +336,6 @@ class MailCheckService {
       return response.statusCode == 200;
     } catch (e) {
       return false;
-    }
-  }
-
-  Future<List<MailMessage>> _fetchOutlookMessages(
-    String accessToken,
-    int count,
-    String? pageToken,
-  ) async {
-    try {
-      String url =
-          'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages'
-          '?\$top=$count&\$select=id,subject,from,receivedDateTime,isRead,bodyPreview'
-          '&\$orderby=receivedDateTime desc';
-      if (pageToken != null) url += '&\$skipToken=$pageToken';
-
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
-
-      if (response.statusCode != 200) {
-        return [];
-      }
-
-      final data = jsonDecode(response.body);
-      final messages = data['value'] as List<dynamic>? ?? [];
-      _nextPageToken = data['@odata.nextLink'] as String?;
-
-      return messages.map((msg) {
-        final from = msg['from']?['emailAddress']?['address'] as String? ?? '';
-        final subject = msg['subject'] as String? ?? '(제목 없음)';
-        final preview = msg['bodyPreview'] as String? ?? '';
-        final isRead = msg['isRead'] as bool? ?? false;
-        DateTime date = DateTime.now();
-        try {
-          date = DateTime.parse(msg['receivedDateTime'] as String);
-        } catch (_) {}
-
-        return MailMessage(
-          id: msg['id'] as String,
-          subject: subject,
-          from: from,
-          preview: preview,
-          date: date,
-          isRead: isRead,
-        );
-      }).toList();
-    } catch (e) {
-      return [];
     }
   }
 
@@ -317,7 +378,7 @@ class MailCheckService {
 
   Future<String?> getGoogleAccessToken() async {
     final account = await _repo.getAccount();
-    if (account == null || account.isOutlook) return null;
+    if (account == null) return null;
     return _getValidAccessToken(account);
   }
 }

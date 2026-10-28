@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
 import '../../../core/auth/google_account_provider.dart';
 import '../models/mail_account.dart';
-import '../services/outlook_auth_service.dart';
 
 class MailLoginDialog extends ConsumerStatefulWidget {
   const MailLoginDialog({super.key});
@@ -14,7 +13,6 @@ class MailLoginDialog extends ConsumerStatefulWidget {
 
 class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
   bool _isGoogleLoading = false;
-  bool _isOutlookLoading = false;
 
   Future<void> _signInWithGoogle() async {
     setState(() => _isGoogleLoading = true);
@@ -33,31 +31,6 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
       if (mounted) _showSnackBar('로그인 실패: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
-    }
-  }
-
-  Future<void> _signInWithOutlook() async {
-    setState(() => _isOutlookLoading = true);
-
-    try {
-      final result = await OutlookAuthService().signIn();
-      if (result == null) {
-        if (mounted) _showSnackBar('로그인 실패', isError: true);
-        return;
-      }
-
-      final account = TaskMailAccount(
-        email: result.email,
-        imapServer: 'outlook',
-        imapPort: 0,
-        pollIntervalMinutes: 5,
-      );
-
-      await ref.read(mailAccountProvider.notifier).saveAccount(account);
-    } catch (e) {
-      if (mounted) _showSnackBar('로그인 실패: $e', isError: true);
-    } finally {
-      if (mounted) setState(() => _isOutlookLoading = false);
     }
   }
 
@@ -133,31 +106,6 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
-
-        // Outlook (준비중)
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _isOutlookLoading ? null : _signInWithOutlook,
-            icon: _isOutlookLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.mail_outline, size: 18),
-            label: const Text('Outlook으로 로그인'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0078D4),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-        ),
         const SizedBox(height: 16),
 
         TextButton(
@@ -169,8 +117,6 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
   }
 
   Widget _buildLoggedInView(TaskMailAccount account) {
-    final isGmail = account.imapServer == 'imap.gmail.com';
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -193,16 +139,12 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isGmail
-                      ? const Color(0xFFEA4335).withOpacity(0.1)
-                      : const Color(0xFF0078D4).withOpacity(0.1),
+                  color: const Color(0xFFEA4335).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.mail,
-                  color: isGmail
-                      ? const Color(0xFFEA4335)
-                      : const Color(0xFF0078D4),
+                  color: Color(0xFFEA4335),
                   size: 20,
                 ),
               ),
@@ -211,9 +153,9 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isGmail ? 'Gmail' : 'Outlook',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    const Text(
+                      'Gmail',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     Text(
                       account.email,
