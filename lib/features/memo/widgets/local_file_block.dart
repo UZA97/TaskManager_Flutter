@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'dart:io';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
@@ -113,19 +114,12 @@ class _LocalFileBlockWidgetState extends State<LocalFileBlockWidget>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.insert_drive_file,
-                size: 16,
-                color: Color(0xFF4A90E2),
-              ),
+              Icon(Icons.insert_drive_file, size: 16, color: context.accent),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   fileName,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF4A90E2),
-                  ),
+                  style: TextStyle(fontSize: 13, color: context.accent),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

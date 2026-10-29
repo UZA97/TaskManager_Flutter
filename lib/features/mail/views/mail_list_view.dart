@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
@@ -219,7 +220,7 @@ class _MailListViewState extends ConsumerState<MailListView> {
               icon: const Icon(Icons.login, size: 18),
               label: const Text('로그인'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4A90E2),
+                backgroundColor: context.accent,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -241,8 +242,8 @@ class _MailListViewState extends ConsumerState<MailListView> {
         // 헤더
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0xFFDDDDDD))),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: context.line)),
           ),
           child: _selectMode
               ? _buildSelectHeader(messagesAsync.value ?? const [])
@@ -402,8 +403,8 @@ class _MailListItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
-          border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+          color: isSelected ? context.selectedTint : Colors.transparent,
+          border: Border(bottom: BorderSide(color: context.lineSubtle)),
         ),
         child: Row(
           children: [
@@ -427,8 +428,8 @@ class _MailListItem extends StatelessWidget {
                           width: 6,
                           height: 6,
                           margin: const EdgeInsets.only(right: 6),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF4A90E2),
+                          decoration: BoxDecoration(
+                            color: context.accent,
                             shape: BoxShape.circle,
                           ),
                         ),

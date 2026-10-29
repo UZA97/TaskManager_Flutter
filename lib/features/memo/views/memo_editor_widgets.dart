@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/note_repository.dart';
@@ -91,7 +92,7 @@ class _MemoEditorTagDialogState extends ConsumerState<MemoEditorTagDialog> {
                 ElevatedButton(
                   onPressed: _addTag,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
+                    backgroundColor: context.accent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -112,7 +113,7 @@ class _MemoEditorTagDialogState extends ConsumerState<MemoEditorTagDialog> {
                     label: Text('#$tag', style: const TextStyle(fontSize: 12)),
                     deleteIcon: const Icon(Icons.close, size: 14),
                     onDeleted: () => _removeTag(tag),
-                    backgroundColor: const Color(0xFFE8F0FE),
+                    backgroundColor: context.selectedTint,
                     side: BorderSide.none,
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                   );
@@ -137,7 +138,7 @@ class _MemoEditorTagDialogState extends ConsumerState<MemoEditorTagDialog> {
                   child: ElevatedButton(
                     onPressed: _save,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A90E2),
+                      backgroundColor: context.accent,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('저장'),

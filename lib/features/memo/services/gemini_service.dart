@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 
-final json = jsonDecode(File('config/gemini_service.json').readAsStringSync());
+import '../../../core/config/app_config.dart';
 
-final _apiKey = json['installed']['_apiKey'];
-final _baseUrl = json['installed']['_baseUrl'];
+final _apiKey = AppConfig.geminiApiKey;
+final _baseUrl = AppConfig.geminiBaseUrl;
 
 class GeminiService {
   Future<String> ask(String prompt) async {

@@ -1,13 +1,11 @@
 import 'dart:convert';
 import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 import '../database/database.dart';
-import 'dart:io';
 
-final json = jsonDecode(File('config/google_oauth.json').readAsStringSync());
-
-final _clientId = json['installed']['client_id'];
-final _screet = json['installed']['client_secret'];
+final _clientId = AppConfig.googleClientId;
+final _screet = AppConfig.googleClientSecret;
 
 const _keyAccessToken = 'google_access_token';
 const _keyRefreshToken = 'google_refresh_token';

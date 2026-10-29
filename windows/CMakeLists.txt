@@ -10,6 +10,9 @@ set(BINARY_NAME "taskmanager")
 # versions of CMake.
 cmake_policy(VERSION 3.14...3.25)
 
+# webview_windows 플러그인의 CMake 개발자 경고(CMP0175) 숨김. 결과물에는 영향 없음.
+set(CMAKE_POLICY_DEFAULT_CMP0175 OLD)
+
 # Define build configuration option.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)

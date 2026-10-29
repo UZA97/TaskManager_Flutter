@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -10,7 +11,6 @@ import '../map/services/kakao_local_service.dart';
 import '../memo/services/gemini_service.dart';
 import 'briefing_sources.dart';
 
-const _accent = Color(0xFF4A90E2);
 const _regionKey = 'briefing_region';
 const _defaultRegion = '서울';
 const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
@@ -56,60 +56,60 @@ const _cacheDuration = Duration(minutes: 30);
 /// 지역별 결과. [_cacheDuration]이 지난 뒤 팝업을 열면 새로 가져옴.
 final aiBriefingProvider = FutureProvider.autoDispose
     .family<AiBriefing, String>((ref, region) async {
-  final link = ref.keepAlive();
-  final timer = Timer(_cacheDuration, link.close);
-  ref.onDispose(timer.cancel);
+      final link = ref.keepAlive();
+      final timer = Timer(_cacheDuration, link.close);
+      ref.onDispose(timer.cancel);
 
-  // 날씨: 카카오 장소 검색으로 좌표 → Open-Meteo 예보
-  List<WeatherDay> weather = const [];
-  String? weatherError;
-  try {
-    final places = await KakaoLocalService().search(region);
-    if (places.isEmpty) {
-      weatherError = "'$region' 지역을 찾지 못했습니다";
-    } else {
-      weather = await fetchWeekWeather(places.first.lat, places.first.lng);
-    }
-  } catch (e) {
-    weatherError = '날씨를 가져오지 못했습니다';
-    print('날씨 조회 오류: $e');
-  }
+      // 날씨: 카카오 장소 검색으로 좌표 → Open-Meteo 예보
+      List<WeatherDay> weather = const [];
+      String? weatherError;
+      try {
+        final places = await KakaoLocalService().search(region);
+        if (places.isEmpty) {
+          weatherError = "'$region' 지역을 찾지 못했습니다";
+        } else {
+          weather = await fetchWeekWeather(places.first.lat, places.first.lng);
+        }
+      } catch (e) {
+        weatherError = '날씨를 가져오지 못했습니다';
+        print('날씨 조회 오류: $e');
+      }
 
-  // 뉴스: Google 뉴스 RSS
-  List<NewsItem> news = const [];
-  String? newsError;
-  try {
-    news = await fetchHeadlines();
-  } catch (e) {
-    newsError = '뉴스를 가져오지 못했습니다';
-    print('뉴스 조회 오류: $e');
-  }
+      // 뉴스: Google 뉴스 RSS
+      List<NewsItem> news = const [];
+      String? newsError;
+      try {
+        news = await fetchHeadlines();
+      } catch (e) {
+        newsError = '뉴스를 가져오지 못했습니다';
+        print('뉴스 조회 오류: $e');
+      }
 
-  // AI: 실제 데이터를 근거로 요약만 (Google 검색 연동은 사용하지 않음)
-  String? aiSummary;
-  String? aiError;
-  if (weather.isNotEmpty || news.isNotEmpty) {
-    try {
-      aiSummary = _stripMarkdown(
-        await GeminiService().ask(_buildPrompt(region, weather, news)),
+      // AI: 실제 데이터를 근거로 요약만 (Google 검색 연동은 사용하지 않음)
+      String? aiSummary;
+      String? aiError;
+      if (weather.isNotEmpty || news.isNotEmpty) {
+        try {
+          aiSummary = _stripMarkdown(
+            await GeminiService().ask(_buildPrompt(region, weather, news)),
+          );
+        } catch (e) {
+          aiError = e.toString().contains('429')
+              ? 'Gemini 사용량 한도를 초과해 AI 요약을 건너뛰었습니다'
+              : 'AI 요약을 가져오지 못했습니다';
+          print('Gemini 요약 오류: $e');
+        }
+      }
+
+      return AiBriefing(
+        weather: weather,
+        weatherError: weatherError,
+        news: news,
+        newsError: newsError,
+        aiSummary: aiSummary,
+        aiError: aiError,
       );
-    } catch (e) {
-      aiError = e.toString().contains('429')
-          ? 'Gemini 사용량 한도를 초과해 AI 요약을 건너뛰었습니다'
-          : 'AI 요약을 가져오지 못했습니다';
-      print('Gemini 요약 오류: $e');
-    }
-  }
-
-  return AiBriefing(
-    weather: weather,
-    weatherError: weatherError,
-    news: news,
-    newsError: newsError,
-    aiSummary: aiSummary,
-    aiError: aiError,
-  );
-});
+    });
 
 String _dayLabel(DateTime d) =>
     '${d.month}/${d.day}(${_weekdays[d.weekday - 1]})';
@@ -217,7 +217,7 @@ class AiBriefingDialog extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(24, 20, 12, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.auto_awesome, color: _accent),
+                  Icon(Icons.auto_awesome, color: context.accent),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Column(
@@ -312,7 +312,7 @@ class _Result extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _accent.withValues(alpha: 0.06),
+              color: context.accent.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(10),
             ),
             child: SelectableText(
@@ -360,7 +360,7 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: _accent),
+          Icon(icon, size: 16, color: context.accent),
           const SizedBox(width: 6),
           Text(
             title,
@@ -406,7 +406,7 @@ class _WeatherRow extends StatelessWidget {
               isToday ? '오늘' : _dayLabel(day.date),
               style: TextStyle(
                 fontSize: 12,
-                color: isToday ? _accent : null,
+                color: isToday ? context.accent : null,
                 fontWeight: isToday ? FontWeight.bold : null,
               ),
             ),
@@ -429,7 +429,7 @@ class _WeatherRow extends StatelessWidget {
               '☔ ${day.rainChance}%',
               style: TextStyle(
                 fontSize: 12,
-                color: rainy ? _accent : Colors.grey,
+                color: rainy ? context.accent : Colors.grey,
                 fontWeight: rainy ? FontWeight.w600 : null,
               ),
             ),

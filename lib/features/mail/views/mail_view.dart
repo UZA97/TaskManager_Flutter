@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
@@ -68,7 +69,7 @@ class _MailViewState extends ConsumerState<MailView> {
             icon: const Icon(Icons.login, size: 18),
             label: const Text('로그인'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4A90E2),
+              backgroundColor: context.accent,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
@@ -86,8 +87,8 @@ class _MailViewState extends ConsumerState<MailView> {
         // 좌측: 메일 목록
         Container(
           width: 250,
-          decoration: const BoxDecoration(
-            border: Border(right: BorderSide(color: Color(0xFFDDDDDD))),
+          decoration: BoxDecoration(
+            border: Border(right: BorderSide(color: context.line)),
           ),
           child: Column(
             children: [
@@ -97,8 +98,8 @@ class _MailViewState extends ConsumerState<MailView> {
                   horizontal: 16,
                   vertical: 12,
                 ),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFFDDDDDD))),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: context.line)),
                 ),
                 child: Row(
                   children: [
@@ -207,8 +208,8 @@ class _MailListItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
-          border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+          color: isSelected ? context.selectedTint : Colors.transparent,
+          border: Border(bottom: BorderSide(color: context.lineSubtle)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,8 +222,8 @@ class _MailListItem extends StatelessWidget {
                     width: 6,
                     height: 6,
                     margin: const EdgeInsets.only(right: 6),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF4A90E2),
+                    decoration: BoxDecoration(
+                      color: context.accent,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -309,14 +310,10 @@ class _MailDetailView extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4A90E2).withOpacity(0.1),
+                  color: context.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(
-                  Icons.person,
-                  color: Color(0xFF4A90E2),
-                  size: 18,
-                ),
+                child: Icon(Icons.person, color: context.accent, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(

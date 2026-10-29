@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'core/config/app_config.dart';
 import 'package:flutter/services.dart';
 import 'core/auth/google_account_provider.dart';
 import 'features/mail/widgets/google_login_dialog.dart';
@@ -12,9 +13,10 @@ import 'core/notification/notification_service.dart';
 import 'core/tray/tray_service.dart';
 import 'core/settings/settings_provider.dart';
 import 'core/settings/app_settings.dart';
+import 'core/theme/app_colors.dart';
 import 'features/lock/views/lock_screen.dart';
 import 'features/memo/views/memo_list_view.dart';
-import 'features/memo/views/memo_editor_view.dart';
+import 'features/memo/editor_v2/editor_mode_provider.dart';
 import 'features/calendar/views/calendar_view.dart';
 import 'features/calendar/views/calendar_editor_view.dart';
 import 'features/settings/views/settings_view.dart';
@@ -37,6 +39,8 @@ import 'features/briefing/briefing_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 구글 OAuth·Gemini 키 (config/*.json 에셋)
+  await AppConfig.load();
 
   // 윈도우 앱의 표시/종료 동작을 제어하기 위해 window_manager 초기화
   await windowManager.ensureInitialized();
@@ -91,8 +95,8 @@ class TaskManagerApp extends ConsumerWidget {
       localizationsDelegates: const [AppFlowyEditorLocalizations.delegate],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: settings?.themeColor ?? const Color(0xFF4A90E2),
-        ).copyWith(primary: settings?.themeColor ?? const Color(0xFF4A90E2)),
+          seedColor: appSeedColor,
+        ).copyWith(primary: settings?.themeColor ?? appSeedColor),
         useMaterial3: true,
         textTheme: TextTheme(
           bodySmall: TextStyle(fontSize: base - 2),
@@ -104,10 +108,13 @@ class TaskManagerApp extends ConsumerWidget {
         ),
       ),
       darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: settings?.themeColor ?? const Color(0xFF4A90E2),
-          brightness: Brightness.dark,
-        ).copyWith(primary: settings?.themeColor ?? const Color(0xFF4A90E2)),
+        colorScheme: withDarkColors(
+          ColorScheme.fromSeed(
+            seedColor: appSeedColor,
+            brightness: Brightness.dark,
+          ).copyWith(primary: settings?.themeColor ?? appSeedColor),
+        ),
+        scaffoldBackgroundColor: darkBackground,
         useMaterial3: true,
         textTheme: TextTheme(
           bodySmall: TextStyle(fontSize: base - 2),
@@ -138,33 +145,22 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   bool _isLocked = false;
   final Set<String> _notifiedAlarmKeys = {};
 
-  /// 메인 화면 좌측 네비게이션에 표시할 항목 목록입니다.
-  static const List<NavigationRailDestination> _navigationDestinations = [
-    NavigationRailDestination(
-      icon: Icon(Icons.note, color: Colors.white),
-      selectedIcon: Icon(Icons.note, color: Color(0xFF4A90E2)),
-      label: Text('메모'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.calendar_month, color: Colors.white),
-      selectedIcon: Icon(Icons.calendar_month, color: Color(0xFF4A90E2)),
-      label: Text('캘린더'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.mail, color: Colors.white),
-      selectedIcon: Icon(Icons.mail, color: Color(0xFF4A90E2)),
-      label: Text('메일'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.map, color: Colors.white),
-      selectedIcon: Icon(Icons.map, color: Color(0xFF4A90E2)),
-      label: Text('지도'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.settings, color: Colors.white),
-      selectedIcon: Icon(Icons.settings, color: Color(0xFF4A90E2)),
-      label: Text('설정'),
-    ),
+  static const _navigationItems = [
+    (Icons.note, '메모'),
+    (Icons.calendar_month, '캘린더'),
+    (Icons.mail, '메일'),
+    (Icons.map, '지도'),
+    (Icons.settings, '설정'),
+  ];
+
+  /// 메인 화면 좌측 네비게이션에 표시할 항목 목록 (선택된 아이콘은 테마색)
+  List<NavigationRailDestination> _navigationDestinations(Color accent) => [
+    for (final (icon, label) in _navigationItems)
+      NavigationRailDestination(
+        icon: Icon(icon, color: Colors.white),
+        selectedIcon: Icon(icon, color: accent),
+        label: Text(label),
+      ),
   ];
 
   /// 메인 화면 좌측 패널에 보여줄 사이드바 콘텐츠 목록입니다.
@@ -178,7 +174,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
 
   /// 메인 화면 우측 콘텐츠 영역에 보여줄 상세 뷰 목록입니다.
   static const List<Widget> _detailPanels = [
-    MemoEditorView(),
+    MemoEditorSwitcher(),
     CalendarEditorView(),
     MailDetailView(),
     MapView(),
@@ -364,7 +360,8 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     final eventDate = DateTime.parse(event.eventDate);
 
     // 시간 일정은 시작 시각, 하루종일 일정은 alarmTime(기본 09:00) 기준
-    final time = event.startTime ??
+    final time =
+        event.startTime ??
         (event.alarmTime.isNotEmpty ? event.alarmTime : '09:00');
     final parts = time.split(':');
     final eventDateTime = DateTime(
@@ -432,7 +429,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
               icon: const Icon(Icons.wb_sunny_outlined, color: Colors.white),
               onPressed: () => showBriefingDialog(context),
             ),
-            destinations: _navigationDestinations,
+            destinations: _navigationDestinations(context.accent),
           ),
           Container(
             width: 250,
@@ -446,7 +443,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
               ),
             ),
           ),
-          const VerticalDivider(width: 1, color: Color(0xFFDDDDDD)),
+          VerticalDivider(width: 1, color: context.line),
           // 메인 패널
           Expanded(
             child: AnimatedSwitcher(
@@ -595,7 +592,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90E2),
+                  backgroundColor: context.accent,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('업데이트'),

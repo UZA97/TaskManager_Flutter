@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/google_account_provider.dart';
@@ -50,14 +51,10 @@ class _GoogleLoginDialogState extends ConsumerState<GoogleLoginDialog> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: const Color(0xFF4A90E2).withOpacity(0.1),
+                color: context.accent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
-                Icons.task_alt,
-                size: 40,
-                color: Color(0xFF4A90E2),
-              ),
+              child: Icon(Icons.task_alt, size: 40, color: context.accent),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -83,7 +80,7 @@ class _GoogleLoginDialogState extends ConsumerState<GoogleLoginDialog> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
-                    side: const BorderSide(color: Color(0xFFDDDDDD)),
+                    side: BorderSide(color: context.line),
                   ),
                 ),
                 child: _isLoading
@@ -124,7 +121,7 @@ class _GoogleLoginDialogState extends ConsumerState<GoogleLoginDialog> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  side: const BorderSide(color: Color(0xFFDDDDDD)),
+                  side: BorderSide(color: context.line),
                 ),
                 child: const Text(
                   '게스트로 시작',

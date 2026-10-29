@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taskmanager/features/map/services/location_search_result.dart';
@@ -24,8 +25,8 @@ class CalendarEditorView extends ConsumerWidget {
         // 헤더
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0xFFDDDDDD))),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: context.line)),
           ),
           child: Row(
             children: [
@@ -50,7 +51,7 @@ class CalendarEditorView extends ConsumerWidget {
                     horizontal: 12,
                     vertical: 4,
                   ),
-                  side: const BorderSide(color: Color(0xFFDDDDDD)),
+                  side: BorderSide(color: context.line),
                 ),
                 child: const Text('오늘', style: TextStyle(fontSize: 12)),
               ),
@@ -61,7 +62,7 @@ class CalendarEditorView extends ConsumerWidget {
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('일정 추가', style: TextStyle(fontSize: 12)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90E2),
+                  backgroundColor: context.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -75,8 +76,8 @@ class CalendarEditorView extends ConsumerWidget {
 
         // 요일 헤더
         Container(
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: context.lineSubtle)),
           ),
           child: Row(
             children: ['일', '월', '화', '수', '목', '금', '토']
@@ -183,8 +184,8 @@ class _CalendarGrid extends StatelessWidget {
                 return Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFEEEEEE)),
-                      color: const Color(0xFFF9F9F9),
+                      border: Border.all(color: context.lineSubtle),
+                      color: context.surfaceMuted,
                     ),
                   ),
                 );
@@ -256,7 +257,7 @@ class _CalendarCell extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFEEEEEE)),
+          border: Border.all(color: context.lineSubtle),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,8 +269,8 @@ class _CalendarCell extends StatelessWidget {
                 width: 24,
                 height: 24,
                 decoration: isToday
-                    ? const BoxDecoration(
-                        color: Color(0xFF4A90E2),
+                    ? BoxDecoration(
+                        color: context.accent,
                         shape: BoxShape.circle,
                       )
                     : null,
@@ -323,7 +324,7 @@ class _CalendarCell extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: event.tagColor != null
                             ? _hexToColor(event.tagColor!).withOpacity(0.8)
-                            : const Color(0xFF4A90E2).withOpacity(0.15),
+                            : context.accent.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: Text(
@@ -580,7 +581,8 @@ class _EventDialogState extends ConsumerState<EventDialog> {
       isCompleted: widget.event?.isCompleted ?? false,
       tagColor: widget.event?.tagColor,
       recurrence: _recurrence.key,
-      recurrenceUntil: _recurrence == Recurrence.none || _recurrenceUntil == null
+      recurrenceUntil:
+          _recurrence == Recurrence.none || _recurrenceUntil == null
           ? null
           : _formatDate(_recurrenceUntil!),
     );
@@ -680,9 +682,7 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: const Color(0xFFDDDDDD),
-                                ),
+                                border: Border.all(color: context.line),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -702,9 +702,7 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: const Color(0xFFDDDDDD),
-                                ),
+                                border: Border.all(color: context.line),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -748,9 +746,7 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: const Color(0xFFDDDDDD),
-                                ),
+                                border: Border.all(color: context.line),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -770,9 +766,7 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: const Color(0xFFDDDDDD),
-                                ),
+                                border: Border.all(color: context.line),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -1003,7 +997,7 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                   ElevatedButton(
                     onPressed: _save,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A90E2),
+                      backgroundColor: context.accent,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('저장'),

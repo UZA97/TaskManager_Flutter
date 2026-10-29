@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -57,7 +58,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
   SelectionMenuItem get _askAiMenuItem => SelectionMenuItem(
     getName: () => 'Ask AI',
     icon: (editorState, onSelected, style) =>
-        const Icon(Icons.auto_awesome, color: Color(0xFF4A90E2), size: 18),
+        Icon(Icons.auto_awesome, color: context.accent, size: 18),
     keywords: ['ai', 'ask', '질문', 'gemini'],
     handler: (editorState, menuService, context) {
       menuService.dismiss();
@@ -1231,7 +1232,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                       const SizedBox(width: 4),
                       _buildToggleButton(
                         icon: Icons.push_pin,
-                        activeColor: const Color(0xFF4A90E2),
+                        activeColor: context.accent,
                         isActive: _currentNote!.isPinned,
                         tooltip: _currentNote!.isPinned ? '고정 해제' : '고정',
                         onTap: () => ref
@@ -1303,14 +1304,14 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE8F0FE),
+                                color: context.selectedTint,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
                                 '#$tag',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: Color(0xFF4A90E2),
+                                  color: context.accent,
                                 ),
                               ),
                             );
@@ -1320,7 +1321,7 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                     );
                   },
                 ),
-              const Divider(height: 1, color: Color(0xFFDDDDDD)),
+              Divider(height: 1, color: context.line),
 
               const SizedBox(height: 24), // 제목 <-> 내용 간격
               Expanded(
@@ -1357,8 +1358,8 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
                   horizontal: 16,
                   vertical: 8,
                 ),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFFDDDDDD))),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: context.line)),
                 ),
                 child: Row(
                   children: [
@@ -1604,19 +1605,19 @@ class _MemoEditorViewState extends ConsumerState<MemoEditorView> {
             Container(
               decoration: BoxDecoration(
                 color: const Color.fromRGBO(74, 144, 226, 0.1),
-                border: Border.all(color: const Color(0xFF4A90E2), width: 2),
+                border: Border.all(color: context.accent, width: 2),
               ),
-              child: const Center(
+              child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.upload_file, size: 48, color: Color(0xFF4A90E2)),
+                    Icon(Icons.upload_file, size: 48, color: context.accent),
                     SizedBox(height: 8),
                     Text(
                       '파일을 여기에 놓으세요',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Color(0xFF4A90E2),
+                        color: context.accent,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

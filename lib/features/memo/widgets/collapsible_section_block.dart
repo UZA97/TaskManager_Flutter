@@ -1,5 +1,6 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 
 const collapsibleSectionType = 'collapsible_section';
@@ -254,7 +255,7 @@ class _CollapsibleSectionBlockWidgetState
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFDDDDDD)),
+        border: Border.all(color: context.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,7 +306,7 @@ class _CollapsibleSectionBlockWidgetState
           ),
           // 내용
           if (!_collapsed) ...[
-            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+            Divider(height: 1, color: context.lineSubtle),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
               child: Column(

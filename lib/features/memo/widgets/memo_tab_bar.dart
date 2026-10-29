@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/note.dart';
@@ -33,8 +34,8 @@ class MemoTabBar extends ConsumerWidget {
 
         return Container(
           height: 36,
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0xFFDDDDDD))),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: context.line)),
           ),
           child: Row(
             children: [
@@ -149,16 +150,14 @@ class _TabItemState extends State<_TabItem> {
             color: widget.isActive
                 ? Theme.of(context).colorScheme.surface
                 : _hovered
-                ? const Color(0xFFF5F5F5)
-                : const Color(0xFFEEEEEE),
+                ? context.surfaceSoft
+                : context.lineSubtle,
             border: Border(
               bottom: BorderSide(
-                color: widget.isActive
-                    ? const Color(0xFF4A90E2)
-                    : Colors.transparent,
+                color: widget.isActive ? context.accent : Colors.transparent,
                 width: 2,
               ),
-              right: const BorderSide(color: Color(0xFFDDDDDD)),
+              right: BorderSide(color: context.line),
             ),
           ),
           child: Row(
@@ -174,7 +173,7 @@ class _TabItemState extends State<_TabItem> {
                     fontWeight: widget.isActive
                         ? FontWeight.w600
                         : FontWeight.normal,
-                    color: widget.isActive ? const Color(0xFF4A90E2) : null,
+                    color: widget.isActive ? context.accent : null,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -189,9 +188,7 @@ class _TabItemState extends State<_TabItem> {
                     width: 16,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: _hovered
-                          ? const Color(0xFFDDDDDD)
-                          : Colors.transparent,
+                      color: _hovered ? context.line : Colors.transparent,
                       borderRadius: BorderRadius.circular(3),
                     ),
                     child: const Icon(
@@ -221,8 +218,8 @@ class _AddTabButton extends ConsumerWidget {
         child: Container(
           width: 36,
           height: 36,
-          decoration: const BoxDecoration(
-            border: Border(left: BorderSide(color: Color(0xFFDDDDDD))),
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: context.line)),
           ),
           child: const Icon(Icons.add, size: 16, color: Colors.grey),
         ),
@@ -356,8 +353,8 @@ class _OverflowTabButton extends ConsumerWidget {
         child: Container(
           width: 36,
           height: 36,
-          decoration: const BoxDecoration(
-            border: Border(left: BorderSide(color: Color(0xFFDDDDDD))),
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: context.line)),
           ),
           child: const Icon(
             Icons.arrow_drop_down,
@@ -395,14 +392,14 @@ class _OverflowTabButton extends ConsumerWidget {
               Icon(
                 Icons.note,
                 size: 14,
-                color: isActive ? const Color(0xFF4A90E2) : Colors.grey,
+                color: isActive ? context.accent : Colors.grey,
               ),
               const SizedBox(width: 8),
               Text(
                 note.title.isEmpty ? '제목 없음' : note.title,
                 style: TextStyle(
                   fontSize: 13,
-                  color: isActive ? const Color(0xFF4A90E2) : null,
+                  color: isActive ? context.accent : null,
                   fontWeight: isActive ? FontWeight.w600 : null,
                 ),
               ),

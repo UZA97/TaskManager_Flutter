@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/folder.dart';
@@ -27,7 +28,7 @@ class MemoListView extends ConsumerWidget {
         // 검색창: 현재 메모 목록을 빠르게 필터링합니다.
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: _buildSearchField(ref),
+          child: _buildSearchField(context, ref),
         ),
 
         const SizedBox(height: 8),
@@ -59,7 +60,7 @@ class MemoListView extends ConsumerWidget {
             label: const Text('폴더', style: TextStyle(fontSize: 12)),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 6),
-              side: const BorderSide(color: Color(0xFFDDDDDD)),
+              side: BorderSide(color: context.line),
               foregroundColor: Colors.grey[700],
             ),
           ),
@@ -72,7 +73,7 @@ class MemoListView extends ConsumerWidget {
             label: const Text('메모', style: TextStyle(fontSize: 12)),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 6),
-              backgroundColor: const Color(0xFF4A90E2),
+              backgroundColor: context.accent,
               foregroundColor: Colors.white,
             ),
           ),
@@ -82,14 +83,14 @@ class MemoListView extends ConsumerWidget {
   }
 
   /// 메모 목록 검색 입력창을 구성합니다.
-  Widget _buildSearchField(WidgetRef ref) {
+  Widget _buildSearchField(BuildContext context, WidgetRef ref) {
     return TextField(
       decoration: InputDecoration(
         hintText: '검색',
         prefixIcon: const Icon(Icons.search, size: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFDDDDDD)),
+          borderSide: BorderSide(color: context.line),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 8),
         isDense: true,
@@ -422,15 +423,11 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
                     horizontal: 12,
                     vertical: 6,
                   ),
-                  color: const Color(0xFFE8F0FE),
+                  color: context.selectedTint,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.folder,
-                        size: 14,
-                        color: Color(0xFF4A90E2),
-                      ),
+                      Icon(Icons.folder, size: 14, color: context.accent),
                       const SizedBox(width: 6),
                       Text(
                         widget.folder.name,
@@ -552,7 +549,7 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
         color: isHovered
             ? const Color(0xFFBBDEFB)
             : isSelected
-            ? const Color(0xFFE8F0FE)
+            ? context.selectedTint
             : Colors.transparent,
         child: Row(
           children: [
@@ -570,7 +567,7 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
             Icon(
               _isExpanded ? Icons.folder_open : Icons.folder,
               size: 14,
-              color: const Color(0xFF4A90E2),
+              color: context.accent,
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -791,7 +788,7 @@ class _NoteNode extends ConsumerWidget {
           top: 4,
           bottom: 4,
         ),
-        color: isSelected ? const Color(0xFFE8F0FE) : Colors.transparent,
+        color: isSelected ? context.selectedTint : Colors.transparent,
         child: Row(
           children: [
             const Icon(Icons.note, size: 14, color: Colors.grey),
@@ -809,7 +806,7 @@ class _NoteNode extends ConsumerWidget {
             if (note.isImportant)
               const Icon(Icons.priority_high, size: 12, color: Colors.orange),
             if (note.isPinned)
-              const Icon(Icons.push_pin, size: 12, color: Color(0xFF4A90E2)),
+              Icon(Icons.push_pin, size: 12, color: context.accent),
             if (note.isFavorite)
               const Icon(Icons.star, size: 10, color: Colors.amber),
           ],
@@ -829,7 +826,7 @@ class _NoteNode extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          color: const Color(0xFFE8F0FE),
+          color: context.selectedTint,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -973,7 +970,7 @@ class _DropIndicator extends ConsumerWidget {
           duration: const Duration(milliseconds: 150),
           height: isHovered ? 3 : 2,
           margin: const EdgeInsets.symmetric(vertical: 1),
-          color: isHovered ? const Color(0xFF4A90E2) : Colors.transparent,
+          color: isHovered ? context.accent : Colors.transparent,
         );
       },
     );
@@ -1099,7 +1096,7 @@ class _FavoriteSectionHeader extends ConsumerWidget {
                   fontWeight: FontWeight.bold,
                   color: isHovered
                       ? Colors.amber
-                      : const Color.fromARGB(255, 0, 0, 0),
+                      : const Color.fromARGB(255, 120, 120, 120),
                   letterSpacing: 0.8,
                 ),
               ),
@@ -1136,7 +1133,7 @@ class _FavoriteItem extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(30, 4, 8, 4),
         child: Row(
           children: [
-            const Icon(Icons.folder, size: 14, color: Color(0xFF4A90E2)),
+            Icon(Icons.folder, size: 14, color: context.accent),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -1164,11 +1161,11 @@ class _FavoriteItem extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          color: const Color(0xFFE8F0FE),
+          color: context.selectedTint,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.folder, size: 14, color: Color(0xFF4A90E2)),
+              Icon(Icons.folder, size: 14, color: context.accent),
               const SizedBox(width: 6),
               Text(folder.name, style: const TextStyle(fontSize: 13)),
             ],
@@ -1244,7 +1241,7 @@ class _FavoriteNoteItem extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          color: const Color(0xFFE8F0FE),
+          color: context.selectedTint,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

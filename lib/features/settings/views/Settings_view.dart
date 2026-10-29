@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/settings/settings_category.dart';
@@ -68,18 +69,18 @@ class SettingsView extends ConsumerWidget {
           leading: Icon(
             item.icon,
             size: 18,
-            color: isSelected ? const Color(0xFF4A90E2) : Colors.grey,
+            color: isSelected ? context.accent : Colors.grey,
           ),
           title: Text(
             item.label,
             style: TextStyle(
               fontSize: 13,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              color: isSelected ? const Color(0xFF4A90E2) : null,
+              color: isSelected ? context.accent : null,
             ),
           ),
           selected: isSelected,
-          selectedTileColor: const Color(0xFFE8F0FE),
+          selectedTileColor: context.selectedTint,
           onTap: () =>
               ref.read(settingsCategoryProvider.notifier).select(item.category),
         );

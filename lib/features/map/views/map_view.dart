@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -423,9 +424,9 @@ class _MapViewState extends ConsumerState<MapView> {
                               );
                           _mapController.move(LatLng(r.lat, r.lng), _maxZoom);
                         },
-                        child: const Icon(
+                        child: Icon(
                           Icons.place,
-                          color: Color(0xFF4A90E2),
+                          color: context.accent,
                           size: 22,
                         ),
                       ),

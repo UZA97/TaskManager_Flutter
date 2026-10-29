@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/settings/settings_category.dart';
@@ -8,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/settings/app_settings.dart';
 import '../../../core/auth/google_account_provider.dart';
 import '../../memo/providers/note_provider.dart';
+import '../../memo/editor_v2/editor_mode_provider.dart';
 import '../../../core/database/database_provider.dart';
 import '../views/google_drive_sync_service.dart';
 
@@ -75,7 +77,7 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
               icon: const Icon(Icons.cloud_upload, size: 16),
               label: const Text('업로드'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4A90E2),
+                backgroundColor: context.accent,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -99,7 +101,7 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFDDDDDD)),
+        border: Border.all(color: context.line),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -108,10 +110,10 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF4A90E2).withOpacity(0.1),
+              color: context.accent.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.account_circle, color: Color(0xFF4A90E2)),
+            child: Icon(Icons.account_circle, color: context.accent),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -151,7 +153,7 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
       icon: const Icon(Icons.login, size: 16),
       label: const Text('Google 계정 연동'),
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF4A90E2),
+        backgroundColor: context.accent,
         foregroundColor: Colors.white,
       ),
     );
@@ -240,6 +242,14 @@ class _GeneralSettings extends ConsumerWidget {
               value: settings.trayModeEnabled,
               onChanged: (v) =>
                   ref.read(settingsProvider.notifier).setTrayMode(v),
+            ),
+          ),
+          _SettingsRow(
+            title: '새 메모 에디터 (베타)',
+            subtitle: '한글 입력이 안정적인 새 에디터. 끄면 기존 에디터로 돌아갑니다 (메모 내용은 그대로)',
+            trailing: Switch(
+              value: ref.watch(newMemoEditorProvider).value ?? true,
+              onChanged: (v) => ref.read(newMemoEditorProvider.notifier).set(v),
             ),
           ),
           const SizedBox(height: 16),
@@ -680,7 +690,7 @@ class _InfoSettingsState extends State<_InfoSettings> {
             icon: const Icon(Icons.download, size: 16),
             label: Text('${_checkResult!.latestVersion}으로 업데이트'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4A90E2),
+              backgroundColor: context.accent,
               foregroundColor: Colors.white,
             ),
           )
@@ -762,7 +772,7 @@ class _NotificationSettings extends ConsumerWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFDDDDDD)),
+                      border: Border.all(color: context.line),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -797,7 +807,7 @@ class _NotificationSettings extends ConsumerWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFDDDDDD)),
+                      border: Border.all(color: context.line),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -1093,7 +1103,7 @@ class _PasswordDialogState extends ConsumerState<_PasswordDialog> {
                   child: ElevatedButton(
                     onPressed: _save,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A90E2),
+                      backgroundColor: context.accent,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('저장'),

@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/settings/settings_provider.dart';
@@ -91,7 +92,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _verify,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
+                    backgroundColor: context.accent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),

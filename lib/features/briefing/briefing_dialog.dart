@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,7 +11,6 @@ import '../memo/providers/note_provider.dart';
 import 'briefing_ai_dialog.dart';
 import 'briefing_provider.dart';
 
-const _accent = Color(0xFF4A90E2);
 const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
 
 // 메인 탭 순서 (main.dart의 _navigationDestinations)
@@ -43,7 +43,7 @@ class BriefingDialog extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(24, 20, 12, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.wb_sunny_outlined, color: _accent),
+                  Icon(Icons.wb_sunny_outlined, color: context.accent),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -174,7 +174,7 @@ class _Section extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
             child: Row(
               children: [
-                Icon(icon, size: 16, color: _accent),
+                Icon(icon, size: 16, color: context.accent),
                 const SizedBox(width: 8),
                 Text(
                   title,
@@ -191,12 +191,12 @@ class _Section extends StatelessWidget {
                       vertical: 1,
                     ),
                     decoration: BoxDecoration(
-                      color: _accent.withValues(alpha: 0.12),
+                      color: context.accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '$count',
-                      style: const TextStyle(fontSize: 11, color: _accent),
+                      style: TextStyle(fontSize: 11, color: context.accent),
                     ),
                   ),
                 ],
@@ -276,9 +276,9 @@ class _MailTile extends ConsumerWidget {
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-      leading: const SizedBox(
+      leading: SizedBox(
         width: 72,
-        child: Icon(Icons.circle, size: 8, color: _accent),
+        child: Icon(Icons.circle, size: 8, color: context.accent),
       ),
       title: Text(mail.subject, overflow: TextOverflow.ellipsis),
       subtitle: Text(mail.from, overflow: TextOverflow.ellipsis),
@@ -312,13 +312,11 @@ class _TodoTile extends ConsumerWidget {
       ),
       onTap: () {
         // 메모를 연 뒤 해당 체크리스트로 커서 이동
-        ref
-            .read(memoFocusRequestProvider.notifier)
-            .request((
-              noteId: todo.note.id!,
-              path: todo.path,
-              text: todo.text,
-            ));
+        ref.read(memoFocusRequestProvider.notifier).request((
+          noteId: todo.note.id!,
+          path: todo.path,
+          text: todo.text,
+        ));
         ref.read(selectedNoteProvider.notifier).select(todo.note);
         ref.read(navigationProvider.notifier).navigateTo(_memoTab);
         Navigator.pop(context);

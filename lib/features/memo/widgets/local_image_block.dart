@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'dart:io';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
@@ -332,10 +333,7 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget>
                     child: IgnorePointer(
                       child: Container(
                         decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0xFF4A90E2),
-                            width: 2,
-                          ),
+                          border: Border.all(color: context.accent, width: 2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -384,7 +382,7 @@ class _LocalImageBlockWidgetState extends State<LocalImageBlockWidget>
                           width: 24,
                           height: 24,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF4A90E2),
+                            color: context.accent,
                             borderRadius: BorderRadius.circular(2),
                           ),
                           child: const Icon(

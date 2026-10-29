@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/event_provider.dart';
@@ -161,9 +162,9 @@ class _MiniCalendar extends ConsumerWidget {
             margin: const EdgeInsets.all(1),
             decoration: BoxDecoration(
               color: isSelected
-                  ? const Color(0xFF4A90E2)
+                  ? context.accent
                   : isToday
-                  ? const Color(0xFFDCEBFF)
+                  ? context.accent.withValues(alpha: 0.18)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(4),
             ),
@@ -188,9 +189,7 @@ class _MiniCalendar extends ConsumerWidget {
                     width: 3,
                     height: 3,
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white
-                          : const Color(0xFF4A90E2),
+                      color: isSelected ? Colors.white : context.accent,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -236,9 +235,7 @@ class _MiniCalendar extends ConsumerWidget {
                 child: Container(
                   margin: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFF4A90E2)
-                        : Colors.transparent,
+                    color: isSelected ? context.accent : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Center(
@@ -295,9 +292,9 @@ class _TagFilterSection extends ConsumerWidget {
                     print('현재 필터: ${ref.read(tagFilterProvider)}');
                     ref.read(tagFilterProvider.notifier).clear();
                   },
-                  child: const Text(
+                  child: Text(
                     '초기화',
-                    style: TextStyle(fontSize: 10, color: Color(0xFF4A90E2)),
+                    style: TextStyle(fontSize: 10, color: context.accent),
                   ),
                 ),
               ],

@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart' as provider;
@@ -222,9 +223,7 @@ class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: _isEditing
-                  ? const Color(0xFF4A90E2)
-                  : const Color(0xFFDDDDDD),
+              color: _isEditing ? context.accent : context.line,
             ),
           ),
           child: Column(
@@ -235,8 +234,8 @@ class _LocalCodeBlockWidgetState extends State<LocalCodeBlockWidget>
                   horizontal: 12,
                   vertical: 6,
                 ),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
+                decoration: BoxDecoration(
+                  color: context.surfaceSoft,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(8),
                     topRight: Radius.circular(8),

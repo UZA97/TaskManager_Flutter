@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/gemini_service.dart';
@@ -85,16 +86,12 @@ class _AskAiDialogState extends State<AskAiDialog> {
             // 헤더
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: context.lineSubtle)),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.auto_awesome,
-                    color: Color(0xFF4A90E2),
-                    size: 20,
-                  ),
+                  Icon(Icons.auto_awesome, color: context.accent, size: 20),
                   const SizedBox(width: 8),
                   const Text(
                     'Ask AI',
@@ -114,14 +111,14 @@ class _AskAiDialogState extends State<AskAiDialog> {
             // 대화 목록
             Expanded(
               child: _messages.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.auto_awesome,
                             size: 40,
-                            color: Color(0xFFDDDDDD),
+                            color: context.line,
                           ),
                           SizedBox(height: 12),
                           Text(
@@ -154,8 +151,8 @@ class _AskAiDialogState extends State<AskAiDialog> {
             // 입력창
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: context.lineSubtle)),
               ),
               child: Row(
                 children: [
@@ -172,21 +169,15 @@ class _AskAiDialogState extends State<AskAiDialog> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFEEEEEE),
-                          ),
+                          borderSide: BorderSide(color: context.lineSubtle),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFEEEEEE),
-                          ),
+                          borderSide: BorderSide(color: context.lineSubtle),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF4A90E2),
-                          ),
+                          borderSide: BorderSide(color: context.accent),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -206,9 +197,7 @@ class _AskAiDialogState extends State<AskAiDialog> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: _isLoading
-                            ? Colors.grey[300]
-                            : const Color(0xFF4A90E2),
+                        color: _isLoading ? Colors.grey[300] : context.accent,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -248,14 +237,10 @@ class _ChatBubble extends StatelessWidget {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: const Color(0xFF4A90E2).withOpacity(0.1),
+                color: context.accent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(
-                Icons.auto_awesome,
-                size: 14,
-                color: Color(0xFF4A90E2),
-              ),
+              child: Icon(Icons.auto_awesome, size: 14, color: context.accent),
             ),
             const SizedBox(width: 8),
           ],
@@ -270,9 +255,7 @@ class _ChatBubble extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: isUser
-                      ? const Color(0xFF4A90E2)
-                      : const Color(0xFFF5F5F5),
+                  color: isUser ? context.accent : context.surfaceSoft,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(16),
                     topRight: const Radius.circular(16),
@@ -329,7 +312,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: context.surfaceSoft,
         borderRadius: BorderRadius.circular(16),
       ),
       child: AnimatedBuilder(

@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -103,20 +104,16 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     decoration: BoxDecoration(
-                      color: _isSearchTab
-                          ? const Color(0xFF4A90E2)
-                          : Colors.transparent,
+                      color: _isSearchTab ? context.accent : Colors.transparent,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF4A90E2)),
+                      border: Border.all(color: context.accent),
                     ),
                     child: Center(
                       child: Text(
                         '검색',
                         style: TextStyle(
                           fontSize: 12,
-                          color: _isSearchTab
-                              ? Colors.white
-                              : const Color(0xFF4A90E2),
+                          color: _isSearchTab ? Colors.white : context.accent,
                         ),
                       ),
                     ),
@@ -131,19 +128,17 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     decoration: BoxDecoration(
                       color: !_isSearchTab
-                          ? const Color(0xFF4A90E2)
+                          ? context.accent
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF4A90E2)),
+                      border: Border.all(color: context.accent),
                     ),
                     child: Center(
                       child: Text(
                         '저장된 장소',
                         style: TextStyle(
                           fontSize: 12,
-                          color: !_isSearchTab
-                              ? Colors.white
-                              : const Color(0xFF4A90E2),
+                          color: !_isSearchTab ? Colors.white : context.accent,
                         ),
                       ),
                     ),
@@ -216,10 +211,10 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.label,
                             size: 16,
-                            color: Color(0xFF4A90E2),
+                            color: context.accent,
                           ),
                           tooltip: '태그 저장',
                           onPressed: () => _showTagSaveDialog(result),
@@ -593,9 +588,9 @@ class _TagSelectDialogState extends State<_TagSelectDialog> {
             const SizedBox(height: 8),
             GestureDetector(
               onTap: () => setState(() => _isCreating = !_isCreating),
-              child: const Text(
+              child: Text(
                 '+ 새 태그 만들기',
-                style: TextStyle(fontSize: 12, color: Color(0xFF4A90E2)),
+                style: TextStyle(fontSize: 12, color: context.accent),
               ),
             ),
             if (_isCreating) ...[
@@ -667,7 +662,7 @@ class _TagSelectDialogState extends State<_TagSelectDialog> {
                   if (context.mounted) Navigator.pop(context);
                 },
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4A90E2),
+            backgroundColor: context.accent,
             foregroundColor: Colors.white,
           ),
           child: const Text('저장'),

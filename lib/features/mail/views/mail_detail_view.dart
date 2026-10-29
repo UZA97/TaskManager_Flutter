@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
@@ -30,7 +31,6 @@ class MailDetailView extends ConsumerWidget {
       });
     }
 
-
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -47,14 +47,10 @@ class MailDetailView extends ConsumerWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4A90E2).withOpacity(0.1),
+                  color: context.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(
-                  Icons.person,
-                  color: Color(0xFF4A90E2),
-                  size: 18,
-                ),
+                child: Icon(Icons.person, color: context.accent, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -131,7 +127,7 @@ class MailDetailView extends ConsumerWidget {
                 icon: const Icon(Icons.reply, size: 16),
                 label: const Text('답장'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90E2),
+                  backgroundColor: context.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,

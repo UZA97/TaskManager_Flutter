@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
@@ -43,7 +44,7 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : const Color(0xFF4A90E2),
+        backgroundColor: isError ? Colors.red : context.accent,
       ),
     );
   }
@@ -130,7 +131,7 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFDDDDDD)),
+            border: Border.all(color: context.line),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -209,7 +210,7 @@ class _MailLoginDialogState extends ConsumerState<MailLoginDialog> {
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90E2),
+                  backgroundColor: context.accent,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('닫기'),

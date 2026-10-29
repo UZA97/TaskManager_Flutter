@@ -1,3 +1,4 @@
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -228,9 +229,9 @@ class _LocalLocationBlockWidgetState extends State<LocalLocationBlockWidget>
                 const SizedBox(width: 4),
                 Text(
                   _name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF4A90E2),
+                    color: context.accent,
                     decoration: TextDecoration.underline,
                   ),
                 ),
