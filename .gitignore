@@ -47,3 +47,5 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+# 설치 파일 빌드 결과 (GitHub Release에만 올림)
+installer_output/

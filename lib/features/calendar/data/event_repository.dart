@@ -51,12 +51,14 @@ class EventRepository {
       return byPriority != 0 ? byPriority : a.eventDate.compareTo(b.eventDate);
     });
 
-    // 태그 색상은 일정(id)당 한 번만 조회
-    final tagColors = <int, String?>{};
-    for (final id in events.map((e) => e.id).whereType<int>().toSet()) {
-      final tags = await getEventTags(id);
-      tagColors[id] = tags.isEmpty ? null : tags.first.color;
-    }
+    // 태그 색상은 한 번의 쿼리로 조회
+    final tagsById = await getTagsForEvents(
+      events.map((e) => e.id).whereType<int>(),
+    );
+    final tagColors = {
+      for (final entry in tagsById.entries)
+        if (entry.value.isNotEmpty) entry.key: entry.value.first.color,
+    };
     return events
         .map(
           (e) => tagColors[e.id] == null
@@ -83,7 +85,7 @@ class EventRepository {
     return rows.map(_rowToEvent).toList();
   }
 
-  Future<int> addEvent(Event event) async {
+  Future<int> addEvent(Event event, {bool dirty = false}) async {
     return await _db
         .into(_db.eventTable)
         .insert(
@@ -109,6 +111,7 @@ class EventRepository {
             content: Value(event.content),
             recurrence: Value(event.recurrence),
             recurrenceUntil: Value(event.recurrenceUntil),
+            dirty: Value(dirty),
           ),
         );
   }
@@ -124,6 +127,12 @@ class EventRepository {
     final googleEventId = event.googleEventId;
     if (googleEventId == null || googleEventId.isEmpty) return;
 
+    // 로컬에서 삭제 대기 중인 일정은 다시 가져오지 않음
+    final pendingDelete = await (_db.select(
+      _db.pendingEventDeleteTable,
+    )..where((t) => t.googleEventId.equals(googleEventId))).getSingleOrNull();
+    if (pendingDelete != null) return;
+
     // googleEventId로 기존 이벤트 확인 (중복 행이 있으면 첫 행만 남김)
     final rows = await (_db.select(
       _db.eventTable,
@@ -137,6 +146,9 @@ class EventRepository {
     for (final dup in rows.skip(1)) {
       await deleteEvent(dup.id);
     }
+
+    // 아직 푸시 안 된 로컬 수정은 덮어쓰지 않음
+    if (rows.first.dirty) return;
 
     // 구글에서 관리되는 필드만 갱신 (알람/우선순위/완료/태그/좌표는 로컬 값 유지)
     await (_db.update(
@@ -174,6 +186,66 @@ class EventRepository {
     );
   }
 
+  // 구글에 반영해야 할 원본 행 (수정됨 또는 아직 구글 ID 없음)
+  Future<List<EventTableData>> getRowsNeedingPush() => (_db.select(
+    _db.eventTable,
+  )..where((t) => t.dirty.equals(true) | t.googleEventId.equals(''))).get();
+
+  Future<Set<int>> getDirtyIds() async {
+    final rows = await (_db.select(
+      _db.eventTable,
+    )..where((t) => t.dirty.equals(true))).get();
+    return rows.map((r) => r.id).toSet();
+  }
+
+  /// 푸시 성공 후 처리. 푸시 도중 사용자가 다시 수정했으면 dirty 유지
+  Future<void> markPushed(
+    EventTableData pushed, {
+    String? googleEventId,
+  }) async {
+    await _db.transaction(() async {
+      final current = await (_db.select(
+        _db.eventTable,
+      )..where((t) => t.id.equals(pushed.id))).getSingleOrNull();
+      if (current == null) {
+        // 푸시 중에 로컬에서 삭제됨 → 방금 만든 구글 일정도 삭제 대기
+        if (googleEventId != null) await addPendingDelete(googleEventId);
+        return;
+      }
+      final unchanged = current == pushed;
+      await (_db.update(
+        _db.eventTable,
+      )..where((t) => t.id.equals(pushed.id))).write(
+        EventTableCompanion(
+          googleEventId: googleEventId == null
+              ? const Value.absent()
+              : Value(googleEventId),
+          dirty: unchanged ? const Value(false) : const Value.absent(),
+        ),
+      );
+    });
+  }
+
+  // 삭제 툼스톤
+  Future<void> addPendingDelete(String googleEventId) async {
+    await _db
+        .into(_db.pendingEventDeleteTable)
+        .insertOnConflictUpdate(
+          PendingEventDeleteTableCompanion.insert(googleEventId: googleEventId),
+        );
+  }
+
+  Future<List<String>> getPendingDeletes() async {
+    final rows = await _db.select(_db.pendingEventDeleteTable).get();
+    return rows.map((r) => r.googleEventId).toList();
+  }
+
+  Future<void> removePendingDelete(String googleEventId) async {
+    await (_db.delete(
+      _db.pendingEventDeleteTable,
+    )..where((t) => t.googleEventId.equals(googleEventId))).go();
+  }
+
   Future<void> deleteEvent(int id) async {
     await (_db.delete(_db.eventTable)..where((t) => t.id.equals(id))).go();
   }
@@ -184,7 +256,7 @@ class EventRepository {
     );
   }
 
-  Future<void> updateEvent(Event event) async {
+  Future<void> updateEvent(Event event, {bool dirty = false}) async {
     await (_db.update(
       _db.eventTable,
     )..where((t) => t.id.equals(event.id!))).write(
@@ -197,7 +269,10 @@ class EventRepository {
         alarmDaysBefore: Value(event.alarmDaysBefore),
         isCompleted: Value(event.isCompleted),
         priority: Value(event.priority),
-        googleEventId: Value(event.googleEventId ?? ''),
+        // 화면의 오래된 값(null)으로 동기화 중 받은 구글 ID를 지우지 않도록
+        googleEventId: event.googleEventId == null
+            ? const Value.absent()
+            : Value(event.googleEventId!),
         isAllDay: Value(event.isAllDay),
         startDate: Value(event.startDate),
         endDate: Value(event.endDate),
@@ -209,6 +284,7 @@ class EventRepository {
         locationLng: Value(event.locationLng),
         recurrence: Value(event.recurrence),
         recurrenceUntil: Value(event.recurrenceUntil),
+        dirty: dirty ? const Value(true) : const Value.absent(),
       ),
     );
   }
@@ -268,6 +344,32 @@ class EventRepository {
       return EventTag(id: tag.id, name: tag.name, color: tag.color);
     }).toList();
   }
+
+  // 여러 일정의 태그를 한 번에 조회 (eventId → 태그 목록)
+  Future<Map<int, List<EventTag>>> getTagsForEvents(Iterable<int> ids) async {
+    final idList = ids.toSet().toList();
+    final result = <int, List<EventTag>>{};
+    // SQLite 변수 개수 제한 대비 500개씩
+    for (var i = 0; i < idList.length; i += 500) {
+      final chunk = idList.sublist(i, (i + 500).clamp(0, idList.length));
+      final query = _db.select(_db.eventTagRelationTable).join([
+        innerJoin(
+          _db.eventTagTable,
+          _db.eventTagTable.id.equalsExp(_db.eventTagRelationTable.tagId),
+        ),
+      ])..where(_db.eventTagRelationTable.eventId.isIn(chunk));
+      for (final r in await query.get()) {
+        final rel = r.readTable(_db.eventTagRelationTable);
+        final tag = r.readTable(_db.eventTagTable);
+        result
+            .putIfAbsent(rel.eventId, () => [])
+            .add(EventTag(id: tag.id, name: tag.name, color: tag.color));
+      }
+    }
+    return result;
+  }
+
+  Event rowToEvent(EventTableData row) => _rowToEvent(row);
 
   Event _rowToEvent(EventTableData row) {
     return Event(

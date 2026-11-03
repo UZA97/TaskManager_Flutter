@@ -2,8 +2,11 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:appflowy_editor/appflowy_editor.dart';
 import 'dart:typed_data';
+
+import '../editor_v2/editor_block.dart';
+import '../editor_v2/inline_image.dart';
+import '../editor_v2/table_block.dart';
 
 class PdfExportService {
   Future<pw.Font> _loadSystemFont({bool bold = false}) async {
@@ -21,7 +24,7 @@ class PdfExportService {
   }
 
   Future<void> exportToPdf({
-    required EditorState editorState,
+    required List<EditorBlock> blocks,
     required String title,
     required List<String> tags,
   }) async {
@@ -75,13 +78,25 @@ class PdfExportService {
     pdfWidgets.add(pw.Divider());
     pdfWidgets.add(pw.SizedBox(height: 8));
 
-    // 블록 순회
-    await _processNodes(
-      editorState.document.root.children.toList(),
-      pdfWidgets,
-      font,
-      boldFont,
-    );
+    // 블록 순회 (번호 목록은 같은 깊이에서 이어지는 동안 번호를 셈)
+    final numbers = <int, int>{};
+    for (final block in blocks) {
+      if (block.type == 'numbered_list') {
+        numbers[block.depth] = (numbers[block.depth] ?? 0) + 1;
+      }
+      numbers.removeWhere(
+        (depth, _) =>
+            depth > block.depth ||
+            (depth == block.depth && block.type != 'numbered_list'),
+      );
+      final widget = await _blockToWidget(
+        block,
+        font,
+        boldFont,
+        number: numbers[block.depth] ?? 1,
+      );
+      if (widget != null) pdfWidgets.add(widget);
+    }
 
     pdf.addPage(
       pw.MultiPage(
@@ -106,42 +121,98 @@ class PdfExportService {
     await file.writeAsBytes(await pdf.save());
   }
 
-  Future<void> _processNodes(
-    List<Node> nodes,
-    List<pw.Widget> pdfWidgets,
+  /// 줄 안의 그림은 글 아래에 차례로
+  Future<pw.Widget?> _blockToWidget(
+    EditorBlock block,
     pw.Font font,
     pw.Font boldFont, {
-    int depth = 0,
+    int number = 1,
   }) async {
-    for (final node in nodes) {
-      final widget = await _nodeToWidget(node, font, boldFont, depth: depth);
-      if (widget != null) pdfWidgets.add(widget);
-
-      if (node.children.isNotEmpty) {
-        await _processNodes(
-          node.children.toList(),
-          pdfWidgets,
-          font,
-          boldFont,
-          depth: depth + 1,
+    final body = await _blockBody(block, font, boldFont, number: number);
+    if (!block.isText) return body;
+    final controller = block.controller;
+    final images = <pw.Widget>[];
+    for (var i = 0; i < controller.text.length; i++) {
+      final marks = controller.marks[i];
+      if (controller.isFileAt(i)) {
+        images.add(
+          _fileChip(marks[fileNameKey] as String? ?? '첨부파일', font, block),
         );
+        continue;
       }
+      if (!controller.isImageAt(i)) continue;
+      final image = await _image(
+        marks[imageMarkKey] as String,
+        width: (marks[imageWidthKey] as num?)?.toDouble() ?? defaultImageWidth,
+        indent: block.depth * 12.0,
+      );
+      if (image != null) images.add(image);
+    }
+    if (images.isEmpty) return body;
+    final hasText = stripInlineImages(controller.text).trim().isNotEmpty;
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [if (hasText && body != null) body, ...images],
+    );
+  }
+
+  pw.Widget _fileChip(String fileName, pw.Font font, EditorBlock block) =>
+      pw.Padding(
+        padding: pw.EdgeInsets.only(bottom: 4, left: block.depth * 12.0),
+        child: pw.Container(
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            color: PdfColors.grey200,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+          ),
+          child: pw.Text(
+            '[첨부파일] $fileName',
+            style: pw.TextStyle(font: font, fontSize: 10),
+          ),
+        ),
+      );
+
+  Future<pw.Widget?> _image(
+    String src, {
+    required double width,
+    required double indent,
+  }) async {
+    try {
+      final file = File(src);
+      if (!await file.exists()) return null;
+      return pw.Padding(
+        padding: pw.EdgeInsets.only(bottom: 8, left: indent),
+        // 화면 너비(px)를 PDF 크기(pt)로 대략 맞춤
+        child: pw.Image(
+          pw.MemoryImage(await file.readAsBytes()),
+          width: width * 0.75,
+          fit: pw.BoxFit.contain,
+        ),
+      );
+    } catch (_) {
+      return pw.Text(
+        '[이미지를 불러올 수 없습니다]',
+        style: const pw.TextStyle(color: PdfColors.red),
+      );
     }
   }
 
-  Future<pw.Widget?> _nodeToWidget(
-    Node node,
+  Future<pw.Widget?> _blockBody(
+    EditorBlock block,
     pw.Font font,
     pw.Font boldFont, {
-    int depth = 0,
+    int number = 1,
   }) async {
-    final type = node.type;
-    final attrs = node.attributes;
+    final type = block.type;
+    final attrs = block.raw == null
+        ? block.data
+        : (block.raw!['data'] as Map?) ?? const {};
+    final depth = block.depth;
     final indent = depth * 12.0;
 
     switch (type) {
       case 'paragraph':
-        final text = node.delta?.toPlainText() ?? '';
+        final text = stripInlineImages(block.controller.text);
         if (text.isEmpty) return pw.SizedBox(height: 8);
         return pw.Padding(
           padding: pw.EdgeInsets.only(bottom: 4, left: indent),
@@ -149,8 +220,8 @@ class PdfExportService {
         );
 
       case 'heading':
-        final level = attrs['level'] as int? ?? 1;
-        final text = node.delta?.toPlainText() ?? '';
+        final level = block.level;
+        final text = stripInlineImages(block.controller.text);
         return pw.Padding(
           padding: const pw.EdgeInsets.only(bottom: 8, top: 8),
           child: pw.Text(
@@ -167,8 +238,8 @@ class PdfExportService {
         );
 
       case 'todo_list':
-        final checked = attrs['checked'] as bool? ?? false;
-        final text = node.delta?.toPlainText() ?? '';
+        final checked = block.checked;
+        final text = stripInlineImages(block.controller.text);
         return pw.Padding(
           padding: pw.EdgeInsets.only(bottom: 4, left: indent),
           child: pw.Row(
@@ -213,7 +284,7 @@ class PdfExportService {
         );
 
       case 'bulleted_list':
-        final text = node.delta?.toPlainText() ?? '';
+        final text = stripInlineImages(block.controller.text);
         return pw.Padding(
           padding: pw.EdgeInsets.only(bottom: 4, left: 12 + indent),
           child: pw.Row(
@@ -234,14 +305,14 @@ class PdfExportService {
         );
 
       case 'numbered_list':
-        final text = node.delta?.toPlainText() ?? '';
+        final text = stripInlineImages(block.controller.text);
         return pw.Padding(
           padding: pw.EdgeInsets.only(bottom: 4, left: 12 + indent),
           child: pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                '${depth + 1}. ',
+                '$number. ',
                 style: pw.TextStyle(font: font, fontSize: 11),
               ),
               pw.Expanded(
@@ -255,7 +326,7 @@ class PdfExportService {
         );
 
       case 'quote':
-        final text = node.delta?.toPlainText() ?? '';
+        final text = stripInlineImages(block.controller.text);
         return pw.Padding(
           padding: pw.EdgeInsets.only(bottom: 8, left: 12 + indent),
           child: pw.Container(
@@ -278,8 +349,7 @@ class PdfExportService {
 
       case 'local_code':
       case 'code':
-        final code =
-            attrs['code'] as String? ?? node.delta?.toPlainText() ?? '';
+        final code = attrs['code'] as String? ?? '';
         final language = attrs['language'] as String? ?? '';
         return pw.Padding(
           padding: const pw.EdgeInsets.only(bottom: 8),
@@ -366,8 +436,41 @@ class PdfExportService {
           ),
         );
 
+      case localTableType:
+        final rows = tableRowsOf(block);
+        return pw.Padding(
+          padding: pw.EdgeInsets.only(bottom: 8, left: indent),
+          child: pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+            children: [
+              for (var r = 0; r < rows.length; r++)
+                pw.TableRow(
+                  decoration: r == 0
+                      ? const pw.BoxDecoration(color: PdfColors.grey100)
+                      : null,
+                  children: [
+                    for (final cell in rows[r])
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          cell,
+                          style: pw.TextStyle(
+                            font: r == 0 ? boldFont : font,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        );
+
+      case 'divider':
+        return pw.Divider(color: PdfColors.grey400);
+
       default:
-        final text = node.delta?.toPlainText() ?? '';
+        final text = stripInlineImages(block.controller.text);
         if (text.isEmpty) return null;
         return pw.Padding(
           padding: pw.EdgeInsets.only(bottom: 4, left: indent),

@@ -4,6 +4,7 @@ import '../data/note_repository.dart';
 import '../models/folder.dart';
 import '../models/note.dart';
 import 'note_provider.dart';
+import 'tab_provider.dart';
 
 // 전체 폴더 상태
 class FolderListNotifier extends AsyncNotifier<List<Folder>> {
@@ -49,10 +50,11 @@ class FolderListNotifier extends AsyncNotifier<List<Folder>> {
     // 하위 폴더 id 전부 수집
     final folderIds = repo.collectDescendantIds(allFolders, id);
 
-    // 각 폴더의 메모 삭제
+    // 각 폴더의 메모는 휴지통으로 (복원 시 폴더가 없으면 루트로 감)
     final noteRepo = ref.read(noteRepositoryProvider);
+    final deletedNoteIds = <int>{};
     for (final folderId in folderIds) {
-      await noteRepo.deleteNotesByFolder(folderId);
+      deletedNoteIds.addAll(await noteRepo.deleteNotesByFolder(folderId));
     }
 
     // 폴더 삭제 (하위부터 역순으로)
@@ -60,8 +62,21 @@ class FolderListNotifier extends AsyncNotifier<List<Folder>> {
       await repo.deleteFolder(folderId);
     }
 
+    // 삭제된 폴더/메모를 가리키던 선택·탭 정리
+    if (folderIds.contains(ref.read(selectedFolderProvider)?.id)) {
+      ref.read(selectedFolderProvider.notifier).clear();
+    }
+    if (deletedNoteIds.contains(ref.read(selectedNoteProvider)?.id)) {
+      ref.read(selectedNoteProvider.notifier).select(null);
+    }
+    final openTabs = ref.read(tabProvider).value?.tabNoteIds ?? const <int>[];
+    for (final noteId in openTabs.where(deletedNoteIds.contains).toList()) {
+      await ref.read(tabProvider.notifier).closeTab(noteId);
+    }
+
     ref.invalidateSelf();
     ref.invalidate(noteListProvider);
+    ref.invalidate(trashProvider);
   }
 
   Future<void> moveFolder(int id, int? newParentId) async {
@@ -123,6 +138,8 @@ class SelectedFolderNotifier extends Notifier<Folder?> {
       state = folder;
     }
   }
+
+  void clear() => state = null;
 }
 
 final selectedFolderProvider =

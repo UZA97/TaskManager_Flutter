@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 
-enum AppDateFormat { iso, korean, us }
-
-enum AppTimeFormat { h24, h12 }
-
 enum AppFontSize { small, medium, large }
 
 class AppSettings {
@@ -12,12 +8,13 @@ class AppSettings {
   final Color themeColor;
   final AppFontSize fontSize;
   final bool notificationEnabled;
-  final AppDateFormat dateFormat;
-  final AppTimeFormat timeFormat;
   final bool lockEnabled;
   final bool focusModeEnabled;
   final String focusModeStart; // "22:00"
   final String focusModeEnd; // "08:00"
+  final int startScreen; // 앱을 켰을 때 화면 (0 메모, 1 캘린더, 2 메일, 3 지도)
+  final bool briefingAutoShow; // 하루 첫 실행 때 오늘 브리핑 띄우기
+  final int trashRetentionDays; // 휴지통 보관 기간 (0이면 자동으로 비우지 않음)
 
   const AppSettings({
     this.trayModeEnabled = true,
@@ -25,12 +22,13 @@ class AppSettings {
     this.themeColor = const Color(0xFF4A90E2),
     this.fontSize = AppFontSize.medium,
     this.notificationEnabled = true,
-    this.dateFormat = AppDateFormat.korean,
-    this.timeFormat = AppTimeFormat.h24,
     this.lockEnabled = false,
     this.focusModeEnabled = false,
     this.focusModeStart = "22:00",
     this.focusModeEnd = "08:00",
+    this.startScreen = 0,
+    this.briefingAutoShow = true,
+    this.trashRetentionDays = 30,
   });
 
   AppSettings copyWith({
@@ -39,12 +37,13 @@ class AppSettings {
     Color? themeColor,
     AppFontSize? fontSize,
     bool? notificationEnabled,
-    AppDateFormat? dateFormat,
-    AppTimeFormat? timeFormat,
     bool? lockEnabled,
     bool? focusModeEnabled,
     String? focusModeStart,
     String? focusModeEnd,
+    int? startScreen,
+    bool? briefingAutoShow,
+    int? trashRetentionDays,
   }) {
     return AppSettings(
       trayModeEnabled: trayModeEnabled ?? this.trayModeEnabled,
@@ -52,12 +51,13 @@ class AppSettings {
       themeColor: themeColor ?? this.themeColor,
       fontSize: fontSize ?? this.fontSize,
       notificationEnabled: notificationEnabled ?? this.notificationEnabled,
-      dateFormat: dateFormat ?? this.dateFormat,
-      timeFormat: timeFormat ?? this.timeFormat,
       lockEnabled: lockEnabled ?? this.lockEnabled,
       focusModeEnabled: focusModeEnabled ?? this.focusModeEnabled,
       focusModeStart: focusModeStart ?? this.focusModeStart,
       focusModeEnd: focusModeEnd ?? this.focusModeEnd,
+      startScreen: startScreen ?? this.startScreen,
+      briefingAutoShow: briefingAutoShow ?? this.briefingAutoShow,
+      trashRetentionDays: trashRetentionDays ?? this.trashRetentionDays,
     );
   }
 }

@@ -3,8 +3,13 @@ import 'package:http/http.dart' as http;
 import '../models/event.dart';
 import '../models/recurrence.dart';
 
+// 일정 수정 결과 — notFound면 구글에서 지워진 일정
+enum GoogleUpdateResult { ok, failed, notFound }
+
 class GoogleCalendarService {
   static const _host = 'www.googleapis.com';
+  // 오프라인 등에서 무한 대기 방지
+  static const _timeout = Duration(seconds: 15);
   static const _eventsPath = '/calendar/v3/calendars/primary/events';
 
   // 사용자 기본 캘린더의 시간대 (예: Asia/Seoul) — 반복 시간 일정에 필요
@@ -12,10 +17,12 @@ class GoogleCalendarService {
 
   Future<String?> _getCalendarTimeZone(String accessToken) async {
     if (_calendarTimeZone != null) return _calendarTimeZone;
-    final response = await http.get(
-      Uri.https(_host, '/calendar/v3/calendars/primary'),
-      headers: {'Authorization': 'Bearer $accessToken'},
-    );
+    final response = await http
+        .get(
+          Uri.https(_host, '/calendar/v3/calendars/primary'),
+          headers: {'Authorization': 'Bearer $accessToken'},
+        )
+        .timeout(_timeout);
     if (response.statusCode != 200) {
       print('구글 캘린더 시간대 조회 실패: ${response.statusCode} ${response.body}');
       return null;
@@ -24,7 +31,10 @@ class GoogleCalendarService {
   }
 
   // 반복 시간 일정은 구글이 시간대를 요구함
-  Future<Map<String, dynamic>> _buildBody(String accessToken, Event event) async {
+  Future<Map<String, dynamic>> _buildBody(
+    String accessToken,
+    Event event,
+  ) async {
     final needsTimeZone = event.isRecurring && !event.isAllDay;
     final timeZone = needsTimeZone
         ? await _getCalendarTimeZone(accessToken)
@@ -44,17 +54,19 @@ class GoogleCalendarService {
     final events = <Event>[];
     String? pageToken;
     do {
-      final response = await http.get(
-        Uri.https(_host, _eventsPath, {
-          'timeMin': timeMin,
-          'timeMax': timeMax,
-          'singleEvents': 'true',
-          'orderBy': 'startTime',
-          'maxResults': '250',
-          if (pageToken != null) 'pageToken': pageToken,
-        }),
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
+      final response = await http
+          .get(
+            Uri.https(_host, _eventsPath, {
+              'timeMin': timeMin,
+              'timeMax': timeMax,
+              'singleEvents': 'true',
+              'orderBy': 'startTime',
+              'maxResults': '250',
+              if (pageToken != null) 'pageToken': pageToken,
+            }),
+            headers: {'Authorization': 'Bearer $accessToken'},
+          )
+          .timeout(_timeout);
 
       if (response.statusCode != 200) {
         print('구글 캘린더 조회 실패: ${response.statusCode} ${response.body}');
@@ -75,14 +87,16 @@ class GoogleCalendarService {
 
   // 일정 추가 — 생성된 구글 이벤트 ID 반환
   Future<String?> addEvent(String accessToken, Event event) async {
-    final response = await http.post(
-      Uri.https(_host, _eventsPath),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(await _buildBody(accessToken, event)),
-    );
+    final response = await http
+        .post(
+          Uri.https(_host, _eventsPath),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(await _buildBody(accessToken, event)),
+        )
+        .timeout(_timeout);
 
     if (response.statusCode != 200 && response.statusCode != 201) {
       print('구글 캘린더 추가 실패: ${response.statusCode} ${response.body}');
@@ -93,31 +107,41 @@ class GoogleCalendarService {
   }
 
   // 일정 수정
-  Future<bool> updateEvent(String accessToken, Event event) async {
-    if (event.googleEventId == null) return false;
+  Future<GoogleUpdateResult> updateEvent(
+    String accessToken,
+    Event event,
+  ) async {
+    if (event.googleEventId == null) return GoogleUpdateResult.failed;
 
-    final response = await http.patch(
-      Uri.https(_host, '$_eventsPath/${event.googleEventId}'),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(await _buildBody(accessToken, event)),
-    );
+    final response = await http
+        .patch(
+          Uri.https(_host, '$_eventsPath/${event.googleEventId}'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(await _buildBody(accessToken, event)),
+        )
+        .timeout(_timeout);
 
+    if (response.statusCode == 404 || response.statusCode == 410) {
+      return GoogleUpdateResult.notFound;
+    }
     if (response.statusCode != 200) {
       print('구글 캘린더 수정 실패: ${response.statusCode} ${response.body}');
-      return false;
+      return GoogleUpdateResult.failed;
     }
-    return true;
+    return GoogleUpdateResult.ok;
   }
 
   // 일정 삭제 — 이미 지워진 일정(404/410)도 성공으로 처리
   Future<bool> deleteEvent(String accessToken, String googleEventId) async {
-    final response = await http.delete(
-      Uri.https(_host, '$_eventsPath/$googleEventId'),
-      headers: {'Authorization': 'Bearer $accessToken'},
-    );
+    final response = await http
+        .delete(
+          Uri.https(_host, '$_eventsPath/$googleEventId'),
+          headers: {'Authorization': 'Bearer $accessToken'},
+        )
+        .timeout(_timeout);
 
     final ok =
         response.statusCode == 204 ||
@@ -153,7 +177,10 @@ class GoogleCalendarService {
         endAt = startAt.add(const Duration(hours: 1));
       if (timeZone != null) {
         // 반복 일정: 현지 시각 + 시간대 (회차마다 같은 현지 시각 유지)
-        start = {'dateTime': _formatLocalDateTime(startAt), 'timeZone': timeZone};
+        start = {
+          'dateTime': _formatLocalDateTime(startAt),
+          'timeZone': timeZone,
+        };
         end = {'dateTime': _formatLocalDateTime(endAt), 'timeZone': timeZone};
       } else {
         start = {'dateTime': startAt.toUtc().toIso8601String()};

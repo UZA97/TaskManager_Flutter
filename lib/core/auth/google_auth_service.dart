@@ -90,7 +90,7 @@ class GoogleAuthService {
         DateTime.now().isBefore(expiry)) {
       return Future.value(_cachedToken);
     }
-    // 메일/캘린더가 동시에 요청해도 refresh는 한 번만
+    // 메일/캘린더가 동시에 요청해도 refresh는 한 번만 (성공·실패·시간초과 모두 끝나면 비움)
     return _refreshing ??= _refresh(db).whenComplete(() => _refreshing = null);
   }
 
@@ -99,16 +99,20 @@ class GoogleAuthService {
     if (refreshToken == null) return null;
 
     try {
-      final response = await http.post(
-        Uri.parse('https://oauth2.googleapis.com/token'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'client_id': _clientId,
-          'client_secret': _screet,
-          'refresh_token': refreshToken,
-          'grant_type': 'refresh_token',
-        },
-      );
+      final response = await http
+          .post(
+            Uri.parse('https://oauth2.googleapis.com/token'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: {
+              'client_id': _clientId,
+              'client_secret': _screet,
+              'refresh_token': refreshToken,
+              'grant_type': 'refresh_token',
+            },
+          )
+          .timeout(
+            const Duration(seconds: 15),
+          ); // 응답이 없으면 공유 중인 갱신이 영원히 멈추지 않도록
       if (response.statusCode != 200) {
         print('구글 토큰 갱신 실패: ${response.statusCode} ${response.body}');
         // 권한 취소/만료된 refresh token → 로그아웃 상태로 정리

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/event_provider.dart';
 import '../providers/google_calendar_provider.dart';
+import '../../../core/auth/google_account_provider.dart';
 import '../models/event_tag.dart';
 import 'calendar_editor_view.dart';
 
@@ -29,6 +30,9 @@ class _MiniCalendar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentMonth = ref.watch(currentMonthProvider);
     final eventsAsync = ref.watch(eventListProvider);
+    final isGoogleLinked = ref.watch(
+      googleAccountProvider.select((a) => a.valueOrNull != null),
+    );
     final selectedDate = ref.watch(selectedDateProvider);
     final eventDates = <String>{};
     for (final event in eventsAsync.value ?? []) {
@@ -61,16 +65,33 @@ class _MiniCalendar extends ConsumerWidget {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
-              // 연도 클릭 시 팝업
-              GestureDetector(
-                onTap: () => _showYearPicker(context, ref, currentMonth),
-                child: Text(
-                  '${currentMonth.year}년 ${currentMonth.month}월',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 연도 클릭 시 팝업
+                  GestureDetector(
+                    onTap: () => _showYearPicker(context, ref, currentMonth),
+                    child: Text(
+                      '${currentMonth.year}년 ${currentMonth.month}월',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
+                  // 구글 캘린더 수동 동기화
+                  if (isGoogleLinked) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.sync, size: 14),
+                      tooltip: '구글 캘린더 동기화',
+                      onPressed: () =>
+                          ref.read(eventListProvider.notifier).syncNow(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ],
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right, size: 18),

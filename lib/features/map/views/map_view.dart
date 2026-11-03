@@ -115,6 +115,7 @@ class _MapViewState extends ConsumerState<MapView> {
   static const _minZoom = 6.0;
   static const _maxZoom = 19.0;
   bool _isLoadingCategory = false;
+  int _categorySeq = 0; // 늦게 온 이전 카테고리 응답 무시용
 
   // 메인 탭 순서 (main.dart의 _navigationDestinations)
   static const _calendarTab = 1;
@@ -128,11 +129,13 @@ class _MapViewState extends ConsumerState<MapView> {
 
   Future<void> _toggleCategory(String code) async {
     final current = ref.read(activeCategoryProvider);
+    final seq = ++_categorySeq;
 
     // 같은 카테고리 누르면 해제
     if (current == code) {
       ref.read(activeCategoryProvider.notifier).set(null);
       ref.read(nearbyRestaurantsProvider.notifier).clear();
+      if (_isLoadingCategory) setState(() => _isLoadingCategory = false);
       return;
     }
 
@@ -146,12 +149,15 @@ class _MapViewState extends ConsumerState<MapView> {
         lng: center.longitude,
         radius: 2000,
       );
+      if (!mounted || seq != _categorySeq) return;
       ref.read(nearbyRestaurantsProvider.notifier).setRestaurants(results);
       ref.read(activeCategoryProvider.notifier).set(code);
     } catch (e) {
       // 실패 무시
     } finally {
-      setState(() => _isLoadingCategory = false);
+      if (mounted && seq == _categorySeq) {
+        setState(() => _isLoadingCategory = false);
+      }
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'editor_block.dart';
+import 'inline_image.dart';
 import 'styled_text_controller.dart';
 
 /// 글자색 (Alt+1~8, 기존 에디터와 같은 순서)
@@ -68,11 +69,27 @@ class BlockEditorController extends ChangeNotifier {
   EditorBlock? get activeBlock =>
       _active != null && blocks.contains(_active) ? _active : null;
 
+  EditorBlock? _activeObject;
+
+  /// 클릭해서 고른 그림·파일 등 (텍스트 줄에 커서가 가면 해제).
+  /// 새로 넣는 블록은 이 블록 바로 아래에 들어감.
+  EditorBlock? get activeObject =>
+      _activeObject != null && blocks.contains(_activeObject)
+      ? _activeObject
+      : null;
+
   EditorBlock _register(EditorBlock block) {
+    block.controller.onEdited = textChanged;
     block.focusNode.onKeyEvent = (_, event) =>
         keyHandler?.call(block, event) ?? KeyEventResult.ignored;
     block.focusNode.addListener(() {
-      if (block.focusNode.hasFocus) _active = block;
+      if (!block.focusNode.hasFocus) return;
+      if (block.isText) {
+        _active = block;
+        _activeObject = null;
+      } else {
+        _activeObject = block;
+      }
     });
     return block;
   }
@@ -163,12 +180,14 @@ class BlockEditorController extends ChangeNotifier {
     await revealer?.call(block, alignment);
   }
 
+  /// 텍스트 줄은 [offset] 위치에 커서, 그림·파일 등은 그 블록을 고름
   void focus(EditorBlock block, int offset) {
     // 새로 만든 블록은 다음 프레임에 화면에 붙으므로 그 뒤에 포커스
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!blocks.contains(block) || !block.isText) return;
+      if (!blocks.contains(block)) return;
       if (!block.isOnScreen) await reveal(block);
       if (!blocks.contains(block)) return;
+      if (!block.isText) return block.focusNode.requestFocus();
       block.controller.selection = TextSelection.collapsed(
         offset: offset.clamp(0, block.controller.text.length),
       );
@@ -180,7 +199,7 @@ class BlockEditorController extends ChangeNotifier {
   /// 선택 범위를 유지한 채 다시 포커스 (툴바 버튼 사용 후)
   void refocus(EditorBlock block) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!blocks.contains(block) || !block.isText) return;
+      if (!blocks.contains(block)) return;
       if (!block.isOnScreen) await reveal(block);
       if (blocks.contains(block)) block.focusNode.requestFocus();
     });
@@ -286,9 +305,13 @@ class BlockEditorController extends ChangeNotifier {
   void insertBlocks(List<EditorBlock> newBlocks, {EditorBlock? focusTarget}) {
     if (newBlocks.isEmpty) return;
     final active = activeBlock;
+    final object = activeObject;
     var insertAt = blocks.length;
     var depth = 0;
-    if (active != null) {
+    if (object != null) {
+      depth = object.depth;
+      insertAt = subtreeEnd(blocks.indexOf(object));
+    } else if (active != null) {
       final index = blocks.indexOf(active);
       depth = active.depth;
       final isEmptyLine =
@@ -327,6 +350,32 @@ class BlockEditorController extends ChangeNotifier {
             ? newBlocks.last
             : (after < blocks.length ? blocks[after] : null));
     if (target != null) focus(target, target.controller.text.length);
+  }
+
+  /// 커서 위치에 그림 (그림·파일 등을 고른 상태면 그 아래 새 줄에)
+  void insertImage(String src) => _insertInline(
+    (c) => c.insertImage(src),
+    () => EditorBlock.imageLine(src),
+  );
+
+  /// 커서 위치에 첨부파일 (그림·표 등을 고른 상태면 그 아래 새 줄에)
+  void insertFile(String src, String fileName) => _insertInline(
+    (c) => c.insertFile(src, fileName),
+    () => EditorBlock.fileLine(src, fileName),
+  );
+
+  void _insertInline(
+    void Function(StyledTextController controller) insert,
+    EditorBlock Function() line,
+  ) {
+    final block = activeObject == null ? activeBlock : null;
+    if (block == null || block.isSection) {
+      insertBlocks([line()]);
+      return;
+    }
+    insert(block.controller);
+    textChanged();
+    refocus(block);
   }
 
   /// 접기 섹션 (제목 + 빈 내용 한 줄)
@@ -427,13 +476,15 @@ class BlockEditorController extends ChangeNotifier {
   }
 
   void showFindHighlights(List<FindMatch> matches, FindMatch? current) {
+    // 블록별로 한 번에 묶음 (블록 수 × 찾은 수만큼 돌지 않게)
+    final byBlock = <EditorBlock, List<TextRange>>{};
+    for (final m in matches) {
+      (byBlock[m.block] ??= []).add(TextRange(start: m.start, end: m.end));
+    }
     for (final block in blocks) {
       if (!block.isText) continue;
       block.controller.setFindHighlights(
-        [
-          for (final m in matches)
-            if (m.block == block) TextRange(start: m.start, end: m.end),
-        ],
+        byBlock[block] ?? const [],
         current?.block == block
             ? TextRange(start: current!.start, end: current.end)
             : null,
@@ -443,7 +494,18 @@ class BlockEditorController extends ChangeNotifier {
 
   void clearFindHighlights() => showFindHighlights(const [], null);
 
-  void replace(FindMatch match, String replacement) {
+  /// 찾은 위치가 아직 유효한지 (편집·실행 취소 뒤 블록이 바뀌었으면 false)
+  bool isMatchValid(FindMatch match, String query) {
+    if (query.isEmpty || !blocks.contains(match.block)) return false;
+    final text = match.block.controller.text;
+    if (match.start < 0 || match.end > text.length) return false;
+    return text.substring(match.start, match.end).toLowerCase() ==
+        query.toLowerCase();
+  }
+
+  /// [match]를 바꿈. 위치가 낡았으면 바꾸지 않고 false.
+  bool replace(FindMatch match, String replacement, {required String query}) {
+    if (!isMatchValid(match, query)) return false;
     final controller = match.block.controller;
     controller.value = TextEditingValue(
       text: controller.text.replaceRange(match.start, match.end, replacement),
@@ -452,6 +514,7 @@ class BlockEditorController extends ChangeNotifier {
       ),
     );
     textChanged();
+    return true;
   }
 
   // ───────────── 여러 줄 선택
@@ -510,6 +573,17 @@ class BlockEditorController extends ChangeNotifier {
         baseOffset: selection.baseOffset,
         extentOffset: selection.extentOffset,
       );
+      return;
+    }
+    // 드래그 중 같은 위치면 다시 그리지 않음
+    final old = _selection;
+    if (old == selection ||
+        (old != null &&
+            selection != null &&
+            old.baseBlock == selection.baseBlock &&
+            old.baseOffset == selection.baseOffset &&
+            old.extentBlock == selection.extentBlock &&
+            old.extentOffset == selection.extentOffset)) {
       return;
     }
     _selection = selection;
@@ -650,11 +724,13 @@ class BlockEditorController extends ChangeNotifier {
       if (!whole || block.type == 'paragraph') {
         // 한 줄 안의 일부: 글자 서식만 유지
         final text = c.text.substring(sel.start, sel.end);
+        final plain = stripInlineImages(text);
         _clipboard = _InternalClipboard(
-          plain: text,
+          plain: plain,
+          inlineText: text,
           inlineMarks: c.marks.sublist(sel.start, sel.end),
         );
-        Clipboard.setData(ClipboardData(text: text));
+        Clipboard.setData(ClipboardData(text: plain));
         return true;
       }
       // 체크박스·목록 줄 전체: 블록 종류까지 유지
@@ -695,7 +771,7 @@ class BlockEditorController extends ChangeNotifier {
     var number = 1;
     for (final block in blocks) {
       final indent = '    ' * block.depth;
-      final text = block.isText ? block.controller.text : '';
+      final text = block.isText ? stripInlineImages(block.controller.text) : '';
       switch (block.type) {
         case 'bulleted_list':
           lines.add('$indent• $text');
@@ -723,7 +799,7 @@ class BlockEditorController extends ChangeNotifier {
 
     final inline = clip.inlineMarks;
     if (inline != null) {
-      block.controller.insertStyled(clip.plain, inline);
+      block.controller.insertStyled(clip.inlineText ?? clip.plain, inline);
       textChanged();
       return true;
     }
@@ -764,30 +840,51 @@ class BlockEditorController extends ChangeNotifier {
     }
   }
 
+  /// 실행 취소 기록 한도 (단계 수, 전체 글자 수 ≈ 20MB)
+  static const _maxHistory = 200;
+  static const _maxHistoryChars = 10 * 1024 * 1024;
+  int _undoChars = 0;
+
+  void _pushUndo(_Snapshot snapshot) {
+    _undo.add(snapshot);
+    _undoChars += snapshot.json.length;
+    // 긴 메모는 단계 수보다 용량 한도에 먼저 걸림 (최근 한 단계는 남김)
+    while (_undo.length > 1 &&
+        (_undo.length > _maxHistory || _undoChars > _maxHistoryChars)) {
+      _undoChars -= _undo.removeAt(0).json.length;
+    }
+  }
+
+  _Snapshot _popUndo() {
+    final snapshot = _undo.removeLast();
+    _undoChars -= snapshot.json.length;
+    return snapshot;
+  }
+
   void _commitHistory() {
     _historyTimer?.cancel();
     final snapshot = _snapshot();
     if (snapshot.json == _current.json) return;
-    _undo.add(_current);
-    if (_undo.length > 200) _undo.removeAt(0);
+    _pushUndo(_current);
     _redo.clear();
     _current = snapshot;
   }
 
-  bool get canUndo => _undo.isNotEmpty || _snapshot().json != _current.json;
+  /// 되돌릴 기록이 있는지 (아직 기록 전인 입력 포함)
+  bool get canUndo => _undo.isNotEmpty || (_historyTimer?.isActive ?? false);
 
   void undo() {
     _commitHistory(); // 아직 기록 안 된 입력부터 한 단계로
     if (_undo.isEmpty) return;
     _redo.add(_current);
-    _current = _undo.removeLast();
+    _current = _popUndo();
     _restore(_current);
   }
 
   void redo() {
     _commitHistory();
     if (_redo.isEmpty) return;
-    _undo.add(_current);
+    _pushUndo(_current);
     _current = _redo.removeLast();
     _restore(_current);
   }
@@ -831,11 +928,15 @@ class BlockSelection {
 class _InternalClipboard {
   const _InternalClipboard({
     required this.plain,
+    this.inlineText,
     this.inlineMarks,
     this.nodesJson,
   });
 
   final String plain;
+
+  /// 한 줄 안의 일부를 복사했을 때 원래 글자 (줄 안의 그림 자리 포함)
+  final String? inlineText;
 
   /// 한 줄 안의 일부를 복사했을 때 글자별 서식
   final List<Marks>? inlineMarks;

@@ -26,20 +26,14 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
           : map['font_size'] == 'large'
           ? AppFontSize.large
           : AppFontSize.medium,
-      dateFormat: switch (map['date_format']) {
-        'iso' => AppDateFormat.iso,
-        'us' => AppDateFormat.us,
-        _ => AppDateFormat.korean,
-      },
-      timeFormat: switch (map['time_format']) {
-        'h12' => AppTimeFormat.h12,
-        _ => AppTimeFormat.h24,
-      },
       lockEnabled: map['lock_enabled'] == 'true',
 
       focusModeEnabled: map['focus_mode_enabled'] == 'true',
       focusModeStart: map['focus_mode_start'] ?? "22:00",
       focusModeEnd: map['focus_mode_end'] ?? "08:00",
+      startScreen: (int.tryParse(map['start_screen'] ?? '') ?? 0).clamp(0, 3),
+      briefingAutoShow: map['briefing_auto_show'] != 'false',
+      trashRetentionDays: int.tryParse(map['trash_retention_days'] ?? '') ?? 30,
     );
   }
 
@@ -113,29 +107,6 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
     return row.value == hash;
   }
 
-  // 날짜 형식
-  Future<void> setDateFormat(AppDateFormat format) async {
-    final db = ref.read(databaseProvider);
-    await db
-        .into(db.settingTable)
-        .insertOnConflictUpdate(
-          SettingTableCompanion.insert(key: 'date_format', value: format.name),
-        );
-    final current = state.requireValue;
-    state = AsyncData(current.copyWith(dateFormat: format));
-  }
-
-  Future<void> setTimeFormat(AppTimeFormat format) async {
-    final db = ref.read(databaseProvider);
-    await db
-        .into(db.settingTable)
-        .insertOnConflictUpdate(
-          SettingTableCompanion.insert(key: 'time_format', value: format.name),
-        );
-    final current = state.requireValue;
-    state = AsyncData(current.copyWith(timeFormat: format));
-  }
-
   // 알림모드 설정
   Future<void> setNotificationEnabled(bool enabled) async {
     final db = ref.read(databaseProvider);
@@ -152,6 +123,33 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   // 트레이 모드 설정
+  Future<void> _put(String key, String value) async {
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.settingTable)
+        .insertOnConflictUpdate(
+          SettingTableCompanion.insert(key: key, value: value),
+        );
+  }
+
+  // 시작 화면
+  Future<void> setStartScreen(int index) async {
+    await _put('start_screen', '$index');
+    state = AsyncData(state.requireValue.copyWith(startScreen: index));
+  }
+
+  // 오늘 브리핑 자동 표시
+  Future<void> setBriefingAutoShow(bool enabled) async {
+    await _put('briefing_auto_show', '$enabled');
+    state = AsyncData(state.requireValue.copyWith(briefingAutoShow: enabled));
+  }
+
+  // 휴지통 보관 기간 (0이면 자동으로 비우지 않음)
+  Future<void> setTrashRetentionDays(int days) async {
+    await _put('trash_retention_days', '$days');
+    state = AsyncData(state.requireValue.copyWith(trashRetentionDays: days));
+  }
+
   Future<void> setTrayMode(bool enabled) async {
     final db = ref.read(databaseProvider);
     await db

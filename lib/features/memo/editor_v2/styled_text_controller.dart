@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'inline_image.dart';
+
 /// 글자 하나의 서식 (appflowy delta의 attributes와 같은 키: bold, italic, font_color ...)
 typedef Marks = Map<String, Object?>;
 
@@ -32,10 +34,23 @@ class StyledTextController extends TextEditingController {
 
   List<Marks> _marks;
 
+  /// 이 입력창의 포커스 (줄 안의 그림을 누르면 커서를 놓으려고)
+  FocusNode? focusNode;
+
+  /// focusNode가 없을 때 쓰는 공용 노드 (그릴 때마다 새로 만들지 않게)
+  static final _noFocus = FocusNode(debugLabel: 'inline object fallback');
+
+  /// 그림 크기 조절·삭제처럼 입력창 밖에서 내용을 바꿨을 때 (저장용)
+  VoidCallback? onEdited;
+
   /// 커서만 있을 때 Ctrl+B 등으로 켠 서식 (다음에 입력하는 글자에 적용)
   Marks? _pending;
 
   List<Marks> get marks => List.unmodifiable(_marks);
+
+  /// 서식이 바뀔 때마다 늘어남 (서식 기준으로 다시 계산할지 판단용)
+  int get marksRevision => _marksRevision;
+  int _marksRevision = 0;
 
   @override
   set value(TextEditingValue newValue) {
@@ -57,18 +72,26 @@ class StyledTextController extends TextEditingController {
         end++;
       }
       final inserted = newText.length - start - end;
-      // 새 글자는 바로 앞 글자의 서식을 이어받음
+      final removed = oldText.length - start - end;
+      // 새 글자는 바로 앞 글자의 서식을 이어받음.
+      // 글자를 바꿔 넣을 때(한글 조합 ㄱ→가 등)는 바뀌는 글자의 서식을 이어받음
+      // (Ctrl+B 후 조합 중인 글자가 굵게 유지되도록)
       var inherit =
           _pending ??
-          (start > 0
+          (removed > 0 && start < _marks.length
+              ? _marks[start]
+              : start > 0
               ? _marks[start - 1]
               : (_marks.isNotEmpty ? _marks.first : const <String, Object?>{}));
+      // 그림 뒤에 친 글자는 그림이 아님
+      inherit = _withoutImage(inherit);
       // 링크 끝에 이어 친 글자는 링크가 아님 (링크 가운데에 넣을 때만 이어받음)
       final next = oldText.length - end;
       if (inherit['href'] != null &&
           (next >= _marks.length || _marks[next]['href'] != inherit['href'])) {
         inherit = {...inherit}..remove('href');
       }
+      _marksRevision++;
       _marks = [
         ..._marks.sublist(0, start),
         ...List.filled(inserted, inherit),
@@ -84,6 +107,7 @@ class StyledTextController extends TextEditingController {
   /// 텍스트와 서식을 통째로 바꿈 (블록 나누기·합치기)
   void setContent(String text, List<Marks> marks, int caret) {
     assert(text.length == marks.length);
+    _marksRevision++;
     _marks = [...marks];
     _pending = null;
     super.value = TextEditingValue(
@@ -97,9 +121,10 @@ class StyledTextController extends TextEditingController {
     final sel = selection;
     if (!sel.isValid) return;
     if (sel.isCollapsed) {
-      final base =
-          _pending ??
-          (sel.start > 0 ? _marks[sel.start - 1] : const <String, Object?>{});
+      final base = _withoutImage(
+        _pending ??
+            (sel.start > 0 ? _marks[sel.start - 1] : const <String, Object?>{}),
+      );
       _pending = _withMark(base, key, base[key] != true);
       return;
     }
@@ -109,7 +134,60 @@ class StyledTextController extends TextEditingController {
     for (var i = sel.start; i < sel.end; i++) {
       _marks[i] = _withMark(_marks[i], key, enable);
     }
+    _marksRevision++;
     notifyListeners();
+  }
+
+  static Marks _withoutImage(Marks marks) =>
+      inlineObjectKeys.any(marks.containsKey)
+      ? ({...marks}..removeWhere((key, _) => inlineObjectKeys.contains(key)))
+      : marks;
+
+  bool _isObjectChar(int offset) =>
+      offset >= 0 && offset < text.length && text[offset] == inlineImageChar;
+
+  /// [offset] 글자가 줄 안의 그림인지
+  bool isImageAt(int offset) =>
+      _isObjectChar(offset) && _marks[offset][imageMarkKey] is String;
+
+  /// [offset] 글자가 줄 안의 첨부파일인지
+  bool isFileAt(int offset) =>
+      _isObjectChar(offset) && _marks[offset][fileMarkKey] is String;
+
+  bool _isObjectAt(int offset) => isImageAt(offset) || isFileAt(offset);
+
+  /// 커서 위치에 그림을 넣고 커서를 그 뒤로
+  void insertImage(String src) =>
+      insertStyled(inlineImageChar, [inlineImageMarks(src)]);
+
+  /// 커서 위치에 첨부파일을 넣고 커서를 그 뒤로
+  void insertFile(String src, String fileName) =>
+      insertStyled(inlineImageChar, [inlineFileMarks(src, fileName)]);
+
+  /// 그림·파일을 고름 (그 글자 하나를 선택)
+  void _selectObject(int offset) {
+    value = value.copyWith(
+      selection: TextSelection(baseOffset: offset, extentOffset: offset + 1),
+      composing: TextRange.empty,
+    );
+    focusNode?.requestFocus();
+  }
+
+  void _resizeImage(int offset, double width) {
+    if (!isImageAt(offset)) return;
+    _marks[offset] = {..._marks[offset], imageWidthKey: width};
+    _marksRevision++;
+    notifyListeners();
+    onEdited?.call();
+  }
+
+  void _deleteObject(int offset) {
+    if (!_isObjectAt(offset)) return;
+    value = TextEditingValue(
+      text: text.replaceRange(offset, offset + 1, ''),
+      selection: TextSelection.collapsed(offset: offset),
+    );
+    onEdited?.call();
   }
 
   static Marks _withMark(Marks marks, String key, bool on) =>
@@ -127,6 +205,7 @@ class StyledTextController extends TextEditingController {
           ? ({..._marks[i]}..remove(key))
           : {..._marks[i], key: value};
     }
+    _marksRevision++;
     notifyListeners();
   }
 
@@ -164,6 +243,7 @@ class StyledTextController extends TextEditingController {
           ? ({..._marks[i]}..remove(key))
           : {..._marks[i], key: value};
     }
+    _marksRevision++;
     notifyListeners();
   }
 
@@ -191,7 +271,10 @@ class StyledTextController extends TextEditingController {
       }
       changed = true;
     }
-    if (changed) notifyListeners();
+    if (changed) {
+      _marksRevision++;
+      notifyListeners();
+    }
   }
 
   /// [offset] 글자의 링크 주소
@@ -241,19 +324,27 @@ class StyledTextController extends TextEditingController {
         ? value.composing
         : TextRange.empty;
     bool inComposing(int i) => i >= composing.start && i < composing.end;
+    final overlays = _overlayColors();
+    Color? overlayAt(int i) => overlays?[i];
 
-    final children = <TextSpan>[];
+    final children = <InlineSpan>[];
     var i = 0;
     while (i < text.length) {
+      if (_isObjectAt(i)) {
+        children.add(_objectSpan(i));
+        i++;
+        continue;
+      }
       var j = i + 1;
       while (j < text.length &&
+          !_isObjectAt(j) &&
           mapEquals(_marks[j], _marks[i]) &&
           inComposing(j) == inComposing(i) &&
-          _overlayColor(j) == _overlayColor(i)) {
+          overlayAt(j) == overlayAt(i)) {
         j++;
       }
       var spanStyle = _styleFor(_marks[i], inComposing(i));
-      final overlay = _overlayColor(i);
+      final overlay = overlayAt(i);
       if (overlay != null) {
         spanStyle = spanStyle.copyWith(backgroundColor: overlay);
       }
@@ -272,6 +363,47 @@ class StyledTextController extends TextEditingController {
     return TextSpan(style: style, children: children);
   }
 
+  WidgetSpan _objectSpan(int offset) {
+    final marks = _marks[offset];
+    final sel = selection;
+    final inSelection = sel.isValid && sel.start <= offset && sel.end > offset;
+    final highlight = _selectionHighlight;
+    final highlighted =
+        highlight != null &&
+        highlight.start <= offset &&
+        highlight.end > offset;
+    final focus = focusNode ?? _noFocus;
+    return WidgetSpan(
+      // 아래쪽을 글자 아래쪽에 맞춤 (옆 글자는 그림 아래쪽에 붙음)
+      alignment: PlaceholderAlignment.bottom,
+      // 입력창 속 위젯의 접근성 정보는 Windows에서 AXTree 오류 로그를 쏟아냄
+      child: ExcludeSemantics(
+        child: isImageAt(offset)
+            ? InlineImage(
+                src: marks[imageMarkKey] as String,
+                width:
+                    (marks[imageWidthKey] as num?)?.toDouble() ??
+                    defaultImageWidth,
+                focusNode: focus,
+                inSelection: inSelection,
+                highlighted: highlighted,
+                onSelect: () => _selectObject(offset),
+                onResize: (width) => _resizeImage(offset, width),
+                onDelete: () => _deleteObject(offset),
+              )
+            : InlineFile(
+                src: marks[fileMarkKey] as String,
+                fileName: marks[fileNameKey] as String? ?? '첨부파일',
+                focusNode: focus,
+                inSelection: inSelection,
+                highlighted: highlighted,
+                onSelect: () => _selectObject(offset),
+                onDelete: () => _deleteObject(offset),
+              ),
+      ),
+    );
+  }
+
   // ───────────── 찾기 강조 표시 (저장되지 않음)
 
   List<TextRange> _findMatches = const [];
@@ -284,15 +416,30 @@ class StyledTextController extends TextEditingController {
     notifyListeners();
   }
 
-  /// 여러 줄 선택 > 현재 찾은 위치 > 찾은 위치 순으로 배경색
-  Color? _overlayColor(int i) {
-    bool inRange(TextRange? r) => r != null && i >= r.start && i < r.end;
-    if (inRange(_selectionHighlight)) return const Color(0x6600B0FF);
-    if (inRange(_findCurrent)) return const Color(0xFFFFB74D);
-    for (final m in _findMatches) {
-      if (inRange(m)) return const Color(0x80FFEB3B);
+  /// 글자별 배경색 (여러 줄 선택 > 현재 찾은 위치 > 찾은 위치 순).
+  /// 칠할 것이 없으면 null. 범위마다 한 번씩만 칠해 글자 수에 비례.
+  List<Color?>? _overlayColors() {
+    if (_selectionHighlight == null &&
+        _findCurrent == null &&
+        _findMatches.isEmpty) {
+      return null;
     }
-    return null;
+    final colors = List<Color?>.filled(text.length, null);
+    // 낮은 순위부터 칠해 높은 순위가 덮음 (편집 뒤 남은 범위는 글자 수로 자름)
+    void paint(TextRange? r, Color color) {
+      if (r == null) return;
+      final end = min(r.end, text.length);
+      for (var i = max(r.start, 0); i < end; i++) {
+        colors[i] = color;
+      }
+    }
+
+    for (final m in _findMatches) {
+      paint(m, const Color(0x80FFEB3B));
+    }
+    paint(_findCurrent, const Color(0xFFFFB74D));
+    paint(_selectionHighlight, const Color(0x6600B0FF));
+    return colors;
   }
 
   static TextStyle _styleFor(Marks marks, bool composing) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -10,17 +11,30 @@ import '../../../core/theme/app_colors.dart';
 import 'block_editor_controller.dart';
 import 'editor_block.dart';
 import 'embed_video_dialog.dart';
+import 'inline_image.dart';
 import 'link_preview.dart';
 import 'object_blocks.dart';
+import 'table_block.dart';
+import 'todo_due.dart';
 
-/// `/` 메뉴 항목
+/// `/` 메뉴 항목. [children]이 있으면 하위 메뉴가 열리는 그룹
 class SlashMenuItem {
-  const SlashMenuItem(this.name, this.icon, this.keywords, this.onSelect);
+  const SlashMenuItem(this.name, this.icon, this.keywords, this.onSelect)
+    : children = const [];
+
+  const SlashMenuItem.group(this.name, this.icon, this.children)
+    : keywords = const [],
+      onSelect = _noop;
 
   final String name;
   final IconData icon;
   final List<String> keywords;
   final VoidCallback onSelect;
+  final List<SlashMenuItem> children;
+
+  bool get isGroup => children.isNotEmpty;
+
+  static void _noop() {}
 
   bool matches(String query) {
     if (query.isEmpty) return true;
@@ -29,6 +43,16 @@ class SlashMenuItem {
         keywords.any((k) => k.toLowerCase().contains(q));
   }
 }
+
+/// `[[`로 링크할 수 있는 메모
+typedef NoteLinkTarget = ({int id, String title});
+
+/// 메모 링크 주소 (글자 서식 href에 저장)
+const noteLinkScheme = 'note://';
+
+int? noteIdOfLink(String href) => href.startsWith(noteLinkScheme)
+    ? int.tryParse(href.substring(noteLinkScheme.length))
+    : null;
 
 const _cursorColor = Color(0xFF00BCF0);
 const _selectionColor = Color(0x6600B0FF);
@@ -44,6 +68,8 @@ class BlockEditor extends StatefulWidget {
     this.extraSlashItems = const [],
     this.onPaste,
     this.onFind,
+    this.noteLinkSearch,
+    this.onOpenNoteLink,
     this.padding = const EdgeInsets.symmetric(horizontal: 36),
   });
 
@@ -57,6 +83,12 @@ class BlockEditor extends StatefulWidget {
 
   /// Ctrl+F(false) / Ctrl+H(true)
   final void Function(bool replace)? onFind;
+
+  /// `[[` 뒤에 친 글자로 링크할 메모 찾기 (제목 일치 순)
+  final List<NoteLinkTarget> Function(String query)? noteLinkSearch;
+
+  /// 메모 링크(note://id)를 눌렀을 때
+  final void Function(int noteId)? onOpenNoteLink;
 
   final EdgeInsets padding;
 
@@ -74,6 +106,10 @@ class _BlockEditorState extends State<BlockEditor> {
   int _slashStart = 0;
   String _slashQuery = '';
   int _slashIndex = 0;
+
+  /// `/` 대신 `[[`(메모 링크)로 연 메뉴인지
+  bool _slashIsLink = false;
+  int get _slashPrefix => _slashIsLink ? 2 : 1;
 
   @override
   void initState() {
@@ -191,7 +227,15 @@ class _BlockEditorState extends State<BlockEditor> {
   }
 
   void _onControllerChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // 실행 취소 등으로 메뉴를 연 블록이 사라졌으면 메뉴 닫기
+    final slash = _slashBlock;
+    if (slash != null && !_blocks.contains(slash)) {
+      _slashPortal.hide();
+      _slashBlock = null;
+      _slashGroup = null;
+    }
+    setState(() {});
   }
 
   // ───────────── `/` 메뉴
@@ -206,52 +250,55 @@ class _BlockEditorState extends State<BlockEditor> {
     }
 
     return [
-      SlashMenuItem('Text', Icons.text_fields, [
-        'text',
-        'paragraph',
-        '텍스트',
-      ], () => turnInto('paragraph')),
-      SlashMenuItem('Heading 1', Icons.title, [
-        'h1',
-        'heading',
-        '제목',
-      ], () => turnInto('heading', level: 1)),
-      SlashMenuItem('Heading 2', Icons.title, [
-        'h2',
-        'heading',
-        '제목',
-      ], () => turnInto('heading', level: 2)),
-      SlashMenuItem('Heading 3', Icons.title, [
-        'h3',
-        'heading',
-        '제목',
-      ], () => turnInto('heading', level: 3)),
-      SlashMenuItem('Bulleted List', Icons.format_list_bulleted, [
-        'bulleted',
-        'list',
-        '목록',
-      ], () => turnInto('bulleted_list')),
-      SlashMenuItem('Numbered List', Icons.format_list_numbered, [
-        'numbered',
-        'list',
-        '번호',
-      ], () => turnInto('numbered_list')),
-      SlashMenuItem('To-do List', Icons.check_box_outlined, [
-        'todo',
-        'checkbox',
-        '체크',
-        '할일',
-      ], () => turnInto('todo_list')),
+      SlashMenuItem.group('Heading', Icons.title, [
+        SlashMenuItem('Heading 1', Icons.looks_one_outlined, [
+          'h1',
+          'heading',
+          '제목',
+        ], () => turnInto('heading', level: 1)),
+        SlashMenuItem('Heading 2', Icons.looks_two_outlined, [
+          'h2',
+          'heading',
+          '제목',
+        ], () => turnInto('heading', level: 2)),
+        SlashMenuItem('Heading 3', Icons.looks_3_outlined, [
+          'h3',
+          'heading',
+          '제목',
+        ], () => turnInto('heading', level: 3)),
+      ]),
+      SlashMenuItem.group('List', Icons.list, [
+        SlashMenuItem('Bulleted List', Icons.format_list_bulleted, [
+          'bulleted',
+          'list',
+          '목록',
+        ], () => turnInto('bulleted_list')),
+        SlashMenuItem('Numbered List', Icons.format_list_numbered, [
+          'numbered',
+          'list',
+          '번호',
+        ], () => turnInto('numbered_list')),
+        SlashMenuItem('To-do List', Icons.check_box_outlined, [
+          'todo',
+          'checkbox',
+          '체크',
+          '할일',
+        ], () => turnInto('todo_list')),
+      ]),
       SlashMenuItem('Quote', Icons.format_quote, [
         'quote',
         '인용',
       ], () => turnInto('quote')),
-      SlashMenuItem(
-        'Divider',
-        Icons.horizontal_rule,
-        ['divider', 'line', '구분선'],
-        () => _c.insertBlocks([EditorBlock.divider()]),
-      ),
+      SlashMenuItem('Divider', Icons.horizontal_rule, [
+        'divider',
+        'line',
+        '구분선',
+      ], () => _c.insertBlocks([EditorBlock.divider()])),
+      SlashMenuItem('Table', Icons.table_chart_outlined, [
+        'table',
+        '표',
+        '테이블',
+      ], () => _c.insertBlocks([EditorBlock.table()])),
       SlashMenuItem('Embed Video', Icons.smart_display, [
         'embed',
         'video',
@@ -266,7 +313,45 @@ class _BlockEditorState extends State<BlockEditor> {
         '접기',
         '섹션',
       ], _c.insertSection),
+      SlashMenuItem.group(
+        'Date',
+        Icons.calendar_today_outlined,
+        _dateItems(DateTime.now()),
+      ),
       ...widget.extraSlashItems,
+    ];
+  }
+
+  /// 지금 날짜·시간을 여러 형식으로 (고르면 그 글자를 커서 자리에 넣음)
+  List<SlashMenuItem> _dateItems(DateTime now) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    final day = weekdays[now.weekday - 1];
+    final ymd = '${now.year}-${two(now.month)}-${two(now.day)}';
+    final hm = '${two(now.hour)}:${two(now.minute)}';
+    final hour12 = now.hour % 12 == 0 ? 12 : now.hour % 12;
+    final ampm = '${now.hour < 12 ? '오전' : '오후'} $hour12:${two(now.minute)}';
+
+    SlashMenuItem item(String text, IconData icon) => SlashMenuItem(
+      text,
+      icon,
+      const ['date', 'time', 'now', 'today', '날짜', '시간', '오늘', '지금'],
+      () => _c.activeBlock?.controller.insertText(text),
+    );
+
+    return [
+      item(ymd, Icons.today_outlined),
+      item(
+        '${now.year}년 ${now.month}월 ${now.day}일 ($day)',
+        Icons.today_outlined,
+      ),
+      item(
+        '${now.year}.${two(now.month)}.${two(now.day)}',
+        Icons.today_outlined,
+      ),
+      item('$ymd $hm', Icons.event_outlined),
+      item(hm, Icons.schedule),
+      item(ampm, Icons.schedule),
     ];
   }
 
@@ -294,8 +379,58 @@ class _BlockEditorState extends State<BlockEditor> {
     ], focusTarget: next);
   }
 
-  List<SlashMenuItem> get _filteredSlashItems =>
-      _slashItems.where((item) => item.matches(_slashQuery)).toList();
+  /// 검색어가 없으면 그룹째로, 있으면 그룹 안 항목까지 펼쳐서 찾음
+  List<SlashMenuItem> get _filteredSlashItems => _slashIsLink
+      ? _noteLinkItems
+      : _slashQuery.isEmpty
+      ? _slashItems
+      : [
+          for (final item in _slashItems)
+            for (final leaf in item.isGroup ? item.children : [item])
+              if (leaf.matches(_slashQuery)) leaf,
+        ];
+
+  List<SlashMenuItem> get _noteLinkItems {
+    final search = widget.noteLinkSearch;
+    if (search == null) return const [];
+    return [
+      for (final note in search(_slashQuery.trim()).take(8))
+        SlashMenuItem(
+          note.title.isEmpty ? '제목 없음' : note.title,
+          Icons.description_outlined,
+          const [],
+          () => _insertNoteLink(note),
+        ),
+    ];
+  }
+
+  /// `[[검색어`를 지운 자리에 메모 제목 링크를 넣음
+  void _insertNoteLink(NoteLinkTarget note) {
+    final block = _c.activeBlock;
+    if (block == null) return;
+    final title = note.title.isEmpty ? '제목 없음' : note.title;
+    final href = '$noteLinkScheme${note.id}';
+    block.controller.insertStyled('$title ', [
+      for (var i = 0; i < title.length; i++) {'href': href},
+      {},
+    ]);
+    _c.refocus(block);
+  }
+
+  /// 열려 있는 하위 메뉴 (Heading·List 그룹)
+  SlashMenuItem? _slashGroup;
+  int _slashSubIndex = 0;
+
+  void _openSlashGroup(SlashMenuItem group) => setState(() {
+    _slashGroup = group;
+    _slashSubIndex = 0;
+  });
+
+  void _closeSlashGroup() => setState(() => _slashGroup = null);
+
+  /// 항목 선택: 그룹이면 하위 메뉴 열기, 아니면 실행
+  void _chooseSlashItem(SlashMenuItem item) =>
+      item.isGroup ? _openSlashGroup(item) : _runSlashItem(item);
 
   void _updateSlash(EditorBlock block) {
     final controller = block.controller;
@@ -303,18 +438,41 @@ class _BlockEditorState extends State<BlockEditor> {
     final caret = controller.selection.baseOffset;
 
     if (_slashBlock == block) {
+      final prefix = _slashPrefix;
       final valid =
-          caret > _slashStart &&
+          caret >= _slashStart + prefix &&
           caret <= text.length &&
-          _slashStart < text.length &&
-          text[_slashStart] == '/' &&
-          !text.substring(_slashStart + 1, caret).contains(' ');
-      if (!valid) return _closeSlash();
+          _slashStart + prefix <= text.length &&
+          text.startsWith(_slashIsLink ? '[[' : '/', _slashStart);
+      final query = valid ? text.substring(_slashStart + prefix, caret) : '';
+      // `/`는 띄어쓰기에서, `[[`는 `]`에서 닫힘 (메모 제목에는 띄어쓰기가 있음)
+      if (!valid || query.contains(_slashIsLink ? ']' : ' ')) {
+        return _closeSlash();
+      }
       setState(() {
-        _slashQuery = text.substring(_slashStart + 1, caret);
+        _slashQuery = query;
         _slashIndex = 0;
+        _slashGroup = null;
       });
-      if (_filteredSlashItems.isEmpty) _closeSlash();
+      // 메모 링크는 맞는 메모가 없어도 열어 두고 '없음'을 보여 줌
+      if (!_slashIsLink && _filteredSlashItems.isEmpty) _closeSlash();
+      return;
+    }
+
+    // `[[`를 치면 메모 링크 메뉴 열기
+    if (widget.noteLinkSearch != null &&
+        caret >= 2 &&
+        caret <= text.length &&
+        text.startsWith('[[', caret - 2)) {
+      setState(() {
+        _slashBlock = block;
+        _slashIsLink = true;
+        _slashStart = caret - 2;
+        _slashQuery = '';
+        _slashIndex = 0;
+        _slashGroup = null;
+      });
+      _slashPortal.show();
       return;
     }
 
@@ -325,9 +483,11 @@ class _BlockEditorState extends State<BlockEditor> {
         (caret == 1 || text[caret - 2] == ' ')) {
       setState(() {
         _slashBlock = block;
+        _slashIsLink = false;
         _slashStart = caret - 1;
         _slashQuery = '';
         _slashIndex = 0;
+        _slashGroup = null;
       });
       _slashPortal.show();
     }
@@ -336,13 +496,21 @@ class _BlockEditorState extends State<BlockEditor> {
   void _closeSlash() {
     if (_slashBlock == null) return;
     _slashPortal.hide();
-    if (mounted) setState(() => _slashBlock = null);
+    if (mounted) {
+      setState(() {
+        _slashBlock = null;
+        _slashGroup = null;
+      });
+    }
   }
 
   void _runSlashItem(SlashMenuItem item) {
     final block = _slashBlock;
     if (block == null) return;
     final controller = block.controller;
+    if (!_blocks.contains(block) || _slashStart > controller.text.length) {
+      return _closeSlash();
+    }
     final caret = controller.selection.baseOffset.clamp(
       _slashStart,
       controller.text.length,
@@ -358,58 +526,283 @@ class _BlockEditorState extends State<BlockEditor> {
     _c.textChanged();
   }
 
+  KeyEventResult? _onSlashKey(LogicalKeyboardKey key) {
+    KeyEventResult done(VoidCallback action) {
+      action();
+      return KeyEventResult.handled;
+    }
+
+    final enter =
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter;
+    final group = _slashGroup;
+    if (group != null) {
+      final items = group.children;
+      if (key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.arrowLeft) {
+        return done(_closeSlashGroup);
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        return done(
+          () => setState(
+            () => _slashSubIndex = (_slashSubIndex + 1) % items.length,
+          ),
+        );
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        return done(
+          () => setState(
+            () => _slashSubIndex =
+                (_slashSubIndex - 1 + items.length) % items.length,
+          ),
+        );
+      }
+      if (enter) return done(() => _runSlashItem(items[_slashSubIndex]));
+      return null;
+    }
+    final items = _filteredSlashItems;
+    if (key == LogicalKeyboardKey.escape) return done(_closeSlash);
+    if (items.isEmpty) return null;
+    final current = items[_slashIndex.clamp(0, items.length - 1)];
+    if (key == LogicalKeyboardKey.arrowDown) {
+      return done(
+        () => setState(() => _slashIndex = (_slashIndex + 1) % items.length),
+      );
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      return done(
+        () => setState(
+          () => _slashIndex = (_slashIndex - 1 + items.length) % items.length,
+        ),
+      );
+    }
+    if (key == LogicalKeyboardKey.arrowRight && current.isGroup) {
+      return done(() => _openSlashGroup(current));
+    }
+    if (enter) return done(() => _chooseSlashItem(current));
+    return null;
+  }
+
+  static const _slashItemHeight = 36.0;
+  static const _slashMaxHeight = 320.0;
+
+  /// 열린 그룹 항목의 위치 (하위 메뉴를 그 옆에 붙임)
+  final _slashGroupLink = LayerLink();
+  final _slashGroupTileKey = GlobalKey();
+
+  /// 메뉴 한 칸 (그룹이면 오른쪽 화살표)
+  Widget _slashTile(
+    SlashMenuItem item, {
+    required bool selected,
+    required VoidCallback onTap,
+    VoidCallback? onHover,
+  }) {
+    final iconColor = context.isDark ? Colors.grey[400] : Colors.grey[700];
+    return InkWell(
+      onTap: onTap,
+      onHover: (hovering) {
+        if (hovering) onHover?.call();
+      },
+      child: Container(
+        height: _slashItemHeight,
+        color: selected ? context.accent.withValues(alpha: 0.15) : null,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            Icon(item.icon, size: 18, color: iconColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(item.name, style: const TextStyle(fontSize: 14)),
+            ),
+            if (item.isGroup)
+              Icon(Icons.chevron_right, size: 18, color: iconColor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _slashPanel(
+    List<Widget> tiles, {
+    double maxHeight = _slashMaxHeight,
+  }) => Material(
+    elevation: 4,
+    color: context.popupSurface,
+    borderRadius: BorderRadius.circular(6),
+    clipBehavior: Clip.antiAlias,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        minWidth: 200,
+        maxWidth: 220,
+        maxHeight: maxHeight,
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        children: tiles,
+      ),
+    ),
+  );
+
+  static double _slashPanelHeight(int itemCount) =>
+      min(itemCount * _slashItemHeight + 8, _slashMaxHeight);
+
+  /// 메뉴를 줄 아래·위 중 어디에 띄울지와 쓸 수 있는 높이.
+  /// [needed]: 메뉴(하위 메뉴 포함)를 다 보여주는 데 필요한 높이.
+  /// 아래 공간이 모자라면 위로, 위아래 모두 모자라면 넓은 쪽에 맞춰 줄임(스크롤).
+  ({bool up, double maxHeight}) _slashPlacement(
+    EditorBlock block,
+    double needed,
+  ) {
+    const fallback = (up: false, maxHeight: _slashMaxHeight);
+    final box = block.focusNode.context?.findRenderObject();
+    final overlay = Overlay.maybeOf(context)?.context.findRenderObject();
+    if (box is! RenderBox || !box.attached || overlay is! RenderBox) {
+      return fallback;
+    }
+    // 메뉴가 그려지는 오버레이(앱 창) 기준 위치
+    final top = box.localToGlobal(Offset.zero, ancestor: overlay).dy;
+    final bottom = top + box.size.height;
+    const gap = 4.0, margin = 8.0;
+    final below = overlay.size.height - bottom - gap - margin;
+    final above = top - gap - margin;
+    final up = needed > below && above > below;
+    return (
+      up: up,
+      maxHeight: min(
+        _slashMaxHeight,
+        max(_slashItemHeight, up ? above : below),
+      ),
+    );
+  }
+
   Widget _buildSlashMenu(BuildContext context) {
     final items = _filteredSlashItems;
     final block = _slashBlock;
-    if (block == null || items.isEmpty) return const SizedBox.shrink();
-    return CompositedTransformFollower(
-      link: block.layerLink,
-      targetAnchor: Alignment.bottomLeft,
-      offset: const Offset(0, 4),
-      child: Align(
-        alignment: Alignment.topLeft,
-        child: Material(
-          elevation: 4,
-          color: context.popupSurface,
-          borderRadius: BorderRadius.circular(6),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 240, maxHeight: 320),
-            child: ListView.builder(
-              shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              itemCount: items.length,
-              itemBuilder: (context, i) {
-                final item = items[i];
-                final selected = i == _slashIndex;
-                return InkWell(
-                  onTap: () => _runSlashItem(item),
-                  child: Container(
-                    color: selected
-                        ? context.accent.withValues(alpha: 0.15)
-                        : null,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          item.icon,
-                          size: 18,
-                          color: context.isDark
-                              ? Colors.grey[400]
-                              : Colors.grey[700],
-                        ),
-                        const SizedBox(width: 10),
-                        Text(item.name, style: const TextStyle(fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                );
-              },
+    if (block == null) return const SizedBox.shrink();
+    if (items.isEmpty) {
+      if (!_slashIsLink) return const SizedBox.shrink();
+      final place = _slashPlacement(block, _slashPanelHeight(1));
+      return CompositedTransformFollower(
+        link: block.layerLink,
+        targetAnchor: place.up ? Alignment.topLeft : Alignment.bottomLeft,
+        followerAnchor: place.up ? Alignment.bottomLeft : Alignment.topLeft,
+        offset: Offset(0, place.up ? -4 : 4),
+        child: Align(
+          alignment: place.up ? Alignment.bottomLeft : Alignment.topLeft,
+          child: _slashPanel([
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Text(
+                '일치하는 메모가 없습니다',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
             ),
+          ]),
+        ),
+      );
+    }
+    final group = _slashGroup;
+    // 항목 목록은 읽을 때마다 새로 만들어지므로 이름으로 찾음
+    final groupIndex = group == null
+        ? -1
+        : items.indexWhere((item) => item.name == group.name);
+    if (group != null && groupIndex < 0) return const SizedBox.shrink();
+    final place = _slashPlacement(block, _slashPanelHeight(items.length));
+    final up = place.up;
+
+    final main = _slashPanel(maxHeight: place.maxHeight, [
+      for (var i = 0; i < items.length; i++)
+        _groupTileTarget(
+          i == groupIndex,
+          _slashTile(
+            items[i],
+            selected: group == null ? i == _slashIndex : i == groupIndex,
+            onTap: () {
+              setState(() => _slashIndex = i);
+              _chooseSlashItem(items[i]);
+            },
+            // 그룹에 올리면 하위 메뉴, 다른 항목에 올리면 하위 메뉴 닫기
+            onHover: () {
+              if (items[i].isGroup) {
+                _slashIndex = i;
+                if (_slashGroup?.name != items[i].name) {
+                  _openSlashGroup(items[i]);
+                }
+              } else if (_slashGroup != null || _slashIndex != i) {
+                setState(() {
+                  _slashIndex = i;
+                  _slashGroup = null;
+                });
+              }
+            },
           ),
         ),
+    ]);
+
+    return Stack(
+      children: [
+        CompositedTransformFollower(
+          link: block.layerLink,
+          targetAnchor: up ? Alignment.topLeft : Alignment.bottomLeft,
+          followerAnchor: up ? Alignment.bottomLeft : Alignment.topLeft,
+          offset: Offset(0, up ? -4 : 4),
+          child: Align(
+            alignment: up ? Alignment.bottomLeft : Alignment.topLeft,
+            child: main,
+          ),
+        ),
+        if (group != null) _buildSlashSubMenu(group),
+      ],
+    );
+  }
+
+  /// 열린 그룹 항목에만 위치 표시를 붙임
+  Widget _groupTileTarget(bool isOpenGroup, Widget tile) => isOpenGroup
+      ? CompositedTransformTarget(
+          key: _slashGroupTileKey,
+          link: _slashGroupLink,
+          child: tile,
+        )
+      : tile;
+
+  /// 하위 메뉴: 그룹 항목 오른쪽에 첫 항목을 나란히 붙임.
+  /// 아래 공간이 모자라면 마지막 항목을 그룹 항목에 맞춰 위로 펼침.
+  Widget _buildSlashSubMenu(SlashMenuItem group) {
+    const listPadding = 4.0; // 메뉴 목록의 위아래 여백
+    final height = _slashPanelHeight(group.children.length);
+    var up = false;
+    final tile = _slashGroupTileKey.currentContext?.findRenderObject();
+    final overlay = Overlay.maybeOf(context)?.context.findRenderObject();
+    if (tile is! RenderBox || !tile.attached) {
+      // 그룹 항목이 이번 프레임에 처음 자리 잡음 → 위치를 알고 나서 다시 그림
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _slashGroup?.name == group.name) setState(() {});
+      });
+    } else if (overlay is RenderBox) {
+      final top = tile.localToGlobal(Offset.zero, ancestor: overlay).dy;
+      final bottom = top + tile.size.height;
+      final screen = overlay.size.height;
+      up =
+          top - listPadding + height > screen - 8 &&
+          bottom + listPadding - height >= 8;
+    }
+    return CompositedTransformFollower(
+      link: _slashGroupLink,
+      targetAnchor: up ? Alignment.bottomRight : Alignment.topRight,
+      followerAnchor: up ? Alignment.bottomLeft : Alignment.topLeft,
+      offset: Offset(4, up ? listPadding : -listPadding),
+      child: Align(
+        alignment: up ? Alignment.bottomLeft : Alignment.topLeft,
+        child: _slashPanel([
+          for (var i = 0; i < group.children.length; i++)
+            _slashTile(
+              group.children[i],
+              selected: i == _slashSubIndex,
+              onTap: () => _runSlashItem(group.children[i]),
+              onHover: () => setState(() => _slashSubIndex = i),
+            ),
+        ]),
       ),
     );
   }
@@ -720,6 +1113,7 @@ class _BlockEditorState extends State<BlockEditor> {
 
   KeyEventResult _onKey(EditorBlock block, KeyEvent event) {
     if (event is KeyUpEvent) return KeyEventResult.ignored;
+    if (!block.isText) return _onObjectKey(block, event);
     final controller = block.controller;
     // 한글 조합 중인 키는 전부 기본 입력창(IME)에 맡김
     if (controller.value.composing.isValid) return KeyEventResult.ignored;
@@ -740,30 +1134,8 @@ class _BlockEditorState extends State<BlockEditor> {
 
     // `/` 메뉴가 열려 있으면 방향키·Enter·Esc는 메뉴용
     if (_slashBlock == block) {
-      final items = _filteredSlashItems;
-      if (key == LogicalKeyboardKey.escape) return done(_closeSlash);
-      if (items.isNotEmpty) {
-        if (key == LogicalKeyboardKey.arrowDown) {
-          return done(
-            () =>
-                setState(() => _slashIndex = (_slashIndex + 1) % items.length),
-          );
-        }
-        if (key == LogicalKeyboardKey.arrowUp) {
-          return done(
-            () => setState(
-              () =>
-                  _slashIndex = (_slashIndex - 1 + items.length) % items.length,
-            ),
-          );
-        }
-        if (key == LogicalKeyboardKey.enter ||
-            key == LogicalKeyboardKey.numpadEnter) {
-          return done(
-            () => _runSlashItem(items[_slashIndex.clamp(0, items.length - 1)]),
-          );
-        }
-      }
+      final result = _onSlashKey(key);
+      if (result != null) return result;
     }
 
     // 여러 줄 선택 중: 복사·삭제·입력 등은 선택 전체에
@@ -882,6 +1254,84 @@ class _BlockEditorState extends State<BlockEditor> {
     return KeyEventResult.ignored;
   }
 
+  /// 그림·파일 등을 고른 상태의 키: Enter 아래에 새 줄, Backspace/Delete 삭제,
+  /// 방향키 이웃 줄로 이동
+  KeyEventResult _onObjectKey(EditorBlock block, KeyEvent event) {
+    // 표 칸·코드 입력창처럼 블록 안의 입력창에 커서가 있으면 그 입력창에 맡김
+    if (!block.focusNode.hasPrimaryFocus) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    final keyboard = HardwareKeyboard.instance;
+    final ctrl = keyboard.isControlPressed;
+    final shift = keyboard.isShiftPressed;
+
+    KeyEventResult done(VoidCallback action) {
+      action();
+      return KeyEventResult.handled;
+    }
+
+    if (keyboard.isAltPressed && !ctrl) {
+      if (key == LogicalKeyboardKey.arrowUp) {
+        return done(() => _c.moveBlock(block, -1));
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        return done(() => _c.moveBlock(block, 1));
+      }
+      return KeyEventResult.ignored;
+    }
+    if (ctrl) {
+      return switch (key) {
+        LogicalKeyboardKey.keyZ => done(shift ? _c.redo : _c.undo),
+        LogicalKeyboardKey.keyY => done(_c.redo),
+        _ => KeyEventResult.ignored,
+      };
+    }
+    return switch (key) {
+      LogicalKeyboardKey.enter || LogicalKeyboardKey.numpadEnter => done(
+        () => _c.insertParagraphAfter(block),
+      ),
+      LogicalKeyboardKey.backspace => done(
+        () => _removeObject(block, forward: false),
+      ),
+      LogicalKeyboardKey.delete => done(
+        () => _removeObject(block, forward: true),
+      ),
+      LogicalKeyboardKey.tab => done(
+        () => shift ? _outdent(block) : _indent(block),
+      ),
+      LogicalKeyboardKey.arrowUp ||
+      LogicalKeyboardKey.arrowLeft => _moveTo(block, -1, toEnd: true),
+      LogicalKeyboardKey.arrowDown ||
+      LogicalKeyboardKey.arrowRight => _moveTo(block, 1, toEnd: false),
+      LogicalKeyboardKey.escape => done(block.focusNode.unfocus),
+      _ => KeyEventResult.ignored,
+    };
+  }
+
+  /// 고른 블록을 지우고 커서를 이웃 줄로 (Backspace는 윗줄 끝, Delete는 아랫줄 처음)
+  Future<void> _removeObject(EditorBlock block, {required bool forward}) async {
+    if (block.type != dividerType &&
+        !await confirmBlockDelete(context, block)) {
+      return;
+    }
+    final index = _blocks.indexOf(block);
+    if (index < 0) return;
+    EditorBlock? neighbor(int direction) {
+      for (var i = index + direction; i >= 0 && i < _blocks.length;) {
+        if (!_c.isHidden(i)) return _blocks[i];
+        i += direction;
+      }
+      return null;
+    }
+
+    final target = neighbor(forward ? 1 : -1) ?? neighbor(forward ? -1 : 1);
+    final toEnd = target != null && _blocks.indexOf(target) < index;
+    _c.removeBlock(block);
+    final focusTarget = target != null && _blocks.contains(target)
+        ? target
+        : _blocks.first;
+    _c.focus(focusTarget, toEnd ? focusTarget.controller.text.length : 0);
+  }
+
   static int? _digitOf(LogicalKeyboardKey key) {
     const digits = [
       LogicalKeyboardKey.digit0,
@@ -899,16 +1349,14 @@ class _BlockEditorState extends State<BlockEditor> {
     return index < 0 ? null : index;
   }
 
-  /// 이웃한 텍스트 블록으로 커서 이동 (텍스트가 아닌 블록·접힌 내용은 건너뜀)
+  /// 이웃한 블록으로 커서 이동 (그림·파일 등은 그 블록을 고름, 접힌 내용은 건너뜀)
   KeyEventResult _moveTo(
     EditorBlock block,
     int direction, {
     required bool toEnd,
   }) {
     var i = _blocks.indexOf(block) + direction;
-    while (i >= 0 &&
-        i < _blocks.length &&
-        (!_blocks[i].isText || _c.isHidden(i))) {
+    while (i >= 0 && i < _blocks.length && _c.isHidden(i)) {
       i += direction;
     }
     if (i < 0 || i >= _blocks.length) return KeyEventResult.ignored;
@@ -922,27 +1370,18 @@ class _BlockEditorState extends State<BlockEditor> {
   bool _caretOnEdgeLine(EditorBlock block, bool first, {bool extent = false}) {
     final controller = block.controller;
     if (!extent && !controller.selection.isCollapsed) return false;
-    if (block.width <= 0) return true;
-    final painter = TextPainter(
-      text: controller.buildTextSpan(
-        context: context,
-        style: _effectiveStyle(block),
-        withComposing: false,
+    // 화면에 그려진 입력창의 줄 나눔 그대로 (줄 안의 그림 높이까지 반영됨)
+    final editable = _renderEditableOf(block);
+    if (editable == null || !editable.attached || !editable.hasSize) {
+      return true;
+    }
+    final line = editable.getLineAtOffset(
+      TextPosition(
+        offset: controller.selection.extentOffset,
+        affinity: controller.selection.affinity,
       ),
-      textDirection: TextDirection.ltr,
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout(maxWidth: block.width - 3); // 커서 폭만큼 여유
-    final caret = painter.getOffsetForCaret(
-      TextPosition(offset: controller.selection.extentOffset),
-      Rect.zero,
     );
-    final lines = painter.computeLineMetrics();
-    final height = painter.height;
-    painter.dispose();
-    if (lines.length <= 1) return true;
-    return first
-        ? caret.dy < lines.first.height / 2
-        : caret.dy > height - lines.last.height * 1.5;
+    return first ? line.start <= 0 : line.end >= controller.text.length;
   }
 
   void _indent(EditorBlock block) => _c.indentBlocks([block], outdent: false);
@@ -983,7 +1422,7 @@ class _BlockEditorState extends State<BlockEditor> {
     }
     if (previous == null) return;
     if (!previous.isText) {
-      _deleteObject(previous);
+      _c.focus(previous, 0); // 한 번 더 누르면 삭제
       return;
     }
     if (_c.isHidden(index - 1) || previous.isSection) {
@@ -999,7 +1438,7 @@ class _BlockEditorState extends State<BlockEditor> {
     if (index + 1 >= _blocks.length) return;
     final next = _blocks[index + 1];
     if (!next.isText) {
-      _deleteObject(next);
+      _c.focus(next, 0); // 한 번 더 누르면 삭제
       return;
     }
     if (next.isSection || _c.isHidden(index + 1)) return;
@@ -1049,10 +1488,6 @@ class _BlockEditorState extends State<BlockEditor> {
     }
     return style;
   }
-
-  /// 입력창이 실제로 쓰는 스타일 (테마 기본값과 합친 것)
-  TextStyle _effectiveStyle(EditorBlock block) =>
-      Theme.of(context).textTheme.titleMedium!.merge(_baseStyle(block));
 
   Widget? _leading(EditorBlock block, int index) {
     const bullets = ['●', '◯', '□'];
@@ -1120,6 +1555,8 @@ class _BlockEditorState extends State<BlockEditor> {
               controller: block.controller,
               focusNode: block.focusNode,
               maxLines: null,
+              // 기본값은 줄 높이를 글자 크기로 고정해서 줄 안의 그림이 윗줄을 덮음
+              strutStyle: const StrutStyle(forceStrutHeight: false),
               style: _baseStyle(block),
               textAlign: _textAlign(block),
               cursorColor: _cursorColor,
@@ -1149,6 +1586,8 @@ class _BlockEditorState extends State<BlockEditor> {
             children: [
               ?leading,
               Expanded(child: field),
+              if (block.type == 'todo_list')
+                TodoDueButton(block: block, onChanged: _c.contentChanged),
             ],
           ),
           // 유튜브 링크가 있으면 미리보기 (없으면 빈 칸)
@@ -1158,31 +1597,55 @@ class _BlockEditorState extends State<BlockEditor> {
     );
   }
 
+  /// 그림·파일 등: 누르면 그 블록을 고름 (커서처럼 키보드로 다룰 수 있게)
   Widget _buildObjectBlock(EditorBlock block) {
+    final child = _buildObjectContent(block);
+    return Focus(
+      focusNode: block.focusNode,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: (event) {
+          if (event.buttons & kPrimaryMouseButton == 0) return;
+          if (!block.focusNode.hasFocus) block.focusNode.requestFocus();
+        },
+        child: ListenableBuilder(
+          listenable: block.focusNode,
+          builder: (context, child) => DecoratedBox(
+            decoration: BoxDecoration(
+              // 표는 자기 테두리로 고른 상태를 보여줌
+              color:
+                  block.focusNode.hasPrimaryFocus &&
+                      block.type != localTableType
+                  ? context.selectedTint
+                  : null,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: child,
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildObjectContent(EditorBlock block) {
     void delete() => _deleteObject(block);
     return switch (block.type) {
       dividerType => const Padding(
         padding: EdgeInsets.symmetric(vertical: 4),
         child: Divider(height: 16, thickness: 1, color: Color(0xFFAAAAAA)),
       ),
-      localImageType => ImageBlockView(
-        block: block,
-        onChanged: _c.textChanged,
-        onDelete: delete,
-        onCut: () {
-          Clipboard.setData(
-            ClipboardData(text: block.rawData['src'] as String? ?? ''),
-          );
-          _c.removeBlock(block);
-        },
-      ),
-      localFileType => FileBlockView(block: block, onDelete: delete),
       localLocationType => LocationBlockView(block: block, onDelete: delete),
       localCodeType => CodeBlockView(
         block: block,
         onChanged: _c.textChanged,
         onDelete: delete,
         startEditing: (block.rawData['code'] as String? ?? '').isEmpty,
+      ),
+      localTableType => TableBlockView(
+        block: block,
+        onChanged: _c.textChanged,
+        onDelete: delete,
       ),
       _ => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1423,6 +1886,8 @@ class _BlockEditorState extends State<BlockEditor> {
           block.align,
           _numbers[block],
           selected,
+          block.data[todoDueKey],
+          Theme.of(context).brightness, // 다크 모드 전환 시 글자색 다시
         );
         final cached = _rowCache[block];
         if (cached != null && cached.$1 == signature) {
@@ -1536,6 +2001,12 @@ class _BlockEditorState extends State<BlockEditor> {
 
   void _onPointerDown(PointerDownEvent event) {
     if (event.buttons & kPrimaryMouseButton == 0) return;
+    // 그림 크기 조절 손잡이: 글 선택 드래그를 하지 않음
+    if (InlineImage.resizing) {
+      _dragBase = null;
+      _linkDown = null;
+      return;
+    }
     final block = _textBlockAt(event.position);
     // 링크 클릭: 끌지 않고 그대로 떼면 열기 (끌면 일반 선택)
     _linkDown = null;
@@ -1577,6 +2048,7 @@ class _BlockEditorState extends State<BlockEditor> {
   }
 
   void _onPointerMove(PointerMoveEvent event) {
+    if (InlineImage.resizing) return;
     final link = _linkDown;
     if (link != null && (event.position - link.$2).distance > 4) {
       _linkDown = null;
@@ -1605,7 +2077,14 @@ class _BlockEditorState extends State<BlockEditor> {
   void _onPointerUp(PointerUpEvent event) {
     final link = _linkDown;
     _linkDown = null;
-    if (link != null) openLink(link.$1);
+    if (link != null) {
+      final noteId = noteIdOfLink(link.$1);
+      if (noteId == null) {
+        openLink(link.$1);
+      } else {
+        widget.onOpenNoteLink?.call(noteId);
+      }
+    }
     _dragBase = null;
     if (_c.selection != null) scheduleMicrotask(_c.applySelectionHighlights);
   }

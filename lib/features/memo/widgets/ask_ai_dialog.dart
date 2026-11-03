@@ -53,19 +53,22 @@ class _AskAiDialogState extends State<AskAiDialog> {
     _scrollToBottom();
 
     try {
-      // 대화 기록을 컨텍스트로 포함
+      // 대화 기록을 컨텍스트로 포함 (방금 보낸 질문은 마지막 줄로 한 번만)
       final history = _messages
+          .take(_messages.length - 1)
           .map((m) => '${m.isUser ? "User" : "AI"}: ${m.text}')
           .join('\n');
-      final prompt = '$history\nUser: $text';
+      final prompt = history.isEmpty ? 'User: $text' : '$history\nUser: $text';
 
       final response = await GeminiService().ask(prompt);
+      if (!mounted) return; // 기다리는 동안 창을 닫은 경우
       setState(() {
         _messages.add(_ChatMessage(text: response, isUser: false));
         _isLoading = false;
       });
       _scrollToBottom();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _messages.add(_ChatMessage(text: '오류가 발생했습니다: $e', isUser: false));
         _isLoading = false;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -47,17 +49,39 @@ class _FindBarState extends State<FindBar> {
       );
       _search();
     });
+    widget.controller.addListener(_onEditorChanged);
+  }
+
+  @override
+  void didUpdateWidget(FindBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onEditorChanged);
+      widget.controller.addListener(_onEditorChanged);
+    }
+  }
+
+  Timer? _researchTimer;
+
+  /// 줄 추가·삭제·실행 취소 등으로 블록이 바뀌면 잠시 뒤 다시 찾음 (스크롤은 그대로)
+  void _onEditorChanged() {
+    _researchTimer?.cancel();
+    _researchTimer = Timer(const Duration(milliseconds: 200), () {
+      if (mounted) _search(keepIndex: true, reveal: false);
+    });
   }
 
   @override
   void dispose() {
+    _researchTimer?.cancel();
+    widget.controller.removeListener(_onEditorChanged);
     _findController.dispose();
     _replaceController.dispose();
     _findFocus.dispose();
     super.dispose();
   }
 
-  void _search({bool keepIndex = false}) {
+  void _search({bool keepIndex = false, bool reveal = true}) {
     final matches = widget.controller.find(_findController.text);
     setState(() {
       _matches = matches;
@@ -65,14 +89,14 @@ class _FindBarState extends State<FindBar> {
           ? 0
           : (keepIndex ? _index.clamp(0, matches.length - 1) : 0);
     });
-    _show();
+    _show(reveal: reveal);
   }
 
-  void _show() {
+  void _show({bool reveal = true}) {
     final current = _matches.isEmpty ? null : _matches[_index];
     widget.controller.showFindHighlights(_matches, current);
     // 화면 밖이라 아직 만들어지지 않은 줄이어도 그 위치로 스크롤
-    if (current != null) {
+    if (reveal && current != null) {
       widget.controller.reveal(current.block, alignment: 0.3);
     }
   }
@@ -85,14 +109,24 @@ class _FindBarState extends State<FindBar> {
 
   void _replaceOne() {
     if (_matches.isEmpty) return;
-    widget.controller.replace(_matches[_index], _replaceController.text);
+    final query = _findController.text;
+    var match = _matches[_index];
+    // 찾은 뒤 내용이 바뀌었으면 다시 찾아 같은 순번의 위치를 바꿈
+    if (!widget.controller.isMatchValid(match, query)) {
+      final fresh = widget.controller.find(query);
+      if (fresh.isEmpty) return _search();
+      match = fresh[_index.clamp(0, fresh.length - 1)];
+    }
+    widget.controller.replace(match, _replaceController.text, query: query);
     _search(keepIndex: true);
   }
 
   void _replaceAll() {
-    // 뒤에서부터 바꿔야 앞쪽 위치가 밀리지 않음
-    for (final match in _matches.reversed) {
-      widget.controller.replace(match, _replaceController.text);
+    final query = _findController.text;
+    // 지금 내용 기준으로 다시 찾고, 뒤에서부터 바꿔야 앞쪽 위치가 밀리지 않음
+    final matches = widget.controller.find(query);
+    for (final match in matches.reversed) {
+      widget.controller.replace(match, _replaceController.text, query: query);
     }
     _search();
   }

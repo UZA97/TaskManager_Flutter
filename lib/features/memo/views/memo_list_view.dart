@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,8 @@ class MemoListView extends ConsumerWidget {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('오류: $e')),
             data: (folders) => notesAsync.when(
+              // 검색어가 바뀌어 다시 읽는 동안에도 이전 목록 유지 (깜빡임·펼침 상태 유지)
+              skipLoadingOnReload: true,
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('오류: $e')),
               data: (notes) => _FolderTree(folders: folders, notes: notes),
@@ -84,22 +87,7 @@ class MemoListView extends ConsumerWidget {
 
   /// 메모 목록 검색 입력창을 구성합니다.
   Widget _buildSearchField(BuildContext context, WidgetRef ref) {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: '검색',
-        prefixIcon: const Icon(Icons.search, size: 18),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: context.line),
-        ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 8),
-        isDense: true,
-      ),
-      onChanged: (value) {
-        ref.read(searchQueryProvider.notifier).update(value);
-        ref.read(noteListProvider.notifier).refresh();
-      },
-    );
+    return const _SearchField();
   }
 
   /// 새 폴더를 생성하기 위한 다이얼로그를 표시합니다.
@@ -140,6 +128,53 @@ class MemoListView extends ConsumerWidget {
   }
 }
 
+// 검색창: 입력이 멈춘 뒤(300ms) 검색어 반영 → 목록은 검색어를 구독해 다시 읽음
+class _SearchField extends ConsumerStatefulWidget {
+  const _SearchField();
+
+  @override
+  ConsumerState<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends ConsumerState<_SearchField> {
+  late final _controller = TextEditingController(
+    text: ref.read(searchQueryProvider),
+  );
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) ref.read(searchQueryProvider.notifier).update(value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      decoration: InputDecoration(
+        hintText: '검색',
+        prefixIcon: const Icon(Icons.search, size: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.line),
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        isDense: true,
+      ),
+      onChanged: _onChanged,
+    );
+  }
+}
+
 // 트리 루트
 class _FolderTree extends ConsumerWidget {
   final List<Folder> folders;
@@ -154,6 +189,7 @@ class _FolderTree extends ConsumerWidget {
     if (searchQuery.isNotEmpty) {
       return _buildSearchResult(searchQuery);
     }
+    final index = _TreeIndex(folders, notes);
 
     final favFolders = folders.where((f) => f.isFavorite).toList()
       ..sort((a, b) => a.favoriteSortOrder.compareTo(b.favoriteSortOrder));
@@ -231,12 +267,7 @@ class _FolderTree extends ConsumerWidget {
       final item = allItems[i];
       if (item.isFolder) {
         normalWidgets.add(
-          _FolderNode(
-            folder: item.folder!,
-            allFolders: folders,
-            allNotes: notes,
-            depth: 0,
-          ),
+          _FolderNode(folder: item.folder!, index: index, depth: 0),
         );
       } else {
         normalWidgets.add(_NoteNode(note: item.note!, depth: 0));
@@ -273,17 +304,10 @@ class _FolderTree extends ConsumerWidget {
 
   /// 검색어와 일치하는 메모와 그 조상 폴더를 보여줍니다.
   Widget _buildSearchResult(String searchQuery) {
-    // 검색된 메모만
-    // 태그 검색 포함 - provider에서 이미 검색된 결과 그대로 사용
+    // 검색된 메모만 (제목·본문 글자·태그. 본문은 JSON 원문이 아닌 글자로 비교)
+    // 새 검색 결과를 읽는 동안 이전 결과가 남아 있어도 현재 검색어로 다시 거름
     final matchedNotes = notes
-        .where(
-          (n) =>
-              n.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              n.content.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              n.tags.any(
-                (tag) => tag.toLowerCase().contains(searchQuery.toLowerCase()),
-              ), // 추가
-        )
+        .where((n) => noteMatchesQuery(n, searchQuery))
         .toList();
 
     if (matchedNotes.isEmpty) {
@@ -303,6 +327,7 @@ class _FolderTree extends ConsumerWidget {
     final visibleFolders = folders
         .where((f) => ancestorIds.contains(f.id))
         .toList();
+    final index = _TreeIndex(visibleFolders, matchedNotes);
 
     return ListView(
       children: [
@@ -317,8 +342,7 @@ class _FolderTree extends ConsumerWidget {
             .map(
               (f) => _FolderNode(
                 folder: f,
-                allFolders: visibleFolders,
-                allNotes: matchedNotes,
+                index: index,
                 depth: 0,
                 forceExpanded: true, // 추가
               ),
@@ -340,17 +364,33 @@ class _FolderTree extends ConsumerWidget {
   }
 }
 
+// 부모 폴더 id → 하위 폴더/메모 (트리를 그릴 때 한 번만 계산)
+class _TreeIndex {
+  final Map<int?, List<Folder>> foldersByParent = {};
+  final Map<int?, List<Note>> notesByFolder = {};
+
+  _TreeIndex(List<Folder> folders, List<Note> notes) {
+    for (final f in folders) {
+      (foldersByParent[f.parentId] ??= []).add(f);
+    }
+    for (final n in notes) {
+      (notesByFolder[n.folderId] ??= []).add(n);
+    }
+  }
+
+  List<Folder> childFolders(int? id) => foldersByParent[id] ?? const [];
+  List<Note> childNotes(int? id) => notesByFolder[id] ?? const [];
+}
+
 // 폴더 노드 (재귀)
 class _FolderNode extends ConsumerStatefulWidget {
   final Folder folder;
-  final List<Folder> allFolders;
-  final List<Note> allNotes;
+  final _TreeIndex index;
   final int depth;
   final bool forceExpanded; // 추가
   const _FolderNode({
     required this.folder,
-    required this.allFolders,
-    required this.allNotes,
+    required this.index,
     required this.depth,
     this.forceExpanded = false,
   });
@@ -382,12 +422,12 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
 
   @override
   Widget build(BuildContext context) {
-    final childFolders = widget.allFolders
-        .where((f) => f.parentId == widget.folder.id)
-        .toList();
-    final childNotes = widget.allNotes
-        .where((n) => n.folderId == widget.folder.id)
-        .toList();
+    final childFolders = widget.index.childFolders(widget.folder.id);
+    final childNotes = widget.index.childNotes(widget.folder.id);
+    // 선택 폴더가 바뀌어도 이 폴더의 선택 여부가 같으면 다시 그리지 않음
+    final isSelected = ref.watch(
+      selectedFolderProvider.select((f) => f?.id == widget.folder.id),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,13 +486,8 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
                 ),
               ),
               child: _buildFolderRow(
-                isSelected:
-                    ref.watch(selectedFolderProvider)?.id == widget.folder.id,
-                hasChildren:
-                    widget.allFolders.any(
-                      (f) => f.parentId == widget.folder.id,
-                    ) ||
-                    widget.allNotes.any((n) => n.folderId == widget.folder.id),
+                isSelected: isSelected,
+                hasChildren: childFolders.isNotEmpty || childNotes.isNotEmpty,
                 isHovered: isHovered,
               ),
             );
@@ -494,8 +529,7 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
                 items.add(
                   _FolderNode(
                     folder: item.folder!,
-                    allFolders: widget.allFolders,
-                    allNotes: widget.allNotes,
+                    index: widget.index,
                     depth: widget.depth + 1,
                     forceExpanded: widget.forceExpanded, // 추가
                   ),
@@ -741,7 +775,9 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('폴더 삭제'),
-        content: Text('"${widget.folder.name}" 폴더와 하위 항목이 모두 삭제됩니다. 계속할까요?'),
+        content: Text(
+          '"${widget.folder.name}" 폴더와 하위 폴더가 삭제되고, 안의 메모는 휴지통으로 이동합니다. 계속할까요?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -772,8 +808,10 @@ class _NoteNode extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedNote = ref.watch(selectedNoteProvider);
-    final isSelected = selectedNote?.id == note.id;
+    // 선택이 바뀌어도 이 메모의 선택 여부가 같으면 다시 그리지 않음
+    final isSelected = ref.watch(
+      selectedNoteProvider.select((n) => n?.id == note.id),
+    );
 
     final noteRow = GestureDetector(
       onTap: () {

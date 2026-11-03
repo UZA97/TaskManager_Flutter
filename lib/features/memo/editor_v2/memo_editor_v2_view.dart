@@ -1,10 +1,6 @@
-import 'package:taskmanager/core/theme/app_colors.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:appflowy_editor/appflowy_editor.dart'
-    show Document, EditorState, markdownToDocument;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -15,20 +11,26 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/providers/navigation_provider.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../map/services/location_search_result.dart';
 import '../../map/widgets/location_search_dialog.dart';
 import '../data/note_repository.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
 import '../providers/tab_provider.dart';
+import '../services/note_template_service.dart';
+import '../services/note_version_service.dart';
 import '../services/pdf_export_service.dart';
 import '../views/memo_editor_widgets.dart';
 import '../widgets/ask_ai_dialog.dart';
 import '../widgets/memo_tab_bar.dart';
+import '../widgets/note_version_dialog.dart';
 import 'block_editor.dart';
 import 'block_editor_controller.dart';
 import 'editor_block.dart';
+import 'inline_image.dart';
 import 'find_bar.dart';
+import 'outline_panel.dart';
 
 /// 새 에디터를 쓰는 메모 화면. 화면 구성(탭·제목·토글·태그·하단 툴바)은 기존과 같음.
 class MemoEditorV2View extends ConsumerStatefulWidget {
@@ -54,21 +56,46 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
   bool _findOpen = false;
   bool _replaceMode = false;
 
+  /// 오른쪽 목차(제목 목록)
+  bool _outlineOpen = false;
+
+  /// `[[` 메모 링크용 전체 메모 (검색 중일 때만 따로 불러 둠, 링크 메뉴를 열 때 불러옴)
+  List<Note>? _allNotesCache;
+  bool _allNotesStale = true;
+
+  /// 지금 에디터·제목 칸이 담고 있는 메모 (전환 중엔 _currentNote와 다를 수 있음)
+  Note? _editorNote;
+
+  /// 저장 대기 중인 메모와 에디터 (타이머를 만들 때 고정해 다른 메모에 쓰지 않게)
+  Note? _pendingNote;
+  BlockEditorController? _pendingEditor;
+
+  /// 화면이 닫힌 뒤에도 마지막 저장을 할 수 있게 미리 잡아 둠
+  late NoteListNotifier _noteList;
+
   static const _imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
   bool _isImage(String filePath) =>
       _imageExts.contains(path.extension(filePath).toLowerCase());
 
   @override
+  void initState() {
+    super.initState();
+    _noteList = ref.read(noteListProvider.notifier);
+  }
+
+  @override
   void dispose() {
-    _saveTimer?.cancel();
+    // 닫히기 전 마지막 입력 저장 (에디터를 정리하기 전에 내용을 꺼냄)
+    _flushSave();
     _editor?.dispose();
     _titleController.dispose();
     _saveStatus.dispose();
     super.dispose();
   }
 
-  /// 메모 내용(appflowy 문서 JSON, 예전 메모는 마크다운)으로 에디터를 만듦
+  /// 메모 내용(appflowy 문서 JSON)으로 에디터를 만듦.
+  /// JSON이 아닌 예전(마크다운) 메모는 한 줄씩 문단으로 엶.
   void _initEditor(Note note) {
     _titleController.text = note.title;
 
@@ -76,20 +103,23 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     try {
       blocks = note.content.isEmpty ? [] : blocksFromJson(note.content);
     } catch (_) {
-      try {
-        blocks = blocksFromJson(
-          jsonEncode(markdownToDocument(note.content).toJson()),
-        );
-      } catch (_) {
-        blocks = [];
-      }
+      blocks = [
+        for (final line in note.content.split('\n'))
+          EditorBlock(
+            type: 'paragraph',
+            delta: [
+              if (line.isNotEmpty) {'insert': line},
+            ],
+          ),
+      ];
     }
 
     final old = _editor;
-    final editor = BlockEditorController(blocks)
-      ..onContentChanged = _onContentChanged;
+    final editor = BlockEditorController(blocks);
+    editor.onContentChanged = () => _onContentChanged(editor);
     setState(() {
       _editor = editor;
+      _editorNote = note;
       _findOpen = false;
     });
     if (old != null) {
@@ -97,31 +127,81 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     }
     // 에디터가 그려진 뒤 대기 중인 체크리스트 이동 요청 처리
     WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocusRequest());
+    // 열 때의 내용을 버전으로 (편집 전 상태로 되돌릴 수 있게)
+    if (note.id != null) {
+      NoteVersionService.snapshot(note.id!, note.title, note.content);
+    }
+  }
+
+  /// `[[` 후보 메모. 검색 중이 아니면 이미 불러온 목록을 그대로 씀
+  List<Note> get _allNotes {
+    final listed = ref.read(noteListProvider).value ?? const <Note>[];
+    if (ref.read(searchQueryProvider).isEmpty) return listed;
+    if (_allNotesStale) {
+      _allNotesStale = false;
+      _loadAllNotes();
+    }
+    return _allNotesCache ?? listed;
+  }
+
+  Future<void> _loadAllNotes() async {
+    final notes = await ref.read(noteRepositoryProvider).getAllNotes();
+    if (mounted) _allNotesCache = notes;
   }
 
   /// 에디터 변경 내용을 일정 시간 동안 모아서 저장합니다.
-  void _onContentChanged() {
-    if (_currentNote == null || _editor == null) return;
+  /// [editor]가 지금 에디터가 아니면(메모 전환 중) 무시.
+  void _onContentChanged([BlockEditorController? editor]) {
+    final current = _editor;
+    final note = _editorNote;
+    if (note?.id == null || current == null) return;
+    if (editor != null && editor != current) return;
 
     _saveTimer?.cancel();
+    _pendingNote = note;
+    _pendingEditor = current;
     _saveStatus.value = _SaveStatus.saving;
+    _saveTimer = Timer(const Duration(milliseconds: 500), _flushSave);
+  }
 
-    _saveTimer = Timer(const Duration(milliseconds: 500), () async {
-      final editor = _editor;
-      if (_currentNote == null || editor == null) return;
-      final updated = _currentNote!.copyWith(
-        title: _titleController.text,
-        content: editor.toJsonString(),
-      );
-      await ref.read(noteListProvider.notifier).saveNote(updated);
-      if (!mounted) return;
-      _saveStatus.value = _SaveStatus.saved;
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted && _saveStatus.value == _SaveStatus.saved) {
-          _saveStatus.value = _SaveStatus.idle;
-        }
-      });
+  /// 대기 중인 저장을 바로 실행 (메모 전환·화면 닫힘 전에 마지막 입력을 남김).
+  /// 내용은 await 전에 동기로 꺼내므로 바로 뒤에 에디터를 정리해도 됨.
+  Future<void> _flushSave() async {
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    final note = _pendingNote;
+    final editor = _pendingEditor;
+    _pendingNote = null;
+    _pendingEditor = null;
+    if (note?.id == null || editor == null) return;
+    // 즐겨찾기 등은 최신 값을 쓰고 제목·본문만 바꿈
+    final base = _editorNote?.id == note!.id ? _editorNote! : note;
+    final updated = base.copyWith(
+      // 제목 칸은 지금 에디터의 메모 것
+      title: editor == _editor ? _titleController.text : null,
+      content: editor.toJsonString(),
+    );
+    await _noteList.saveNote(updated);
+    NoteVersionService.snapshot(updated.id!, updated.title, updated.content);
+    // 그사이 새 입력이 저장을 기다리면 표시는 그쪽에 맡김
+    if (!mounted || _saveTimer != null) return;
+    _saveStatus.value = _SaveStatus.saved;
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted && _saveStatus.value == _SaveStatus.saved) {
+        _saveStatus.value = _SaveStatus.idle;
+      }
     });
+  }
+
+  /// 대기 중인 저장을 버림 (내용을 통째로 바꿀 때)
+  void _cancelPendingSave() {
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    _pendingNote = null;
+    _pendingEditor = null;
+    if (_saveStatus.value == _SaveStatus.saving) {
+      _saveStatus.value = _SaveStatus.idle;
+    }
   }
 
   /// 오늘 브리핑에서 고른 체크리스트로 이동하고 그 줄 끝에 커서를 둡니다.
@@ -200,11 +280,11 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
   Future<void> _processFile(String srcPath) async {
     if (_currentNote == null || _editor == null) return;
     final destPath = await _copyToAppDir(srcPath);
-    _editor!.insertBlocks([
-      _isImage(destPath)
-          ? EditorBlock.image(destPath)
-          : EditorBlock.file(destPath, path.basename(destPath)),
-    ]);
+    if (_isImage(destPath)) {
+      _editor!.insertImage(destPath);
+    } else {
+      _editor!.insertFile(destPath, path.basename(destPath));
+    }
   }
 
   Future<void> _pickFile() async {
@@ -240,7 +320,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
         ),
       );
       await file.writeAsBytes(imageBytes);
-      editor.insertBlocks([EditorBlock.image(file.path)]);
+      editor.insertImage(file.path);
       return true;
     }
 
@@ -249,7 +329,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
         !text.contains('\n') &&
         _isImage(text) &&
         File(text).existsSync()) {
-      editor.insertBlocks([EditorBlock.image(text)]);
+      editor.insertImage(text);
       return true;
     }
     return false;
@@ -289,6 +369,245 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     ),
   ];
 
+  // ───────────── 메모 링크 `[[`
+
+  /// 제목이 검색어로 시작하는 메모 먼저, 검색어가 없으면 최근 수정한 메모부터
+  List<NoteLinkTarget> _searchNoteLinks(String query) {
+    final q = query.toLowerCase();
+    final candidates = _allNotes.where(
+      (n) => n.id != null && n.id != _currentNote?.id,
+    );
+    final List<Note> matches;
+    if (q.isEmpty) {
+      matches = candidates.toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    } else {
+      final starts = <Note>[];
+      final contains = <Note>[];
+      for (final note in candidates) {
+        final title = note.title.toLowerCase();
+        if (title.startsWith(q)) {
+          starts.add(note);
+        } else if (title.contains(q)) {
+          contains.add(note);
+        }
+      }
+      matches = [...starts, ...contains];
+    }
+    return [for (final n in matches) (id: n.id!, title: n.title)];
+  }
+
+  void _openNoteLink(int noteId) {
+    final note = _allNotes.where((n) => n.id == noteId).firstOrNull;
+    if (note == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('삭제되었거나 찾을 수 없는 메모입니다')));
+      return;
+    }
+    ref.read(selectedNoteProvider.notifier).select(note);
+  }
+
+  // ───────────── 버전 기록
+
+  Future<void> _showVersions() async {
+    final note = _currentNote;
+    if (note?.id == null) return;
+    final version = await showNoteVersionDialog(context, note!.id!);
+    if (version == null || !mounted) return;
+    await _replaceContent(version.content, title: version.title);
+  }
+
+  /// 메모 내용을 통째로 바꿈 (지금 내용은 버전으로 남김)
+  Future<void> _replaceContent(String content, {String? title}) async {
+    final note = _currentNote;
+    final editor = _editor;
+    if (note?.id == null || editor == null) return;
+    _cancelPendingSave();
+    await NoteVersionService.snapshot(
+      note!.id!,
+      _titleController.text,
+      editor.toJsonString(),
+      force: true,
+    );
+    final updated = note.copyWith(
+      title: title ?? _titleController.text,
+      content: content,
+    );
+    await ref.read(noteListProvider.notifier).saveNote(updated);
+    if (!mounted) return;
+    // 기다리는 사이 입력한 내용이 바꾼 내용을 덮어쓰지 않게
+    _cancelPendingSave();
+    _currentNote = updated;
+    _initEditor(updated);
+  }
+
+  // ───────────── 템플릿
+
+  Future<void> _showTemplateMenu(BuildContext buttonContext) async {
+    final templates = await NoteTemplateService.list();
+    if (!mounted || !buttonContext.mounted) return;
+    final box = buttonContext.findRenderObject() as RenderBox;
+    final overlay =
+        Overlay.of(buttonContext).context.findRenderObject() as RenderBox;
+    final position = RelativeRect.fromRect(
+      box.localToGlobal(Offset.zero, ancestor: overlay) & box.size,
+      Offset.zero & overlay.size,
+    );
+    final choice = await showMenu<(String, NoteTemplate?)>(
+      context: context,
+      position: position,
+      items: [
+        for (final t in templates)
+          PopupMenuItem(
+            value: ('apply', t),
+            height: 36,
+            child: Builder(
+              builder: (itemContext) => Row(
+                children: [
+                  const Icon(Icons.description_outlined, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(t.name, overflow: TextOverflow.ellipsis),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    tooltip: '템플릿 삭제',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.pop(itemContext, ('delete', t)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (templates.isEmpty)
+          const PopupMenuItem(
+            enabled: false,
+            height: 36,
+            child: Text('저장한 템플릿이 없어요', style: TextStyle(fontSize: 13)),
+          ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: ('save', null),
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.save_outlined, size: 16),
+              SizedBox(width: 8),
+              Text('현재 메모를 템플릿으로 저장'),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case ('apply', final NoteTemplate t):
+        await _applyTemplate(t);
+      case ('delete', final NoteTemplate t):
+        await NoteTemplateService.delete(t);
+        _toast('"${t.name}" 템플릿을 삭제했어요');
+      case _:
+        await _saveAsTemplate();
+    }
+  }
+
+  /// 빈 메모면 템플릿 내용으로, 내용이 있으면 맨 아래에 이어서 넣음
+  Future<void> _applyTemplate(NoteTemplate template) async {
+    final editor = _editor;
+    if (editor == null) return;
+    final empty = editor.blocks.every(
+      (b) => b.isText && b.controller.text.trim().isEmpty,
+    );
+    await _replaceContent(
+      empty
+          ? template.content
+          : appendNoteContent(editor.toJsonString(), template.content),
+    );
+  }
+
+  Future<void> _saveAsTemplate() async {
+    final editor = _editor;
+    if (editor == null) return;
+    final nameController = TextEditingController(text: _titleController.text);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('템플릿으로 저장'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '템플릿 이름'),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, nameController.text),
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+    nameController.dispose();
+    if (name == null || name.trim().isEmpty) return;
+    await NoteTemplateService.save(name.trim(), editor.toJsonString());
+    _toast('"${name.trim()}" 템플릿을 저장했어요');
+  }
+
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // ───────────── 목차
+
+  /// 목차에서 고른 제목으로 이동 (접힌 섹션 안이면 펼침)
+  void _goToBlock(EditorBlock block) {
+    final editor = _editor;
+    if (editor == null) return;
+    final blocks = editor.blocks;
+    final index = blocks.indexOf(block);
+    if (index < 0) return;
+    var depth = block.depth;
+    for (var i = index - 1; i >= 0 && depth > 0; i--) {
+      if (blocks[i].depth >= depth) continue;
+      if (blocks[i].isSection && blocks[i].collapsed) {
+        editor.toggleCollapsed(blocks[i]);
+      }
+      depth = blocks[i].depth;
+    }
+    editor.focus(block, 0);
+  }
+
+  // ───────────── 글자 수·수정 시각
+
+  String _statusText(BlockEditorController editor) {
+    var count = 0;
+    for (final block in editor.blocks) {
+      if (block.isText) {
+        count += stripInlineImages(block.controller.text).length;
+      }
+    }
+    final digits = count.toString().replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (_) => ',',
+    );
+    final updated = DateTime.tryParse(_currentNote?.updatedAt ?? '');
+    if (updated == null) return '$digits자';
+    String two(int n) => n.toString().padLeft(2, '0');
+    final now = DateTime.now();
+    final day = DateUtils.isSameDay(updated, now)
+        ? '오늘'
+        : '${updated.month}/${updated.day}';
+    return '$digits자 · $day ${two(updated.hour)}:${two(updated.minute)} 수정';
+  }
+
   Future<void> _exportToPdf() async {
     final editor = _editor;
     if (_currentNote == null || editor == null) return;
@@ -296,12 +615,8 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       final tags = await ref
           .read(noteRepositoryProvider)
           .getNoteTags(_currentNote!.id!);
-      // PDF 변환은 기존 문서 형식을 그대로 사용
-      final document = Document.fromJson(
-        jsonDecode(editor.toJsonString()) as Map<String, Object?>,
-      );
       await PdfExportService().exportToPdf(
-        editorState: EditorState(document: document),
+        blocks: editor.blocks,
         title: _currentNote!.title,
         tags: tags,
       );
@@ -352,10 +667,33 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
         extraSlashItems: _extraSlashItems,
         onPaste: _handlePaste,
         onFind: _openFind,
+        noteLinkSearch: _searchNoteLinks,
+        onOpenNoteLink: _openNoteLink,
         padding: const EdgeInsets.fromLTRB(44, 0, 36, 0),
       );
     }
     return _editorWidget!;
+  }
+
+  Widget _buildEditorArea(BlockEditorController editor) {
+    return Stack(
+      children: [
+        Positioned.fill(child: _editorWidgetFor(editor)),
+        if (_findOpen)
+          Positioned(
+            top: 0,
+            right: 24,
+            child: FindBar(
+              key: ValueKey(editor),
+              controller: editor,
+              replaceMode: _replaceMode,
+              onToggleReplace: () =>
+                  setState(() => _replaceMode = !_replaceMode),
+              onClose: _closeFind,
+            ),
+          ),
+      ],
+    );
   }
 
   void _openFind(bool replace) {
@@ -414,7 +752,26 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
   @override
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
-    final notes = ref.watch(noteListProvider).value ?? [];
+    _noteList = ref.read(noteListProvider.notifier);
+    // 자동 저장마다 목록이 바뀌어도 화면에 보이는 값이 같으면 다시 그리지 않음
+    final selectedId = selectedNote?.id;
+    ref.watch(
+      noteListProvider.select((s) {
+        final n = s.value?.where((n) => n.id == selectedId).firstOrNull;
+        if (n == null) return null;
+        return (
+          n.isFavorite,
+          n.isPinned,
+          n.isImportant,
+          n.updatedAt,
+          n.tags.join('\n'),
+        );
+      }),
+    );
+    final notes = ref.read(noteListProvider).value ?? const <Note>[];
+
+    // 링크 후보는 다음에 `[[`를 열 때 다시 불러옴
+    ref.listen(noteListProvider, (_, _) => _allNotesStale = true);
 
     ref.listen(navigationProvider, (prev, next) {
       if (prev == 0 && next != 0 && _findOpen) _closeFind();
@@ -436,6 +793,8 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
         orElse: () => selectedNote,
       );
       if (freshNote.id != _currentNote?.id) {
+        // 이전 메모의 저장 대기분을 바로 저장 (500ms 안에 전환해도 잃지 않게)
+        _flushSave();
         _currentNote = freshNote;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ref.read(tabProvider.notifier).addTab(freshNote.id!);
@@ -443,6 +802,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
         });
       } else {
         _currentNote = freshNote;
+        if (_editorNote?.id == freshNote.id) _editorNote = freshNote;
       }
     }
 
@@ -588,6 +948,16 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
                         tooltip: '찾기/바꾸기 [Ctrl+F]',
                         onPressed: () => _openFind(false),
                       ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.toc,
+                          size: 20,
+                          color: _outlineOpen ? context.accent : null,
+                        ),
+                        tooltip: _outlineOpen ? '목차 닫기' : '목차',
+                        onPressed: () =>
+                            setState(() => _outlineOpen = !_outlineOpen),
+                      ),
                     ],
                   ],
                 ),
@@ -596,21 +966,16 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
 
               const SizedBox(height: 24), // 제목 <-> 내용 간격
               Expanded(
-                child: Stack(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Positioned.fill(child: _editorWidgetFor(editor)),
-                    if (_findOpen)
-                      Positioned(
-                        top: 0,
-                        right: 24,
-                        child: FindBar(
-                          key: ValueKey(editor),
-                          controller: editor,
-                          replaceMode: _replaceMode,
-                          onToggleReplace: () =>
-                              setState(() => _replaceMode = !_replaceMode),
-                          onClose: _closeFind,
-                        ),
+                    Expanded(child: _buildEditorArea(editor)),
+                    if (_outlineOpen)
+                      OutlinePanel(
+                        editor: editor,
+                        refresh: _saveStatus,
+                        onSelect: _goToBlock,
+                        onClose: () => setState(() => _outlineOpen = false),
                       ),
                   ],
                 ),
@@ -737,8 +1102,30 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
                         _exportToPdf,
                       ),
                       const SizedBox(width: 4),
+                      Builder(
+                        builder: (buttonContext) => _toolbarButton(
+                          Icons.dashboard_customize_outlined,
+                          '템플릿',
+                          () => _showTemplateMenu(buttonContext),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      _toolbarButton(Icons.history, '버전 기록', _showVersions),
+                      const SizedBox(width: 4),
                     ],
                     const Spacer(),
+                    // 글자 수·마지막 수정 (저장될 때마다 갱신)
+                    ValueListenableBuilder<_SaveStatus>(
+                      valueListenable: _saveStatus,
+                      builder: (context, _, _) => Text(
+                        _statusText(editor),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     ValueListenableBuilder<_SaveStatus>(
                       valueListenable: _saveStatus,
                       builder: (context, status, _) => switch (status) {

@@ -19,6 +19,7 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
   final _searchController = TextEditingController();
   List<LocationSearchResult> _results = [];
   bool _isLoading = false;
+  int _searchSeq = 0; // 늦게 온 이전 검색 응답 무시용
 
   @override
   void dispose() {
@@ -29,12 +30,14 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
   Future<void> _search() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
+    final seq = ++_searchSeq;
     setState(() {
       _isLoading = true;
       _results = [];
     });
     try {
       final results = await KakaoLocalService().search(query);
+      if (!mounted || seq != _searchSeq) return;
       setState(() {
         _results = results;
         _isLoading = false;
@@ -42,6 +45,7 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
       // 검색 결과 지도 마커 업데이트
       ref.read(searchResultsProvider.notifier).setResults(results);
     } catch (e) {
+      if (!mounted || seq != _searchSeq) return;
       setState(() => _isLoading = false);
     }
   }

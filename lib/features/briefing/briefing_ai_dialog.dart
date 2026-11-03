@@ -101,6 +101,12 @@ final aiBriefingProvider = FutureProvider.autoDispose
         }
       }
 
+      // 일부라도 실패했으면 캐시하지 않음 (팝업을 다시 열면 재시도)
+      if (weatherError != null || newsError != null || aiError != null) {
+        timer.cancel();
+        link.close();
+      }
+
       return AiBriefing(
         weather: weather,
         weatherError: weatherError,

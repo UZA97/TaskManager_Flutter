@@ -7,9 +7,9 @@ import '../../../core/settings/settings_provider.dart';
 import '../../../core/update/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/settings/app_settings.dart';
+import '../../../core/settings/autostart_service.dart';
 import '../../../core/auth/google_account_provider.dart';
 import '../../memo/providers/note_provider.dart';
-import '../../memo/editor_v2/editor_mode_provider.dart';
 import '../../../core/database/database_provider.dart';
 import '../views/google_drive_sync_service.dart';
 
@@ -159,6 +159,11 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
     );
   }
 
+  // 탭 전환 시 패널이 dispose되므로 mounted 확인 후 갱신
+  void _safeSetState(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
+
   Future<void> _upload() async {
     final account = ref.read(googleAccountProvider).value;
     if (account == null) {
@@ -175,18 +180,18 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
           .read(googleAccountProvider.notifier)
           .getAccessToken();
       if (accessToken == null) {
-        setState(() => _statusMessage = 'Google 인증이 만료되었습니다. 다시 연동해주세요');
+        _safeSetState(() => _statusMessage = 'Google 인증이 만료되었습니다. 다시 연동해주세요');
         return;
       }
       final service = GoogleDriveSyncService(accessToken: accessToken);
       await service.upload(
         db,
-        onStatus: (s) => setState(() => _statusMessage = s),
+        onStatus: (s) => _safeSetState(() => _statusMessage = s),
       );
     } catch (e) {
-      setState(() => _statusMessage = '오류: $e');
+      _safeSetState(() => _statusMessage = '오류: $e');
     } finally {
-      setState(() => _isSyncing = false);
+      _safeSetState(() => _isSyncing = false);
     }
   }
 
@@ -206,18 +211,18 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
           .read(googleAccountProvider.notifier)
           .getAccessToken();
       if (accessToken == null) {
-        setState(() => _statusMessage = 'Google 인증이 만료되었습니다. 다시 연동해주세요');
+        _safeSetState(() => _statusMessage = 'Google 인증이 만료되었습니다. 다시 연동해주세요');
         return;
       }
       final service = GoogleDriveSyncService(accessToken: accessToken);
       await service.download(
         db,
-        onStatus: (s) => setState(() => _statusMessage = s),
+        onStatus: (s) => _safeSetState(() => _statusMessage = s),
       );
     } catch (e) {
-      setState(() => _statusMessage = '오류: $e');
+      _safeSetState(() => _statusMessage = '오류: $e');
     } finally {
-      setState(() => _isSyncing = false);
+      _safeSetState(() => _isSyncing = false);
     }
   }
 }
@@ -244,49 +249,94 @@ class _GeneralSettings extends ConsumerWidget {
                   ref.read(settingsProvider.notifier).setTrayMode(v),
             ),
           ),
+          const _AutostartRow(),
           _SettingsRow(
-            title: '새 메모 에디터 (베타)',
-            subtitle: '한글 입력이 안정적인 새 에디터. 끄면 기존 에디터로 돌아갑니다 (메모 내용은 그대로)',
+            title: '오늘의 브리핑 자동 표시',
+            subtitle: '하루 처음 실행할 때 브리핑 띄우기',
             trailing: Switch(
-              value: ref.watch(newMemoEditorProvider).value ?? true,
-              onChanged: (v) => ref.read(newMemoEditorProvider.notifier).set(v),
+              value: settings.briefingAutoShow,
+              onChanged: (v) =>
+                  ref.read(settingsProvider.notifier).setBriefingAutoShow(v),
             ),
           ),
-          const SizedBox(height: 16),
-          const _SectionHeader(title: '날짜 형식'),
           const SizedBox(height: 8),
-          SegmentedButton<AppDateFormat>(
-            segments: const [
-              ButtonSegment(
-                value: AppDateFormat.iso,
-                label: Text('yyyy-mm-dd'),
-              ),
-              ButtonSegment(
-                value: AppDateFormat.korean,
-                label: Text('yyyy년 mm월 dd일'),
-              ),
-              ButtonSegment(value: AppDateFormat.us, label: Text('mm/dd/yyyy')),
-            ],
-            selected: {settings.dateFormat},
-            onSelectionChanged: (value) =>
-                ref.read(settingsProvider.notifier).setDateFormat(value.first),
-          ),
-          const SizedBox(height: 16),
-          const _SectionHeader(title: '시간 형식'),
+          const Text('시작 화면', style: TextStyle(fontSize: 14)),
           const SizedBox(height: 8),
-          SegmentedButton<AppTimeFormat>(
+          SegmentedButton<int>(
             segments: const [
-              ButtonSegment(value: AppTimeFormat.h24, label: Text('14:30')),
-              ButtonSegment(value: AppTimeFormat.h12, label: Text('2:30 PM')),
+              ButtonSegment(value: 0, label: Text('메모')),
+              ButtonSegment(value: 1, label: Text('캘린더')),
+              ButtonSegment(value: 2, label: Text('메일')),
+              ButtonSegment(value: 3, label: Text('지도')),
             ],
-            selected: {settings.timeFormat},
+            selected: {settings.startScreen},
             onSelectionChanged: (value) =>
-                ref.read(settingsProvider.notifier).setTimeFormat(value.first),
+                ref.read(settingsProvider.notifier).setStartScreen(value.first),
           ),
           const SizedBox(height: 16),
           const _SectionHeader(title: '휴지통'),
+          const SizedBox(height: 8),
+          const Text('자동으로 비우기', style: TextStyle(fontSize: 14)),
+          const SizedBox(height: 8),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 7, label: Text('7일')),
+              ButtonSegment(value: 30, label: Text('30일')),
+              ButtonSegment(value: 90, label: Text('90일')),
+              ButtonSegment(value: 0, label: Text('안 함')),
+            ],
+            selected: {settings.trashRetentionDays},
+            onSelectionChanged: (value) => ref
+                .read(settingsProvider.notifier)
+                .setTrashRetentionDays(value.first),
+          ),
+          const SizedBox(height: 8),
           _TrashSection(),
         ],
+      ),
+    );
+  }
+}
+
+/// Windows 시작 시 자동 실행 (레지스트리에서 현재 상태를 읽음)
+class _AutostartRow extends StatefulWidget {
+  const _AutostartRow();
+
+  @override
+  State<_AutostartRow> createState() => _AutostartRowState();
+}
+
+class _AutostartRowState extends State<_AutostartRow> {
+  bool? _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    AutostartService.isEnabled().then((v) {
+      if (mounted) setState(() => _enabled = v);
+    });
+  }
+
+  Future<void> _toggle(bool value) async {
+    setState(() => _enabled = value);
+    final ok = await AutostartService.setEnabled(value);
+    if (!mounted) return;
+    if (!ok) {
+      setState(() => _enabled = !value);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('자동 실행 설정을 바꾸지 못했습니다')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsRow(
+      title: 'Windows 시작 시 자동 실행',
+      subtitle: '컴퓨터를 켜면 앱이 함께 실행됨',
+      trailing: Switch(
+        value: _enabled ?? false,
+        onChanged: _enabled == null ? null : _toggle,
       ),
     );
   }
@@ -615,6 +665,7 @@ class _InfoSettingsState extends State<_InfoSettings> {
     });
 
     final result = await _updateService.checkForUpdate();
+    if (!mounted) return;
     setState(() {
       _isChecking = false;
       _checkResult = result;
@@ -634,15 +685,26 @@ class _InfoSettingsState extends State<_InfoSettings> {
       _statusMessage = '다운로드 중...';
     });
 
-    await _updateService.downloadAndInstall(
-      _checkResult!.downloadUrl!,
-      onProgress: (progress) {
-        setState(() {
-          _downloadProgress = progress;
-          _statusMessage = '다운로드 중... ${(progress * 100).toStringAsFixed(0)}%';
-        });
-      },
-    );
+    try {
+      await _updateService.downloadAndInstall(
+        _checkResult!.downloadUrl!,
+        _checkResult!.latestVersion!,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() {
+            _downloadProgress = progress;
+            _statusMessage =
+                '다운로드 중... ${(progress * 100).toStringAsFixed(0)}%';
+          });
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isDownloading = false;
+        _statusMessage = '오류: $e';
+      });
+    }
   }
 
   @override
@@ -881,7 +943,7 @@ class _SecuritySettingsState extends ConsumerState<_SecuritySettings> {
       context: context,
       builder: (context) => _PasswordDialog(isChange: isChange),
     );
-    setState(() {}); // 다이얼로그 닫힌 후 UI 갱신
+    if (mounted) setState(() {}); // 다이얼로그 닫힌 후 UI 갱신
   }
 
   @override

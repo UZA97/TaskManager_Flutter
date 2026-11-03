@@ -15,6 +15,7 @@ class _LocationSearchDialogState extends State<LocationSearchDialog> {
   List<LocationSearchResult> _results = [];
   bool _isLoading = false;
   String? _error;
+  int _searchSeq = 0; // 늦게 온 이전 검색 응답 무시용
 
   @override
   void dispose() {
@@ -25,6 +26,7 @@ class _LocationSearchDialogState extends State<LocationSearchDialog> {
   Future<void> _search() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
+    final seq = ++_searchSeq;
 
     setState(() {
       _isLoading = true;
@@ -35,12 +37,14 @@ class _LocationSearchDialogState extends State<LocationSearchDialog> {
     try {
       final service = KakaoLocalService();
       final results = await service.search(query);
+      if (!mounted || seq != _searchSeq) return;
 
       setState(() {
         _results = results;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted || seq != _searchSeq) return;
       setState(() {
         _error = '검색 실패: $e';
         _isLoading = false;

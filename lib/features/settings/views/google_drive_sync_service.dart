@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -14,6 +17,7 @@ class GoogleDriveSyncService {
   static const _dbFileName = 'taskmanager.sqlite';
   static const _metaFileName = 'sync_meta.json';
   static const _appDataFolder = 'appDataFolder';
+  static const _hashCacheFileName = 'sync_hash_cache.json';
 
   final String accessToken;
 
@@ -104,16 +108,20 @@ class GoogleDriveSyncService {
       'parents': [_appDataFolder],
     });
 
-    final body =
+    // 큰 파일도 리스트 연결 없이 한 번에 조립
+    final builder = BytesBuilder(copy: false)
+      ..add(
         utf8.encode(
           '--$boundary\r\n'
           'Content-Type: application/json; charset=UTF-8\r\n\r\n'
           '$metadata\r\n'
           '--$boundary\r\n'
           'Content-Type: $mimeType\r\n\r\n',
-        ) +
-        bytes +
-        utf8.encode('\r\n--$boundary--');
+        ),
+      )
+      ..add(bytes)
+      ..add(utf8.encode('\r\n--$boundary--'));
+    final body = builder.takeBytes();
 
     final uri = Uri.parse(
       '$_driveUploadBase/files?uploadType=multipart&fields=id',
@@ -151,7 +159,7 @@ class GoogleDriveSyncService {
     _check(res, '파일 업데이트');
   }
 
-  Future<List<int>?> _downloadFile(String fileId) async {
+  Future<Uint8List?> _downloadFile(String fileId) async {
     final uri = Uri.parse('$_driveApiBase/files/$fileId?alt=media');
     final res = await http.get(uri, headers: _headers);
     _check(res, '파일 다운로드');
@@ -191,8 +199,92 @@ class GoogleDriveSyncService {
     return result;
   }
 
-  static String _checksum(List<int> bytes) => sha256.convert(bytes).toString();
-  static String _checksumFile(File file) => _checksum(file.readAsBytesSync());
+  // 해시는 UI 멈춤 방지를 위해 별도 isolate에서 계산
+  static Future<String> _checksumBytes(Uint8List bytes) =>
+      Isolate.run(() => sha256.convert(bytes).toString());
+
+  static Future<Map<String, String>> _checksumPaths(List<String> paths) {
+    if (paths.isEmpty) return Future.value({});
+    return Isolate.run(() async {
+      final result = <String, String>{};
+      for (final path in paths) {
+        final digest = await sha256.bind(File(path).openRead()).first;
+        result[path] = digest.toString();
+      }
+      return result;
+    });
+  }
+
+  // 로컬 해시 캐시: relPath → {s: 크기, m: 수정시각(ms), c: 체크섬}
+  static Future<File> _hashCacheFile() async {
+    final dir = await _appSupportDir();
+    return File(p.join(dir.path, _hashCacheFileName));
+  }
+
+  static Future<Map<String, dynamic>> _loadHashCache() async {
+    try {
+      final f = await _hashCacheFile();
+      if (!await f.exists()) return {};
+      return jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> _saveHashCache(Map<String, dynamic> cache) async {
+    try {
+      final f = await _hashCacheFile();
+      await f.writeAsString(jsonEncode(cache), flush: true);
+    } catch (e) {
+      debugPrint('해시 캐시 저장 실패: $e');
+    }
+  }
+
+  // 크기+수정시각이 캐시와 같으면 재해시 생략
+  static Future<List<AttachmentMeta>> _attachmentChecksums(
+    List<File> files,
+  ) async {
+    final cache = await _loadHashCache();
+    final newCache = <String, dynamic>{};
+    final relPaths = <String, String>{}; // 절대경로 → 상대경로
+    final stats = <String, FileStat>{};
+    final toHash = <String>[];
+
+    for (final file in files) {
+      final relPath = await _relativeAttachmentPath(file);
+      final stat = await file.stat();
+      relPaths[file.path] = relPath;
+      stats[file.path] = stat;
+      final cached = cache[relPath];
+      if (cached is Map &&
+          cached['s'] == stat.size &&
+          cached['m'] == stat.modified.millisecondsSinceEpoch &&
+          cached['c'] is String) {
+        newCache[relPath] = cached;
+      } else {
+        toHash.add(file.path);
+      }
+    }
+
+    final hashed = await _checksumPaths(toHash);
+    for (final entry in hashed.entries) {
+      final stat = stats[entry.key]!;
+      newCache[relPaths[entry.key]!] = {
+        's': stat.size,
+        'm': stat.modified.millisecondsSinceEpoch,
+        'c': entry.value,
+      };
+    }
+    await _saveHashCache(newCache);
+
+    return [
+      for (final file in files)
+        AttachmentMeta(
+          relativePath: relPaths[file.path]!,
+          checksum: (newCache[relPaths[file.path]!] as Map)['c'] as String,
+        ),
+    ];
+  }
 
   static String _attachmentDriveKey(String relativePath) =>
       'ATT_${relativePath.replaceAll('/', '_').replaceAll('\\', '_')}';
@@ -227,7 +319,7 @@ class GoogleDriveSyncService {
 
   static Future<List<File>> _collectValidAttachments(AppDatabase db) async {
     final attDir = await _attachmentsDir();
-    if (!attDir.existsSync()) return [];
+    if (!await attDir.exists()) return [];
 
     final notes = await (db.select(
       db.noteTable,
@@ -256,12 +348,12 @@ class GoogleDriveSyncService {
     if (remoteMeta == null) return 'upload';
 
     final dbFile = await _dbFile();
-    if (!dbFile.existsSync()) return 'download';
+    if (!await dbFile.exists()) return 'download';
 
-    final localChecksum = _checksumFile(dbFile);
+    final localChecksum = (await _checksumPaths([dbFile.path]))[dbFile.path];
     if (localChecksum == remoteMeta.dbChecksum) return 'none';
 
-    final localModified = dbFile.lastModifiedSync();
+    final localModified = await dbFile.lastModified();
     if (localModified.isAfter(remoteMeta.lastSync)) return 'upload';
     return 'download';
   }
@@ -271,9 +363,30 @@ class GoogleDriveSyncService {
     await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
 
     final dbFile = await _dbFile();
-    final dbBytes = dbFile.readAsBytesSync();
-    final dbChecksum = _checksum(dbBytes);
+    final dbBytes = await dbFile.readAsBytes();
+    final dbChecksum = await _checksumBytes(dbBytes);
     final deviceId = await _getDeviceId(db);
+
+    onStatus?.call('첨부파일 확인 중...');
+    final validFiles = await _collectValidAttachments(db);
+    final localMetas = await _attachmentChecksums(validFiles);
+    final driveAttachments = await _listDriveAttachments();
+    final remoteMeta = await fetchRemoteMeta();
+    final remoteChecksums = {
+      for (final m in remoteMeta?.attachments ?? <AttachmentMeta>[])
+        m.relativePath: m.checksum,
+    };
+
+    // 올려야 할 첨부 (Drive에 없거나 체크섬이 다름)
+    final pending = <int>[];
+    for (var i = 0; i < localMetas.length; i++) {
+      final m = localMetas[i];
+      final key = _attachmentDriveKey(m.relativePath);
+      if (!driveAttachments.containsKey(key) ||
+          remoteChecksums[m.relativePath] != m.checksum) {
+        pending.add(i);
+      }
+    }
 
     onStatus?.call('DB 업로드 중...');
     final existingDbId = await _getFileId(_dbFileName);
@@ -287,43 +400,38 @@ class GoogleDriveSyncService {
       );
     }
 
-    onStatus?.call('첨부파일 동기화 중...');
-    final validFiles = await _collectValidAttachments(db);
-    final driveAttachments = await _listDriveAttachments();
-    final remoteMeta = await fetchRemoteMeta();
-    final remoteChecksums = {
-      for (final m in remoteMeta?.attachments ?? <AttachmentMeta>[])
-        m.relativePath: m.checksum,
-    };
-    final newAttachmentMetas = <AttachmentMeta>[];
+    // DB 직후 메타 갱신 — 이후 실패해도 다른 기기 다운로드가 막히지 않게
+    // 아직 안 올린 첨부는 이전 원격 체크섬(없으면 '')으로 기록 → 다음 업로드 때 재시도
+    final pendingSet = pending.toSet();
+    await _uploadMeta(deviceId, dbChecksum, [
+      for (var i = 0; i < localMetas.length; i++)
+        pendingSet.contains(i)
+            ? AttachmentMeta(
+                relativePath: localMetas[i].relativePath,
+                checksum: remoteChecksums[localMetas[i].relativePath] ?? '',
+              )
+            : localMetas[i],
+    ]);
 
-    for (final file in validFiles) {
-      final relPath = await _relativeAttachmentPath(file);
-      final driveKey = _attachmentDriveKey(relPath);
-      final fileBytes = file.readAsBytesSync();
-      final fileChecksum = _checksum(fileBytes);
-
-      newAttachmentMetas.add(
-        AttachmentMeta(relativePath: relPath, checksum: fileChecksum),
-      );
-
+    for (var n = 0; n < pending.length; n++) {
+      final i = pending[n];
+      final driveKey = _attachmentDriveKey(localMetas[i].relativePath);
+      onStatus?.call('첨부파일 업로드 중... (${n + 1}/${pending.length})');
+      final fileBytes = await validFiles[i].readAsBytes();
       final existingId = driveAttachments[driveKey];
       if (existingId != null) {
-        if (remoteChecksums[relPath] != fileChecksum) {
-          await _updateFile(existingId, fileBytes, 'application/octet-stream');
-        }
-        continue;
+        await _updateFile(existingId, fileBytes, 'application/octet-stream');
+      } else {
+        await _multipartUpload(
+          name: driveKey,
+          mimeType: 'application/octet-stream',
+          bytes: fileBytes,
+        );
       }
-
-      await _multipartUpload(
-        name: driveKey,
-        mimeType: 'application/octet-stream',
-        bytes: fileBytes,
-      );
     }
 
     // 고아 파일 삭제
-    final validKeys = newAttachmentMetas
+    final validKeys = localMetas
         .map((m) => _attachmentDriveKey(m.relativePath))
         .toSet();
     for (final entry in driveAttachments.entries) {
@@ -333,14 +441,22 @@ class GoogleDriveSyncService {
     }
 
     onStatus?.call('메타데이터 저장 중...');
+    await _uploadMeta(deviceId, dbChecksum, localMetas);
+    onStatus?.call('업로드 완료');
+  }
+
+  Future<void> _uploadMeta(
+    String deviceId,
+    String dbChecksum,
+    List<AttachmentMeta> attachments,
+  ) async {
     final meta = SyncMeta(
       lastSync: DateTime.now().toUtc(),
       deviceId: deviceId,
       dbChecksum: dbChecksum,
-      attachments: newAttachmentMetas,
+      attachments: attachments,
     );
     await _uploadText(_metaFileName, meta.encode());
-    onStatus?.call('업로드 완료');
   }
 
   Future<void> download(
@@ -350,13 +466,6 @@ class GoogleDriveSyncService {
     onStatus?.call('Drive 메타데이터 확인 중...');
     final remoteMeta = await fetchRemoteMeta();
     if (remoteMeta == null) throw Exception('Drive에 백업이 없습니다');
-
-    onStatus?.call('로컬 DB 백업 중...');
-    final dbFile = await _dbFile();
-    if (dbFile.existsSync()) {
-      final backupFile = File('${dbFile.path}.backup');
-      dbFile.copySync(backupFile.path);
-    }
 
     onStatus?.call('DB 다운로드 중...');
     final dbFileId = await _getFileId(_dbFileName);
@@ -368,25 +477,77 @@ class GoogleDriveSyncService {
       throw Exception('Drive의 DB 파일이 손상되었습니다');
     }
     if (remoteMeta.dbChecksum.isNotEmpty &&
-        _checksum(dbBytes) != remoteMeta.dbChecksum) {
-      throw Exception('DB 파일이 메타데이터와 일치하지 않습니다. 다시 업로드해주세요');
+        await _checksumBytes(dbBytes) != remoteMeta.dbChecksum) {
+      // Drive 업로드는 원자적이라 파일 자체는 온전함 — 메타 갱신 전에 중단된 경우
+      debugPrint('Drive DB 체크섬이 메타데이터와 다름 — 그대로 진행');
+      onStatus?.call('메타데이터 불일치 — Drive의 최신 DB로 진행합니다');
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
+    onStatus?.call('로컬 DB 백업 중...');
+    final dbFile = await _dbFile();
+    final backupFile = File('${dbFile.path}.backup');
+    var hasBackup = false;
+    if (await dbFile.exists()) {
+      // WAL 내용을 본 파일에 반영한 뒤 복사해야 백업이 완전함
+      await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
+      await dbFile.copy(backupFile.path);
+      hasBackup = true;
     }
 
     await db.close();
+    // 여기부터는 DB가 닫혔으므로 무슨 일이 있어도 재시작
+    try {
+      try {
+        await _replaceDbFile(dbFile, dbBytes);
+      } catch (e) {
+        debugPrint('DB 교체 실패: $e');
+        if (hasBackup) {
+          onStatus?.call('DB 교체 실패 — 백업에서 복원합니다');
+          await _replaceDbFile(dbFile, await backupFile.readAsBytes());
+        }
+        rethrow;
+      }
+
+      try {
+        await _downloadAttachments(remoteMeta, onStatus);
+      } catch (e) {
+        // 첨부 일부 실패 — DB는 유지하고 재시작
+        debugPrint('첨부파일 동기화 실패: $e');
+        onStatus?.call('첨부파일 일부 동기화 실패: $e');
+        await Future.delayed(const Duration(seconds: 2));
+      }
+
+      onStatus?.call('다운로드 완료 — 앱을 재시작합니다');
+      await Future.delayed(const Duration(seconds: 1)); // 메시지 보여주고
+    } catch (e) {
+      onStatus?.call('오류: $e — 앱을 재시작합니다');
+      await Future.delayed(const Duration(seconds: 2));
+    } finally {
+      await _restartApp();
+    }
+  }
+
+  static Future<void> _replaceDbFile(File dbFile, List<int> bytes) async {
     // 이전 DB의 WAL/SHM이 남아 있으면 새 DB 위에 적용되므로 제거
     for (final suffix in ['-wal', '-shm']) {
       final f = File('${dbFile.path}$suffix');
-      if (f.existsSync()) f.deleteSync();
+      if (await f.exists()) await f.delete();
     }
-    dbFile.writeAsBytesSync(dbBytes, flush: true);
+    await dbFile.writeAsBytes(bytes, flush: true);
+  }
 
+  Future<void> _downloadAttachments(
+    SyncMeta remoteMeta,
+    void Function(String)? onStatus,
+  ) async {
     onStatus?.call('첨부파일 동기화 중...');
     final appDir = await _appSupportDir();
     final driveAttachments = await _listDriveAttachments();
 
     for (final meta in remoteMeta.attachments) {
       final localFile = File(p.join(appDir.path, meta.relativePath));
-      if (!localFile.existsSync()) {
+      if (!await localFile.exists()) {
         final driveKey = _attachmentDriveKey(meta.relativePath);
         final fileId = driveAttachments[driveKey];
         if (fileId == null) continue;
@@ -394,8 +555,8 @@ class GoogleDriveSyncService {
         final bytes = await _downloadFile(fileId);
         if (bytes == null) continue;
 
-        localFile.parent.createSync(recursive: true);
-        localFile.writeAsBytesSync(bytes);
+        await localFile.parent.create(recursive: true);
+        await localFile.writeAsBytes(bytes);
       }
     }
 
@@ -404,17 +565,13 @@ class GoogleDriveSyncService {
         .map((m) => p.join(appDir.path, m.relativePath))
         .toSet();
     final attDir = await _attachmentsDir();
-    if (attDir.existsSync()) {
+    if (await attDir.exists()) {
       await for (final entity in attDir.list(recursive: true)) {
         if (entity is File && !validPaths.contains(entity.path)) {
-          entity.deleteSync();
+          await entity.delete();
         }
       }
     }
-
-    onStatus?.call('다운로드 완료 — 앱을 재시작합니다');
-    await Future.delayed(const Duration(seconds: 1)); // 메시지 보여주고
-    await _restartApp();
   }
 
   static bool _isSqliteFile(List<int> bytes) {
@@ -424,16 +581,11 @@ class GoogleDriveSyncService {
         header;
   }
 
-  // 단일 인스턴스 mutex 때문에 현재 프로세스가 살아 있는 동안 새로 띄우면 바로 종료됨
-  // → 현재 프로세스 종료 2초 뒤 다시 실행하도록 예약
+  // 단일 인스턴스 mutex 때문에 그냥 띄우면 바로 종료됨
+  // → --restart로 띄우면 새 프로세스가 이 프로세스가 끝날 때까지 기다렸다 시작
   static Future<void> _restartApp() async {
-    final exe = Platform.resolvedExecutable.replaceAll("'", "''");
-    await Process.start('powershell', [
-      '-NoProfile',
-      '-WindowStyle',
-      'Hidden',
-      '-Command',
-      "Start-Sleep -Seconds 2; Start-Process -FilePath '$exe'",
+    await Process.start(Platform.resolvedExecutable, [
+      '--restart',
     ], mode: ProcessStartMode.detached);
     exit(0);
   }

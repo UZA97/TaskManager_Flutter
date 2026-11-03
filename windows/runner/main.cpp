@@ -17,7 +17,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command)
 {
   HANDLE hMutex = ::CreateMutexW(nullptr, TRUE, kMutexName);
-  if (hMutex != nullptr && ::GetLastError() == ERROR_ALREADY_EXISTS)
+  bool alreadyRunning =
+      hMutex != nullptr && ::GetLastError() == ERROR_ALREADY_EXISTS;
+  // --restart: the app relaunches itself; wait until the old process exits
+  if (alreadyRunning && wcsstr(command_line, L"--restart") != nullptr)
+  {
+    DWORD wait = ::WaitForSingleObject(hMutex, 15000);
+    alreadyRunning = wait != WAIT_OBJECT_0 && wait != WAIT_ABANDONED;
+  }
+  if (alreadyRunning)
   {
     HWND hWnd = ::FindWindowW(kWindowClassName, nullptr);
     if (hWnd != nullptr)

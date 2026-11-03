@@ -2441,6 +2441,19 @@ class $EventTableTable extends EventTable
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
+  @override
+  late final GeneratedColumn<bool> dirty = GeneratedColumn<bool>(
+    'dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2464,6 +2477,7 @@ class $EventTableTable extends EventTable
     content,
     recurrence,
     recurrenceUntil,
+    dirty,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2628,6 +2642,12 @@ class $EventTableTable extends EventTable
         ),
       );
     }
+    if (data.containsKey('dirty')) {
+      context.handle(
+        _dirtyMeta,
+        dirty.isAcceptableOrUnknown(data['dirty']!, _dirtyMeta),
+      );
+    }
     return context;
   }
 
@@ -2721,6 +2741,10 @@ class $EventTableTable extends EventTable
         DriftSqlType.string,
         data['${effectivePrefix}recurrence_until'],
       ),
+      dirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dirty'],
+      )!,
     );
   }
 
@@ -2752,6 +2776,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
   final String? content;
   final String recurrence;
   final String? recurrenceUntil;
+  final bool dirty;
   const EventTableData({
     required this.id,
     required this.title,
@@ -2774,6 +2799,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     this.content,
     required this.recurrence,
     this.recurrenceUntil,
+    required this.dirty,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2817,6 +2843,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     if (!nullToAbsent || recurrenceUntil != null) {
       map['recurrence_until'] = Variable<String>(recurrenceUntil);
     }
+    map['dirty'] = Variable<bool>(dirty);
     return map;
   }
 
@@ -2861,6 +2888,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       recurrenceUntil: recurrenceUntil == null && nullToAbsent
           ? const Value.absent()
           : Value(recurrenceUntil),
+      dirty: Value(dirty),
     );
   }
 
@@ -2891,6 +2919,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       content: serializer.fromJson<String?>(json['content']),
       recurrence: serializer.fromJson<String>(json['recurrence']),
       recurrenceUntil: serializer.fromJson<String?>(json['recurrenceUntil']),
+      dirty: serializer.fromJson<bool>(json['dirty']),
     );
   }
   @override
@@ -2918,6 +2947,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       'content': serializer.toJson<String?>(content),
       'recurrence': serializer.toJson<String>(recurrence),
       'recurrenceUntil': serializer.toJson<String?>(recurrenceUntil),
+      'dirty': serializer.toJson<bool>(dirty),
     };
   }
 
@@ -2943,6 +2973,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     Value<String?> content = const Value.absent(),
     String? recurrence,
     Value<String?> recurrenceUntil = const Value.absent(),
+    bool? dirty,
   }) => EventTableData(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -2967,6 +2998,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     recurrenceUntil: recurrenceUntil.present
         ? recurrenceUntil.value
         : this.recurrenceUntil,
+    dirty: dirty ?? this.dirty,
   );
   EventTableData copyWithCompanion(EventTableCompanion data) {
     return EventTableData(
@@ -3009,6 +3041,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       recurrenceUntil: data.recurrenceUntil.present
           ? data.recurrenceUntil.value
           : this.recurrenceUntil,
+      dirty: data.dirty.present ? data.dirty.value : this.dirty,
     );
   }
 
@@ -3035,7 +3068,8 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           ..write('isAllDay: $isAllDay, ')
           ..write('content: $content, ')
           ..write('recurrence: $recurrence, ')
-          ..write('recurrenceUntil: $recurrenceUntil')
+          ..write('recurrenceUntil: $recurrenceUntil, ')
+          ..write('dirty: $dirty')
           ..write(')'))
         .toString();
   }
@@ -3063,6 +3097,7 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     content,
     recurrence,
     recurrenceUntil,
+    dirty,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -3088,7 +3123,8 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           other.isAllDay == this.isAllDay &&
           other.content == this.content &&
           other.recurrence == this.recurrence &&
-          other.recurrenceUntil == this.recurrenceUntil);
+          other.recurrenceUntil == this.recurrenceUntil &&
+          other.dirty == this.dirty);
 }
 
 class EventTableCompanion extends UpdateCompanion<EventTableData> {
@@ -3113,6 +3149,7 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
   final Value<String?> content;
   final Value<String> recurrence;
   final Value<String?> recurrenceUntil;
+  final Value<bool> dirty;
   const EventTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -3135,6 +3172,7 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.content = const Value.absent(),
     this.recurrence = const Value.absent(),
     this.recurrenceUntil = const Value.absent(),
+    this.dirty = const Value.absent(),
   });
   EventTableCompanion.insert({
     this.id = const Value.absent(),
@@ -3158,6 +3196,7 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.content = const Value.absent(),
     this.recurrence = const Value.absent(),
     this.recurrenceUntil = const Value.absent(),
+    this.dirty = const Value.absent(),
   }) : eventDate = Value(eventDate),
        createdAt = Value(createdAt);
   static Insertable<EventTableData> custom({
@@ -3182,6 +3221,7 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Expression<String>? content,
     Expression<String>? recurrence,
     Expression<String>? recurrenceUntil,
+    Expression<bool>? dirty,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3205,6 +3245,7 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       if (content != null) 'content': content,
       if (recurrence != null) 'recurrence': recurrence,
       if (recurrenceUntil != null) 'recurrence_until': recurrenceUntil,
+      if (dirty != null) 'dirty': dirty,
     });
   }
 
@@ -3230,6 +3271,7 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Value<String?>? content,
     Value<String>? recurrence,
     Value<String?>? recurrenceUntil,
+    Value<bool>? dirty,
   }) {
     return EventTableCompanion(
       id: id ?? this.id,
@@ -3253,6 +3295,7 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       content: content ?? this.content,
       recurrence: recurrence ?? this.recurrence,
       recurrenceUntil: recurrenceUntil ?? this.recurrenceUntil,
+      dirty: dirty ?? this.dirty,
     );
   }
 
@@ -3322,6 +3365,9 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     if (recurrenceUntil.present) {
       map['recurrence_until'] = Variable<String>(recurrenceUntil.value);
     }
+    if (dirty.present) {
+      map['dirty'] = Variable<bool>(dirty.value);
+    }
     return map;
   }
 
@@ -3348,7 +3394,8 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
           ..write('isAllDay: $isAllDay, ')
           ..write('content: $content, ')
           ..write('recurrence: $recurrence, ')
-          ..write('recurrenceUntil: $recurrenceUntil')
+          ..write('recurrenceUntil: $recurrenceUntil, ')
+          ..write('dirty: $dirty')
           ..write(')'))
         .toString();
   }
@@ -4515,6 +4562,192 @@ class MapPlaceTableCompanion extends UpdateCompanion<MapPlaceTableData> {
   }
 }
 
+class $PendingEventDeleteTableTable extends PendingEventDeleteTable
+    with TableInfo<$PendingEventDeleteTableTable, PendingEventDeleteTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingEventDeleteTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _googleEventIdMeta = const VerificationMeta(
+    'googleEventId',
+  );
+  @override
+  late final GeneratedColumn<String> googleEventId = GeneratedColumn<String>(
+    'google_event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [googleEventId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_event_deletes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingEventDeleteTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('google_event_id')) {
+      context.handle(
+        _googleEventIdMeta,
+        googleEventId.isAcceptableOrUnknown(
+          data['google_event_id']!,
+          _googleEventIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_googleEventIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {googleEventId};
+  @override
+  PendingEventDeleteTableData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingEventDeleteTableData(
+      googleEventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}google_event_id'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingEventDeleteTableTable createAlias(String alias) {
+    return $PendingEventDeleteTableTable(attachedDatabase, alias);
+  }
+}
+
+class PendingEventDeleteTableData extends DataClass
+    implements Insertable<PendingEventDeleteTableData> {
+  final String googleEventId;
+  const PendingEventDeleteTableData({required this.googleEventId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['google_event_id'] = Variable<String>(googleEventId);
+    return map;
+  }
+
+  PendingEventDeleteTableCompanion toCompanion(bool nullToAbsent) {
+    return PendingEventDeleteTableCompanion(
+      googleEventId: Value(googleEventId),
+    );
+  }
+
+  factory PendingEventDeleteTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingEventDeleteTableData(
+      googleEventId: serializer.fromJson<String>(json['googleEventId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'googleEventId': serializer.toJson<String>(googleEventId),
+    };
+  }
+
+  PendingEventDeleteTableData copyWith({String? googleEventId}) =>
+      PendingEventDeleteTableData(
+        googleEventId: googleEventId ?? this.googleEventId,
+      );
+  PendingEventDeleteTableData copyWithCompanion(
+    PendingEventDeleteTableCompanion data,
+  ) {
+    return PendingEventDeleteTableData(
+      googleEventId: data.googleEventId.present
+          ? data.googleEventId.value
+          : this.googleEventId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingEventDeleteTableData(')
+          ..write('googleEventId: $googleEventId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => googleEventId.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingEventDeleteTableData &&
+          other.googleEventId == this.googleEventId);
+}
+
+class PendingEventDeleteTableCompanion
+    extends UpdateCompanion<PendingEventDeleteTableData> {
+  final Value<String> googleEventId;
+  final Value<int> rowid;
+  const PendingEventDeleteTableCompanion({
+    this.googleEventId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingEventDeleteTableCompanion.insert({
+    required String googleEventId,
+    this.rowid = const Value.absent(),
+  }) : googleEventId = Value(googleEventId);
+  static Insertable<PendingEventDeleteTableData> custom({
+    Expression<String>? googleEventId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (googleEventId != null) 'google_event_id': googleEventId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingEventDeleteTableCompanion copyWith({
+    Value<String>? googleEventId,
+    Value<int>? rowid,
+  }) {
+    return PendingEventDeleteTableCompanion(
+      googleEventId: googleEventId ?? this.googleEventId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (googleEventId.present) {
+      map['google_event_id'] = Variable<String>(googleEventId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingEventDeleteTableCompanion(')
+          ..write('googleEventId: $googleEventId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4532,6 +4765,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $EventTagRelationTableTable(this);
   late final $MapTagTableTable mapTagTable = $MapTagTableTable(this);
   late final $MapPlaceTableTable mapPlaceTable = $MapPlaceTableTable(this);
+  late final $PendingEventDeleteTableTable pendingEventDeleteTable =
+      $PendingEventDeleteTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4548,6 +4783,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     eventTagRelationTable,
     mapTagTable,
     mapPlaceTable,
+    pendingEventDeleteTable,
   ];
 }
 
@@ -6722,6 +6958,7 @@ typedef $$EventTableTableCreateCompanionBuilder =
       Value<String?> content,
       Value<String> recurrence,
       Value<String?> recurrenceUntil,
+      Value<bool> dirty,
     });
 typedef $$EventTableTableUpdateCompanionBuilder =
     EventTableCompanion Function({
@@ -6746,6 +6983,7 @@ typedef $$EventTableTableUpdateCompanionBuilder =
       Value<String?> content,
       Value<String> recurrence,
       Value<String?> recurrenceUntil,
+      Value<bool> dirty,
     });
 
 final class $$EventTableTableReferences
@@ -6895,6 +7133,11 @@ class $$EventTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> eventTagRelationTableRefs(
     Expression<bool> Function($$EventTagRelationTableTableFilterComposer f) f,
   ) {
@@ -7035,6 +7278,11 @@ class $$EventTableTableOrderingComposer
     column: $table.recurrenceUntil,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EventTableTableAnnotationComposer
@@ -7127,6 +7375,9 @@ class $$EventTableTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get dirty =>
+      $composableBuilder(column: $table.dirty, builder: (column) => column);
+
   Expression<T> eventTagRelationTableRefs<T extends Object>(
     Expression<T> Function($$EventTagRelationTableTableAnnotationComposer a) f,
   ) {
@@ -7203,6 +7454,7 @@ class $$EventTableTableTableManager
                 Value<String?> content = const Value.absent(),
                 Value<String> recurrence = const Value.absent(),
                 Value<String?> recurrenceUntil = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
               }) => EventTableCompanion(
                 id: id,
                 title: title,
@@ -7225,6 +7477,7 @@ class $$EventTableTableTableManager
                 content: content,
                 recurrence: recurrence,
                 recurrenceUntil: recurrenceUntil,
+                dirty: dirty,
               ),
           createCompanionCallback:
               ({
@@ -7249,6 +7502,7 @@ class $$EventTableTableTableManager
                 Value<String?> content = const Value.absent(),
                 Value<String> recurrence = const Value.absent(),
                 Value<String?> recurrenceUntil = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
               }) => EventTableCompanion.insert(
                 id: id,
                 title: title,
@@ -7271,6 +7525,7 @@ class $$EventTableTableTableManager
                 content: content,
                 recurrence: recurrence,
                 recurrenceUntil: recurrenceUntil,
+                dirty: dirty,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -8590,6 +8845,151 @@ typedef $$MapPlaceTableTableProcessedTableManager =
       MapPlaceTableData,
       PrefetchHooks Function({bool tagId})
     >;
+typedef $$PendingEventDeleteTableTableCreateCompanionBuilder =
+    PendingEventDeleteTableCompanion Function({
+      required String googleEventId,
+      Value<int> rowid,
+    });
+typedef $$PendingEventDeleteTableTableUpdateCompanionBuilder =
+    PendingEventDeleteTableCompanion Function({
+      Value<String> googleEventId,
+      Value<int> rowid,
+    });
+
+class $$PendingEventDeleteTableTableFilterComposer
+    extends Composer<_$AppDatabase, $PendingEventDeleteTableTable> {
+  $$PendingEventDeleteTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get googleEventId => $composableBuilder(
+    column: $table.googleEventId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingEventDeleteTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $PendingEventDeleteTableTable> {
+  $$PendingEventDeleteTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get googleEventId => $composableBuilder(
+    column: $table.googleEventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingEventDeleteTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PendingEventDeleteTableTable> {
+  $$PendingEventDeleteTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get googleEventId => $composableBuilder(
+    column: $table.googleEventId,
+    builder: (column) => column,
+  );
+}
+
+class $$PendingEventDeleteTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingEventDeleteTableTable,
+          PendingEventDeleteTableData,
+          $$PendingEventDeleteTableTableFilterComposer,
+          $$PendingEventDeleteTableTableOrderingComposer,
+          $$PendingEventDeleteTableTableAnnotationComposer,
+          $$PendingEventDeleteTableTableCreateCompanionBuilder,
+          $$PendingEventDeleteTableTableUpdateCompanionBuilder,
+          (
+            PendingEventDeleteTableData,
+            BaseReferences<
+              _$AppDatabase,
+              $PendingEventDeleteTableTable,
+              PendingEventDeleteTableData
+            >,
+          ),
+          PendingEventDeleteTableData,
+          PrefetchHooks Function()
+        > {
+  $$PendingEventDeleteTableTableTableManager(
+    _$AppDatabase db,
+    $PendingEventDeleteTableTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingEventDeleteTableTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$PendingEventDeleteTableTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PendingEventDeleteTableTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> googleEventId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingEventDeleteTableCompanion(
+                googleEventId: googleEventId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String googleEventId,
+                Value<int> rowid = const Value.absent(),
+              }) => PendingEventDeleteTableCompanion.insert(
+                googleEventId: googleEventId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingEventDeleteTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingEventDeleteTableTable,
+      PendingEventDeleteTableData,
+      $$PendingEventDeleteTableTableFilterComposer,
+      $$PendingEventDeleteTableTableOrderingComposer,
+      $$PendingEventDeleteTableTableAnnotationComposer,
+      $$PendingEventDeleteTableTableCreateCompanionBuilder,
+      $$PendingEventDeleteTableTableUpdateCompanionBuilder,
+      (
+        PendingEventDeleteTableData,
+        BaseReferences<
+          _$AppDatabase,
+          $PendingEventDeleteTableTable,
+          PendingEventDeleteTableData
+        >,
+      ),
+      PendingEventDeleteTableData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8616,4 +9016,9 @@ class $AppDatabaseManager {
       $$MapTagTableTableTableManager(_db, _db.mapTagTable);
   $$MapPlaceTableTableTableManager get mapPlaceTable =>
       $$MapPlaceTableTableTableManager(_db, _db.mapPlaceTable);
+  $$PendingEventDeleteTableTableTableManager get pendingEventDeleteTable =>
+      $$PendingEventDeleteTableTableTableManager(
+        _db,
+        _db.pendingEventDeleteTable,
+      );
 }

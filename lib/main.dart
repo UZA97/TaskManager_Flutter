@@ -3,12 +3,14 @@ import 'core/config/app_config.dart';
 import 'package:flutter/services.dart';
 import 'core/auth/google_account_provider.dart';
 import 'features/mail/widgets/google_login_dialog.dart';
+import 'features/memo/data/note_repository.dart';
 import 'features/memo/providers/note_provider.dart';
 import 'features/memo/providers/tab_provider.dart';
 import '../features/calendar/data/event_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 import 'core/notification/notification_service.dart';
 import 'core/tray/tray_service.dart';
 import 'core/settings/settings_provider.dart';
@@ -16,7 +18,8 @@ import 'core/settings/app_settings.dart';
 import 'core/theme/app_colors.dart';
 import 'features/lock/views/lock_screen.dart';
 import 'features/memo/views/memo_list_view.dart';
-import 'features/memo/editor_v2/editor_mode_provider.dart';
+import 'features/memo/widgets/quick_memo_dialog.dart';
+import 'features/memo/editor_v2/memo_editor_v2_view.dart';
 import 'features/calendar/views/calendar_view.dart';
 import 'features/calendar/views/calendar_editor_view.dart';
 import 'features/settings/views/settings_view.dart';
@@ -26,7 +29,6 @@ import 'features/map/views/map_view.dart';
 import 'features/map/views/map_sidebar_view.dart';
 import 'core/providers/navigation_provider.dart';
 import 'features/settings/views/settings_detail_view.dart';
-import 'package:appflowy_editor/appflowy_editor.dart';
 import 'features/mail/providers/mail_provider.dart';
 import 'features/calendar/models/event.dart';
 import 'features/calendar/models/recurrence.dart';
@@ -45,6 +47,8 @@ void main() async {
   // 윈도우 앱의 표시/종료 동작을 제어하기 위해 window_manager 초기화
   await windowManager.ensureInitialized();
   await windowManager.setPreventClose(true);
+  // 빠른 메모 단축키: 이전 실행에서 남은 등록 정리
+  await hotKeyManager.unregisterAll();
   await windowManager.waitUntilReadyToShow(
     const WindowOptions(
       size: Size(1280, 720),
@@ -85,14 +89,25 @@ class TaskManagerApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider).value;
+    // 테마 관련 값만 구독 (다른 설정이 바뀌어도 앱 전체를 다시 그리지 않도록)
+    final settings = ref.watch(
+      settingsProvider.select((s) {
+        final v = s.value;
+        return v == null
+            ? null
+            : (
+                fontSize: v.fontSize,
+                themeColor: v.themeColor,
+                themeMode: v.themeMode,
+              );
+      }),
+    );
     final fontSize = settings?.fontSize ?? AppFontSize.medium;
     final base = _fontSizeBase(fontSize);
 
     return MaterialApp(
       title: 'TaskManager',
       debugShowCheckedModeBanner: false,
-      localizationsDelegates: const [AppFlowyEditorLocalizations.delegate],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: appSeedColor,
@@ -174,7 +189,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
 
   /// 메인 화면 우측 콘텐츠 영역에 보여줄 상세 뷰 목록입니다.
   static const List<Widget> _detailPanels = [
-    MemoEditorSwitcher(),
+    MemoEditorV2View(),
     CalendarEditorView(),
     MailDetailView(),
     MapView(),
@@ -196,11 +211,52 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     final settings = ref.read(settingsProvider).value;
     // 이미 화면에 떠 있는 창(알림 클릭 등)은 다시 잠그지 않음
     if ((settings?.lockEnabled ?? false) && !await windowManager.isVisible()) {
-      setState(() => _isLocked = true);
+      _lock();
     }
     if (await windowManager.isMinimized()) await windowManager.restore();
     await windowManager.show();
     await windowManager.focus();
+  }
+
+  /// 잠금 화면 표시. 루트 네비게이터의 다이얼로그가 잠금 화면 위에 남지 않도록 먼저 닫음
+  void _lock() {
+    if (!mounted || _isLocked) return;
+    Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+    setState(() => _isLocked = true);
+  }
+
+  /// 어디서든 Ctrl+Alt+M: 빠른 메모 창 (트레이에 있었으면 저장 후 다시 트레이로)
+  static final _quickMemoHotKey = HotKey(
+    key: PhysicalKeyboardKey.keyM,
+    modifiers: [HotKeyModifier.control, HotKeyModifier.alt],
+    scope: HotKeyScope.system,
+  );
+  bool _quickMemoOpen = false;
+
+  Future<void> _registerQuickMemoHotKey() async {
+    try {
+      await hotKeyManager.register(
+        _quickMemoHotKey,
+        keyDownHandler: (_) => _openQuickMemo(),
+      );
+    } catch (e) {
+      print('빠른 메모 단축키 등록 실패: $e');
+    }
+  }
+
+  Future<void> _openQuickMemo() async {
+    if (_quickMemoOpen || !mounted) return;
+    final wasVisible = await windowManager.isVisible();
+    await _showWindow();
+    // 잠금 화면이 떠 있으면 빠른 메모는 열지 않음
+    if (_isLocked || !mounted) return;
+    _quickMemoOpen = true;
+    try {
+      await showQuickMemoDialog(context);
+    } finally {
+      _quickMemoOpen = false;
+    }
+    if (!wasVisible) await windowManager.hide();
   }
 
   // 알람 알림 클릭: 트레이/최소화 상태에서도 창을 띄우고 해당 날짜의 캘린더로 이동
@@ -222,6 +278,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     super.initState();
     windowManager.addListener(this);
     _initTray();
+    _registerQuickMemoHotKey();
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -230,12 +287,27 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       // 알람 체커는 로그인 팝업과 무관하게 먼저 시작
       _startAlarmChecker();
 
-      // 앱 시작 시 잠금 체크
-      final settings = ref.read(settingsProvider).value;
-      if (settings?.lockEnabled ?? false) {
-        setState(() => _isLocked = true);
+      // 앱 시작 시 잠금 체크 (설정을 다 읽기 전이면 잠금이 빠지므로 기다림)
+      AppSettings? settings;
+      try {
+        settings = await ref.read(settingsProvider.future);
+      } catch (e) {
+        print('설정 읽기 실패: $e');
       }
+      if (!mounted) return;
+      // 설정한 시작 화면으로
+      final startScreen = settings?.startScreen ?? 0;
+      if (startScreen != 0) {
+        ref.read(navigationProvider.notifier).navigateTo(startScreen);
+      }
+      if (settings?.lockEnabled ?? false) _lock();
       _checkForUpdate();
+
+      // 휴지통 보관 기간이 지난 메모 정리 (기다리지 않음)
+      ref
+          .read(noteRepositoryProvider)
+          .deleteExpiredNotes(days: settings?.trashRetentionDays ?? 30)
+          .catchError((Object e) => print('휴지통 정리 실패: $e'));
 
       // 구글 로그인 여부 체크 — 오류가 나도 로그인 팝업은 띄움
       GoogleAccount? account;
@@ -271,6 +343,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   // 하루 첫 실행 때 오늘 브리핑 표시 (잠금 중이면 잠금 해제 후)
   Future<void> _maybeShowDailyBriefing() async {
     if (!mounted || _isLocked) return;
+    if (!(ref.read(settingsProvider).value?.briefingAutoShow ?? true)) return;
     final db = ref.read(databaseProvider);
     if (!await claimDailyBriefing(db)) return;
     if (mounted) await showBriefingDialog(context);
@@ -307,9 +380,19 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   }
 
   Future<void> _checkForUpdate() async {
-    final result = await UpdateService().checkForUpdate();
-    if (!result.hasUpdate) return;
+    final service = UpdateService();
+    final result = await service.checkForUpdate();
+    // 지난번 업데이트가 설치되지 않았으면 같은 업데이트를 또 띄우지 않고 원인을 보여줌
+    final failure = await service.takeUpdateFailure(result.downloadUrl ?? '');
     if (!mounted) return;
+    if (failure != null) {
+      showDialog(
+        context: context,
+        builder: (context) => _UpdateFailureDialog(failure: failure),
+      );
+      return;
+    }
+    if (!result.hasUpdate) return;
 
     showDialog(
       context: context,
@@ -462,6 +545,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
+    hotKeyManager.unregister(_quickMemoHotKey);
     _alarmTimer?.cancel();
     windowManager.removeListener(this);
     _focusModeTimer?.cancel();
@@ -484,17 +568,14 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
 
     final ids = tabState.tabNoteIds;
     final currentIndex = ids.indexOf(tabState.activeNoteId ?? -1);
-    final notes = ref.read(noteListProvider).value ?? [];
+    // 검색 필터와 무관하게 id로 찾아 선택 (없으면 선택 해제)
+    final noteList = ref.read(noteListProvider.notifier);
 
     if (event.logicalKey == LogicalKeyboardKey.tab && !shift) {
       // Ctrl+Tab: 다음 탭
       final nextId = ids[(currentIndex + 1) % ids.length];
       ref.read(tabProvider.notifier).setActive(nextId);
-      final note = notes.firstWhere(
-        (n) => n.id == nextId,
-        orElse: () => notes.first,
-      );
-      ref.read(selectedNoteProvider.notifier).select(note);
+      noteList.selectById(nextId);
       return true;
     }
 
@@ -502,11 +583,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       // Ctrl+Shift+Tab: 이전 탭
       final prevId = ids[(currentIndex - 1 + ids.length) % ids.length];
       ref.read(tabProvider.notifier).setActive(prevId);
-      final note = notes.firstWhere(
-        (n) => n.id == prevId,
-        orElse: () => notes.first,
-      );
-      ref.read(selectedNoteProvider.notifier).select(note);
+      noteList.selectById(prevId);
       return true;
     }
 
@@ -515,15 +592,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       if (tabState.activeNoteId == null) return false;
       ref.read(tabProvider.notifier).closeTab(tabState.activeNoteId!);
       final newState = ref.read(tabProvider).value;
-      if (newState?.activeNoteId != null) {
-        final note = notes.firstWhere(
-          (n) => n.id == newState!.activeNoteId,
-          orElse: () => notes.first,
-        );
-        ref.read(selectedNoteProvider.notifier).select(note);
-      } else {
-        ref.read(selectedNoteProvider.notifier).select(null);
-      }
+      noteList.selectById(newState?.activeNoteId);
       return true;
     }
 
@@ -550,8 +619,40 @@ class _UpdateDialog extends StatefulWidget {
 }
 
 class _UpdateDialogState extends State<_UpdateDialog> {
+  final _service = UpdateService();
   bool _isDownloading = false;
   double _progress = 0;
+  String? _error;
+
+  Future<void> _install() async {
+    setState(() {
+      _isDownloading = true;
+      _progress = 0;
+      _error = null;
+    });
+    try {
+      await _service.downloadAndInstall(
+        widget.result.downloadUrl!,
+        widget.result.latestVersion!,
+        onProgress: (progress) {
+          if (mounted) setState(() => _progress = progress);
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isDownloading = false;
+        // 취소는 오류로 보여주지 않음
+        _error = e is UpdateCancelledException ? null : '$e';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_isDownloading) _service.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -572,30 +673,128 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: const TextStyle(fontSize: 12, color: Colors.red),
+            ),
+          ],
         ],
       ),
       actions: _isDownloading
-          ? null
+          ? [TextButton(onPressed: _service.cancel, child: const Text('취소'))]
           : [
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('나중에'),
               ),
               ElevatedButton(
-                onPressed: () async {
-                  setState(() => _isDownloading = true);
-                  await UpdateService().downloadAndInstall(
-                    widget.result.downloadUrl!,
-                    onProgress: (progress) {
-                      setState(() => _progress = progress);
-                    },
-                  );
-                },
+                onPressed: _install,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: context.accent,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('업데이트'),
+                child: Text(_error == null ? '업데이트' : '다시 시도'),
+              ),
+            ],
+    );
+  }
+}
+
+/// 지난번 업데이트가 설치되지 않았을 때: 원인과 직접 설치 버튼
+class _UpdateFailureDialog extends StatefulWidget {
+  final UpdateFailure failure;
+  const _UpdateFailureDialog({required this.failure});
+
+  @override
+  State<_UpdateFailureDialog> createState() => _UpdateFailureDialogState();
+}
+
+class _UpdateFailureDialogState extends State<_UpdateFailureDialog> {
+  final _service = UpdateService();
+  bool _isDownloading = false;
+  double _progress = 0;
+  String? _error;
+
+  Future<void> _installManually() async {
+    setState(() {
+      _isDownloading = true;
+      _progress = 0;
+      _error = null;
+    });
+    try {
+      await _service.installManually(
+        widget.failure,
+        onProgress: (progress) {
+          if (mounted) setState(() => _progress = progress);
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isDownloading = false;
+        _error = e is UpdateCancelledException ? null : '$e';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_isDownloading) _service.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final failure = widget.failure;
+    return AlertDialog(
+      title: const Text('업데이트가 설치되지 않았습니다'),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('현재 버전: ${failure.currentVersion}'),
+            Text('설치하려던 버전: ${failure.version}'),
+            const SizedBox(height: 12),
+            SelectableText(failure.reason, style: const TextStyle(height: 1.5)),
+            if (failure.logPath != null) ...[
+              const SizedBox(height: 12),
+              SelectableText(
+                '설치 기록: ${failure.logPath}',
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+            if (_isDownloading) ...[
+              const SizedBox(height: 16),
+              LinearProgressIndicator(value: _progress),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: const TextStyle(fontSize: 12, color: Colors.red),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: _isDownloading
+          ? [TextButton(onPressed: _service.cancel, child: const Text('취소'))]
+          : [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('닫기'),
+              ),
+              ElevatedButton(
+                onPressed: _installManually,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.accent,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('설치 화면으로 직접 설치'),
               ),
             ],
     );

@@ -119,11 +119,32 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
     }
     // 탭에서도 제거
     ref.read(tabProvider.notifier).closeTab(id);
+    // 휴지통 목록 갱신
+    ref.invalidate(trashProvider);
   }
 
+  // 기존 목록은 유지한 채 다시 읽음 (트리가 사라지거나 펼친 폴더가 접히지 않도록)
   Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(_fetchNotes);
+    ref.invalidateSelf();
+    try {
+      await future;
+    } catch (_) {
+      // 오류는 state(AsyncError)로 화면에 표시됨
+    }
+  }
+
+  /// 검색 필터와 무관하게 id로 메모 찾기 (휴지통·없는 메모는 null)
+  Future<Note?> findById(int id) async {
+    for (final note in state.value ?? const <Note>[]) {
+      if (note.id == id) return note;
+    }
+    return ref.read(noteRepositoryProvider).getNoteById(id);
+  }
+
+  /// id로 찾아 선택 (못 찾으면 선택 해제)
+  Future<void> selectById(int? id) async {
+    final note = id == null ? null : await findById(id);
+    ref.read(selectedNoteProvider.notifier).select(note);
   }
 
   Future<void> togglePin(int id, bool isPinned) async {
@@ -165,6 +186,27 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
 final noteListProvider = AsyncNotifierProvider<NoteListNotifier, List<Note>>(
   NoteListNotifier.new,
 );
+
+/// 탭에 열린 메모 (검색으로 목록에서 빠진 메모는 DB에서 id로 조회)
+final tabNotesProvider = FutureProvider<Map<int, Note>>((ref) async {
+  final ids = ref.watch(
+    tabProvider.select((s) => s.value?.tabNoteIds ?? const <int>[]),
+  );
+  final listed = ref.watch(noteListProvider).value ?? const <Note>[];
+  final idSet = ids.toSet();
+  final result = <int, Note>{
+    for (final n in listed)
+      if (idSet.contains(n.id)) n.id!: n,
+  };
+  final missing = idSet.where((id) => !result.containsKey(id));
+  if (missing.isNotEmpty) {
+    final repo = ref.read(noteRepositoryProvider);
+    for (final n in await repo.getNotesByIds(missing)) {
+      result[n.id!] = n;
+    }
+  }
+  return result;
+});
 
 class TrashNotifier extends AsyncNotifier<List<Note>> {
   @override

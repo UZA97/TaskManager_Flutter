@@ -296,6 +296,19 @@ class _TodoTile extends ConsumerWidget {
 
   const _TodoTile({required this.todo});
 
+  /// 마감일: 오늘 / 지남 / 날짜
+  Widget? _dueLabel(BuildContext context) {
+    final due = todo.due;
+    if (due == null) return null;
+    final today = DateUtils.dateOnly(DateTime.now());
+    final (label, color) = DateUtils.isSameDay(due, today)
+        ? ('오늘', context.accent)
+        : due.isBefore(today)
+        ? ('지남 ${due.month}/${due.day}', Colors.red)
+        : ('${due.month}/${due.day}', Colors.grey);
+    return Text(label, style: TextStyle(fontSize: 12, color: color));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
@@ -310,6 +323,7 @@ class _TodoTile extends ConsumerWidget {
         todo.note.title.isEmpty ? '(제목 없음)' : todo.note.title,
         overflow: TextOverflow.ellipsis,
       ),
+      trailing: _dueLabel(context),
       onTap: () {
         // 메모를 연 뒤 해당 체크리스트로 커서 이동
         ref.read(memoFocusRequestProvider.notifier).request((

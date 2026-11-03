@@ -152,6 +152,20 @@ class EventTable extends Table {
   TextColumn get recurrence => text().withDefault(const Constant(''))();
   // 반복 종료일 (yyyy-MM-dd, 포함). null이면 무기한
   TextColumn get recurrenceUntil => text().nullable()();
+
+  // 로컬 변경이 아직 구글에 반영되지 않음 (동기화 때 먼저 푸시, 풀이 덮어쓰지 않음)
+  BoolColumn get dirty => boolean().withDefault(const Constant(false))();
+}
+
+// 로컬에서 삭제했지만 구글 삭제가 아직 안 된 일정 (재수입 방지용 툼스톤)
+class PendingEventDeleteTable extends Table {
+  @override
+  String get tableName => 'pending_event_deletes';
+
+  TextColumn get googleEventId => text()();
+
+  @override
+  Set<Column> get primaryKey => {googleEventId};
 }
 
 @DriftDatabase(
@@ -167,13 +181,14 @@ class EventTable extends Table {
     EventTagRelationTable,
     MapTagTable,
     MapPlaceTable,
+    PendingEventDeleteTable,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   /// 신규 설치와 기존 데이터베이스 업그레이드 모두에서 공통으로 쓰이는
   /// 기본 폴더를 생성하고, 폴더가 비어 있는 메모에 자동으로 연결합니다.
@@ -268,6 +283,15 @@ class AppDatabase extends _$AppDatabase {
           eventTable.recurrenceUntil as GeneratedColumn,
         );
       }
+      if (from < 11) {
+        await _addColumnIfMissing(
+          m,
+          eventTable,
+          eventTable.dirty as GeneratedColumn,
+        );
+        // createTable은 IF NOT EXISTS라 재업그레이드에도 안전
+        await m.createTable(pendingEventDeleteTable);
+      }
     },
   );
 
@@ -284,6 +308,7 @@ class AppDatabase extends _$AppDatabase {
     if (columns.any((row) => row.read<String>('name') == column.name)) return;
     await m.addColumn(table, column);
   }
+
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {
       final dir = await getApplicationSupportDirectory();

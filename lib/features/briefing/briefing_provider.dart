@@ -17,7 +17,10 @@ class BriefingTodo {
   /// 메모 문서 안에서 체크리스트 노드의 위치
   final List<int> path;
 
-  const BriefingTodo(this.note, this.text, this.path);
+  /// 마감일 (메모 에디터에서 정한 경우)
+  final DateTime? due;
+
+  const BriefingTodo(this.note, this.text, this.path, {this.due});
 }
 
 class BriefingData {
@@ -45,6 +48,20 @@ final briefingProvider = FutureProvider.autoDispose<BriefingData>((ref) async {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
 
+  // 안 읽은 메일 (메일 연동 시): 다른 항목과 동시에 받고, 실패·지연되면 null
+  // (메일 때문에 브리핑 전체가 멈추지 않도록)
+  final unreadMailFuture = ref
+      .read(mailCheckServiceProvider)
+      .fetchUnread()
+      .timeout(const Duration(seconds: 15))
+      .then<({List<MailMessage> messages, int total})?>(
+        (v) => v,
+        onError: (Object e) {
+          print('브리핑 메일 조회 실패: $e');
+          return null;
+        },
+      );
+
   // 오늘 일정: 하루종일 → 시간순
   final events = await ref
       .read(eventRepositoryProvider)
@@ -54,23 +71,21 @@ final briefingProvider = FutureProvider.autoDispose<BriefingData>((ref) async {
     return (a.startTime ?? '').compareTo(b.startTime ?? '');
   });
 
-  // 안 읽은 메일 (메일 연동 시)
-  final unreadMail = await ref.read(mailCheckServiceProvider).fetchUnread();
-
-  // 미완료 체크리스트: 최근 수정한 메모부터
+  // 미완료 체크리스트: 마감일이 오늘이거나 지난 것 먼저(날짜순), 나머지는 최근 수정한 메모부터
   final notes = await ref.read(noteRepositoryProvider).getAllNotes();
   notes.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-  final todos = <BriefingTodo>[];
-  var totalTodoCount = 0;
-  for (final note in notes) {
-    final items = uncheckedTodos(note.content);
-    totalTodoCount += items.length;
-    for (final item in items) {
-      if (todos.length < _maxTodos) {
-        todos.add(BriefingTodo(note, item.text, item.path));
-      }
-    }
-  }
+  final all = [
+    for (final note in notes)
+      for (final item in uncheckedTodos(note.content))
+        BriefingTodo(note, item.text, item.path, due: item.due),
+  ];
+  bool urgent(BriefingTodo t) => t.due != null && !t.due!.isAfter(today);
+  final todos = [
+    ...all.where(urgent).toList()..sort((a, b) => a.due!.compareTo(b.due!)),
+    ...all.where((t) => !urgent(t)),
+  ].take(_maxTodos).toList();
+  final totalTodoCount = all.length;
+  final unreadMail = await unreadMailFuture;
 
   return BriefingData(
     date: today,

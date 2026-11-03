@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
+import 'inline_image.dart';
 import 'styled_text_controller.dart';
 
 /// 텍스트를 직접 편집하는 블록 (type 이름은 appflowy 문서와 동일)
@@ -25,6 +26,7 @@ const localFileType = 'local_file';
 const localLocationType = 'local_location';
 const localCodeType = 'local_code';
 const collapsibleSectionType = 'collapsible_section';
+const localTableType = 'local_table';
 
 /// 에디터의 한 줄(블록). 문서의 트리 구조는 [depth](들여쓰기)로 펼쳐서 다룸.
 class EditorBlock {
@@ -36,7 +38,9 @@ class EditorBlock {
     this.raw,
   }) : data = {...?data},
        controller = StyledTextController.fromDelta(delta ?? const []),
-       focusNode = FocusNode();
+       focusNode = FocusNode() {
+    controller.focusNode = focusNode;
+  }
 
   /// 텍스트가 아닌 블록 (이미지·파일·위치·코드·구분선 등)
   factory EditorBlock.object(
@@ -48,11 +52,34 @@ class EditorBlock {
 
   factory EditorBlock.divider() => EditorBlock.object(dividerType, {});
 
-  factory EditorBlock.image(String src, {double width = 300}) =>
-      EditorBlock.object(localImageType, {'src': src, 'width': width});
+  /// 그림 하나만 있는 줄 (그림 옆에 이어서 글을 쓸 수 있음)
+  factory EditorBlock.imageLine(
+    String src, {
+    double width = defaultImageWidth,
+    int depth = 0,
+  }) => EditorBlock(
+    type: 'paragraph',
+    depth: depth,
+    delta: [
+      {
+        'insert': inlineImageChar,
+        'attributes': inlineImageMarks(src, width: width),
+      },
+    ],
+  );
 
-  factory EditorBlock.file(String src, String fileName) =>
-      EditorBlock.object(localFileType, {'src': src, 'fileName': fileName});
+  /// 첨부파일 하나만 있는 줄 (파일 옆에 이어서 글을 쓸 수 있음)
+  factory EditorBlock.fileLine(String src, String fileName, {int depth = 0}) =>
+      EditorBlock(
+        type: 'paragraph',
+        depth: depth,
+        delta: [
+          {
+            'insert': inlineImageChar,
+            'attributes': inlineFileMarks(src, fileName),
+          },
+        ],
+      );
 
   factory EditorBlock.location(String name, double lat, double lng) =>
       EditorBlock.object(localLocationType, {
@@ -63,6 +90,12 @@ class EditorBlock {
 
   factory EditorBlock.code({String code = '', String language = 'dart'}) =>
       EditorBlock.object(localCodeType, {'code': code, 'language': language});
+
+  /// 빈 표 (첫 행은 머리글)
+  factory EditorBlock.table({int rows = 3, int columns = 3}) =>
+      EditorBlock.object(localTableType, {
+        'rows': List.generate(rows, (_) => List.filled(columns, '')),
+      });
 
   String type;
   int depth;
@@ -100,7 +133,8 @@ class EditorBlock {
       ..remove('checked')
       ..remove('level')
       ..remove('collapsed')
-      ..remove('backgroundColor');
+      ..remove('backgroundColor')
+      ..remove('due');
     if (newType == 'todo_list') data['checked'] = false;
     if (newType == 'heading') data['level'] = level ?? 1;
     if (newType == collapsibleSectionType) data['collapsed'] = false;
@@ -130,6 +164,30 @@ List<EditorBlock> blocksFromJson(String content) {
       );
       // 화면 깊이 = 트리 깊이 + 추가 들여쓰기 (저장할 때 다시 계산해서 넣음)
       final extra = (data.remove(extraIndentKey) as num?)?.toInt() ?? 0;
+      if (type == localImageType) {
+        // 예전 그림 블록 → 그림 하나만 있는 줄
+        final src = (data['src'] ?? data['url']) as String? ?? '';
+        final width = (data['width'] as num?)?.toDouble();
+        result.add(
+          EditorBlock.imageLine(
+            src,
+            width: width ?? defaultImageWidth,
+            depth: depth + extra,
+          ),
+        );
+        continue;
+      }
+      if (type == localFileType) {
+        // 예전 첨부파일 블록 → 파일 하나만 있는 줄
+        result.add(
+          EditorBlock.fileLine(
+            data['src'] as String? ?? '',
+            data['fileName'] as String? ?? '첨부파일',
+            depth: depth + extra,
+          ),
+        );
+        continue;
+      }
       if (!textBlockTypes.contains(type)) {
         // 수정 가능한 복사본 (원래 data가 없던 블록은 그대로 없이)
         if (node.containsKey('data')) node['data'] = data;

@@ -11,7 +11,8 @@ class MemoTabBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tabAsync = ref.watch(tabProvider);
-    final notes = ref.watch(noteListProvider).value ?? [];
+    // 검색 필터와 무관한 탭 메모 (검색 중에도 제목 표시)
+    final tabNotes = ref.watch(tabNotesProvider).value ?? const <int, Note>{};
 
     return tabAsync.when(
       loading: () => const SizedBox(height: 36),
@@ -19,16 +20,15 @@ class MemoTabBar extends ConsumerWidget {
       data: (tabState) {
         final tabs = tabState.tabNoteIds
             .map(
-              (id) => notes.firstWhere(
-                (n) => n.id == id,
-                orElse: () => Note(
-                  id: id,
-                  title: '...',
-                  content: '',
-                  createdAt: '',
-                  updatedAt: '',
-                ),
-              ),
+              (id) =>
+                  tabNotes[id] ??
+                  Note(
+                    id: id,
+                    title: '...',
+                    content: '',
+                    createdAt: '',
+                    updatedAt: '',
+                  ),
             )
             .toList();
 
@@ -69,26 +69,17 @@ class MemoTabBar extends ConsumerWidget {
                               ref
                                   .read(tabProvider.notifier)
                                   .setActive(note.id!);
+                              // 아직 못 읽은 탭('...')이 빈 내용으로 열리지 않도록 id로 조회
                               ref
-                                  .read(selectedNoteProvider.notifier)
-                                  .select(note);
+                                  .read(noteListProvider.notifier)
+                                  .selectById(note.id);
                             },
                             onClose: () {
                               ref.read(tabProvider.notifier).closeTab(note.id!);
                               final newTabState = ref.read(tabProvider).value;
-                              if (newTabState?.activeNoteId != null) {
-                                final activeNote = notes.firstWhere(
-                                  (n) => n.id == newTabState!.activeNoteId,
-                                  orElse: () => notes.first,
-                                );
-                                ref
-                                    .read(selectedNoteProvider.notifier)
-                                    .select(activeNote);
-                              } else {
-                                ref
-                                    .read(selectedNoteProvider.notifier)
-                                    .select(null);
-                              }
+                              ref
+                                  .read(noteListProvider.notifier)
+                                  .selectById(newTabState?.activeNoteId);
                             },
                           ),
                         );
@@ -370,8 +361,6 @@ class _OverflowTabButton extends ConsumerWidget {
     final box = context.findRenderObject() as RenderBox;
     final offset = box.localToGlobal(Offset.zero);
 
-    final notes = ref.read(noteListProvider).value ?? [];
-
     await showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -385,7 +374,7 @@ class _OverflowTabButton extends ConsumerWidget {
         return PopupMenuItem(
           onTap: () {
             ref.read(tabProvider.notifier).setActive(note.id!);
-            ref.read(selectedNoteProvider.notifier).select(note);
+            ref.read(noteListProvider.notifier).selectById(note.id);
           },
           child: Row(
             children: [

@@ -15,12 +15,14 @@ final _youtubePattern = RegExp(
 
 /// 줄에 들어 있는 첫 유튜브 영상 ID (링크 주소 우선, 없으면 글자에서)
 String? youtubeIdOf(StyledTextController controller) {
+  // 링크 글자들은 같은 주소가 이어지므로 주소가 바뀔 때만 검사
+  String? last;
   for (final mark in controller.marks) {
     final href = mark['href'];
-    if (href is String) {
-      final match = _youtubePattern.firstMatch(href);
-      if (match != null) return match.group(1);
-    }
+    if (href is! String || href == last) continue;
+    last = href;
+    final match = _youtubePattern.firstMatch(href);
+    if (match != null) return match.group(1);
   }
   return _youtubePattern.firstMatch(controller.text)?.group(1);
 }
@@ -77,13 +79,17 @@ class YoutubePreview extends StatefulWidget {
 class _YoutubePreviewState extends State<YoutubePreview> {
   String? _id;
 
+  // 마지막으로 검사한 글자·서식 (커서만 움직였으면 다시 검사하지 않음)
+  String? _checkedText;
+  int _checkedRevision = -1;
+
   /// 카드 자리에서 재생 중
   bool _playing = false;
 
   @override
   void initState() {
     super.initState();
-    _id = youtubeIdOf(widget.controller);
+    _id = _check();
     widget.controller.addListener(_onChanged);
   }
 
@@ -93,6 +99,7 @@ class _YoutubePreviewState extends State<YoutubePreview> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_onChanged);
       widget.controller.addListener(_onChanged);
+      _checkedText = null;
       _onChanged();
     }
   }
@@ -103,9 +110,21 @@ class _YoutubePreviewState extends State<YoutubePreview> {
     super.dispose();
   }
 
+  String? _check() {
+    final controller = widget.controller;
+    _checkedText = controller.text;
+    _checkedRevision = controller.marksRevision;
+    return youtubeIdOf(controller);
+  }
+
   // 글자를 칠 때마다 불리므로, 영상이 바뀔 때만 다시 그림
   void _onChanged() {
-    final id = youtubeIdOf(widget.controller);
+    final controller = widget.controller;
+    if (controller.text == _checkedText &&
+        controller.marksRevision == _checkedRevision) {
+      return;
+    }
+    final id = _check();
     if (id != _id) {
       setState(() {
         _id = id;
