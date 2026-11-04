@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database_provider.dart';
-import '../../features/calendar/providers/event_provider.dart';
 import '../../features/mail/models/mail_account.dart';
 import '../../features/mail/providers/mail_provider.dart';
 import 'google_auth_service.dart';
@@ -51,9 +50,8 @@ class GoogleAccountNotifier extends AsyncNotifier<GoogleAccount?> {
     } catch (e, st) {
       print('[GoogleLogin] Gmail 연결 실패(로그인은 유지): $e\n$st');
     }
-    // googleCalendarProvider / mailAccountProvider는 이 provider를 watch하므로
-    // 자동 갱신됨 (여기서 invalidate하면 CircularDependencyError)
-    ref.invalidate(eventListProvider);
+    // googleCalendarProvider / mailAccountProvider / eventListProvider는
+    // 이 provider를 watch하므로 자동 갱신됨 (여기서 invalidate하면 CircularDependencyError)
     print('[GoogleLogin] 5. 완료');
     return true;
   }
@@ -104,7 +102,7 @@ class GoogleAccountNotifier extends AsyncNotifier<GoogleAccount?> {
 
     state = const AsyncData(null);
     ref.invalidate(mailMessagesProvider);
-    ref.invalidate(eventListProvider);
+    // eventListProvider는 로그인 상태를 watch하므로 자동 갱신
   }
 
   // 유효한 access token. 로그인 안 되어 있거나 갱신 실패 시 null
