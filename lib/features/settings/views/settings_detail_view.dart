@@ -1,4 +1,5 @@
 import 'package:taskmanager/core/theme/app_colors.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/settings/settings_category.dart';
@@ -6,10 +7,13 @@ import '../../../core/settings/settings_category_provider.dart';
 import '../../../core/settings/settings_provider.dart';
 import '../../../core/update/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as p;
 import '../../../core/settings/app_settings.dart';
 import '../../../core/settings/autostart_service.dart';
 import '../../../core/auth/google_account_provider.dart';
+import '../../memo/providers/folder_provider.dart';
 import '../../memo/providers/note_provider.dart';
+import '../../memo/services/note_import_export_service.dart';
 import '../../../core/database/database_provider.dart';
 import '../views/google_drive_sync_service.dart';
 
@@ -292,8 +296,144 @@ class _GeneralSettings extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           _TrashSection(),
+          const SizedBox(height: 16),
+          const _SectionHeader(title: '가져오기 / 내보내기'),
+          const _ImportExportSection(),
         ],
       ),
+    );
+  }
+}
+
+/// 마크다운·Evernote 가져오기, 전체 메모 마크다운 내보내기
+class _ImportExportSection extends ConsumerStatefulWidget {
+  const _ImportExportSection();
+
+  @override
+  ConsumerState<_ImportExportSection> createState() =>
+      _ImportExportSectionState();
+}
+
+class _ImportExportSectionState extends ConsumerState<_ImportExportSection> {
+  String? _busy; // 진행 중인 작업 이름
+
+  Future<void> _run(String label, Future<String> Function() task) async {
+    setState(() => _busy = label);
+    String message;
+    try {
+      message = await task();
+    } catch (e) {
+      message = '$label 실패: $e';
+    }
+    if (!mounted) return;
+    setState(() => _busy = null);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _importMessage(ImportResult result) {
+    ref.invalidate(folderListProvider);
+    ref.invalidate(noteListProvider);
+    final failed = result.failed.isEmpty
+        ? ''
+        : ' (실패 ${result.failed.length}개: ${result.failed.take(3).join(', ')})';
+    return '메모 ${result.notes}개를 가져왔습니다$failed';
+  }
+
+  Future<void> _importFiles() async {
+    final picked = await FilePicker.platform.pickFiles(
+      dialogTitle: '가져올 파일 선택 (마크다운, 텍스트, Evernote .enex)',
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: ['md', 'markdown', 'txt', 'enex'],
+    );
+    final paths = [
+      for (final f in picked?.files ?? <PlatformFile>[])
+        if (f.path != null) f.path!,
+    ];
+    if (paths.isEmpty) return;
+    await _run('가져오기', () async {
+      final result = await ref
+          .read(noteImportExportProvider)
+          .importFiles(paths);
+      return _importMessage(result);
+    });
+  }
+
+  Future<void> _importDirectory() async {
+    final dir = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: '가져올 폴더 선택 (하위 폴더 포함)',
+    );
+    if (dir == null) return;
+    await _run('가져오기', () async {
+      final result = await ref
+          .read(noteImportExportProvider)
+          .importDirectory(dir);
+      return _importMessage(result);
+    });
+  }
+
+  Future<void> _exportAll() async {
+    final dir = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: '내보낼 위치 선택',
+    );
+    if (dir == null) return;
+    final now = DateTime.now();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final target = p.join(
+      dir,
+      'TaskManager 메모 ${now.year}-${two(now.month)}-${two(now.day)} '
+      '${two(now.hour)}${two(now.minute)}',
+    );
+    await _run('내보내기', () async {
+      final count = await ref.read(noteImportExportProvider).exportAll(target);
+      return '메모 $count개를 내보냈습니다: $target';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = _busy != null;
+    Widget button(IconData icon, String label, VoidCallback onPressed) =>
+        OutlinedButton.icon(
+          onPressed: busy ? null : onPressed,
+          icon: Icon(icon, size: 16),
+          label: Text(label),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '마크다운(.md)·텍스트 파일, Evernote(.enex)를 메모로 가져오거나 '
+          '모든 메모를 마크다운 파일로 내보냅니다. 그림·첨부파일도 함께 옮겨집니다.',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            button(Icons.file_open_outlined, '파일 가져오기', _importFiles),
+            button(Icons.folder_open_outlined, '폴더 가져오기', _importDirectory),
+            button(Icons.ios_share, '전체 메모 내보내기', _exportAll),
+          ],
+        ),
+        if (busy) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 8),
+              Text('$_busy 중...', style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

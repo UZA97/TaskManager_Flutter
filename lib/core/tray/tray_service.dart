@@ -35,8 +35,12 @@ class TrayService with TrayListener {
     );
   }
 
-  void destroy() {
+  /// 리스너 해제 + 트레이 아이콘 제거
+  Future<void> destroy() async {
     trayManager.removeListener(this);
+    try {
+      await trayManager.destroy();
+    } catch (_) {}
   }
 
   @override

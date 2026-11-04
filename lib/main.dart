@@ -202,8 +202,15 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     if (settings?.trayModeEnabled ?? true) {
       await windowManager.hide();
     } else {
-      await windowManager.destroy();
+      await _quitApp();
     }
+  }
+
+  /// 종료: 트레이 아이콘을 먼저 치워 바로 꺼진 것처럼 보이게 함
+  /// (창은 네이티브 쪽에서 엔진 정리 전에 숨김)
+  Future<void> _quitApp() async {
+    await _trayService.destroy();
+    await windowManager.destroy();
   }
 
   // 트레이에서 복귀할 때 잠금 체크
@@ -475,9 +482,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   Future<void> _initTray() async {
     await _trayService.init(
       onShow: _showWindow, // 트레이 클릭 시 창을 보이고 잠금 상태를 체크합니다.
-      onExit: () async {
-        await windowManager.destroy();
-      },
+      onExit: _quitApp,
     );
   }
 

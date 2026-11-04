@@ -72,6 +72,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
   }
 
+  // Engine/plugin teardown below can take a while; hide the window and
+  // release the single-instance lock first so exit feels instant.
+  ::ShowWindow(window.GetHandle(), SW_HIDE);
   ::CloseHandle(hMutex);
   ::CoUninitialize();
   return EXIT_SUCCESS;

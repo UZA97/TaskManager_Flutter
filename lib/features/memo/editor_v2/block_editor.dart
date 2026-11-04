@@ -268,16 +268,18 @@ class _BlockEditorState extends State<BlockEditor> {
         ], () => turnInto('heading', level: 3)),
       ]),
       SlashMenuItem.group('List', Icons.list, [
-        SlashMenuItem('Bulleted List', Icons.format_list_bulleted, [
-          'bulleted',
-          'list',
-          '목록',
-        ], () => turnInto('bulleted_list')),
-        SlashMenuItem('Numbered List', Icons.format_list_numbered, [
-          'numbered',
-          'list',
-          '번호',
-        ], () => turnInto('numbered_list')),
+        SlashMenuItem(
+          'Bulleted List',
+          Icons.format_list_bulleted,
+          ['bulleted', 'list', '목록'],
+          () => turnInto('bulleted_list'),
+        ),
+        SlashMenuItem(
+          'Numbered List',
+          Icons.format_list_numbered,
+          ['numbered', 'list', '번호'],
+          () => turnInto('numbered_list'),
+        ),
         SlashMenuItem('To-do List', Icons.check_box_outlined, [
           'todo',
           'checkbox',
@@ -289,16 +291,18 @@ class _BlockEditorState extends State<BlockEditor> {
         'quote',
         '인용',
       ], () => turnInto('quote')),
-      SlashMenuItem('Divider', Icons.horizontal_rule, [
-        'divider',
-        'line',
-        '구분선',
-      ], () => _c.insertBlocks([EditorBlock.divider()])),
-      SlashMenuItem('Table', Icons.table_chart_outlined, [
-        'table',
-        '표',
-        '테이블',
-      ], () => _c.insertBlocks([EditorBlock.table()])),
+      SlashMenuItem(
+        'Divider',
+        Icons.horizontal_rule,
+        ['divider', 'line', '구분선'],
+        () => _c.insertBlocks([EditorBlock.divider()]),
+      ),
+      SlashMenuItem(
+        'Table',
+        Icons.table_chart_outlined,
+        ['table', '표', '테이블'],
+        () => _c.insertBlocks([EditorBlock.table()]),
+      ),
       SlashMenuItem('Embed Video', Icons.smart_display, [
         'embed',
         'video',
@@ -2096,7 +2100,11 @@ class _BlockEditorState extends State<BlockEditor> {
       data: const TextSelectionThemeData(selectionColor: _selectionColor),
       child: OverlayPortal(
         controller: _slashPortal,
-        overlayChildBuilder: _buildSlashMenu,
+        // 메뉴 바깥(다른 줄, 툴바 등)을 누르면 닫음
+        overlayChildBuilder: (context) => TapRegion(
+          onTapOutside: (_) => _closeSlash(),
+          child: _buildSlashMenu(context),
+        ),
         child: Listener(
           onPointerDown: _onPointerDown,
           onPointerMove: _onPointerMove,

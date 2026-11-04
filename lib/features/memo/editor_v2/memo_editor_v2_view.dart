@@ -18,6 +18,7 @@ import '../data/note_repository.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
 import '../providers/tab_provider.dart';
+import '../services/note_import_export_service.dart';
 import '../services/note_template_service.dart';
 import '../services/note_version_service.dart';
 import '../services/pdf_export_service.dart';
@@ -585,7 +586,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     editor.focus(block, 0);
   }
 
-  // ───────────── 글자 수·수정 시각
+  // ───────────── 글자 수
 
   String _statusText(BlockEditorController editor) {
     var count = 0;
@@ -598,14 +599,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
       (_) => ',',
     );
-    final updated = DateTime.tryParse(_currentNote?.updatedAt ?? '');
-    if (updated == null) return '$digits자';
-    String two(int n) => n.toString().padLeft(2, '0');
-    final now = DateTime.now();
-    final day = DateUtils.isSameDay(updated, now)
-        ? '오늘'
-        : '${updated.month}/${updated.day}';
-    return '$digits자 · $day ${two(updated.hour)}:${two(updated.minute)} 수정';
+    return '$digits자';
   }
 
   Future<void> _exportToPdf() async {
@@ -625,6 +619,42 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('PDF 내보내기 실패: $e')));
+    }
+  }
+
+  Future<void> _exportToMarkdown() async {
+    final editor = _editor;
+    final note = _currentNote;
+    if (note == null || editor == null) return;
+    final name = note.title.trim().isEmpty
+        ? '제목없음'
+        : note.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), ' ').trim();
+    final mdPath = await FilePicker.platform.saveFile(
+      dialogTitle: '마크다운으로 내보내기',
+      fileName: '$name.md',
+      type: FileType.custom,
+      allowedExtensions: ['md'],
+    );
+    if (mdPath == null) return;
+    try {
+      await ref
+          .read(noteImportExportProvider)
+          .exportNote(
+            note: note,
+            blocks: editor.blocks,
+            mdPath: mdPath.toLowerCase().endsWith('.md')
+                ? mdPath
+                : '$mdPath.md',
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('마크다운으로 내보냈습니다')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('마크다운 내보내기 실패: $e')));
     }
   }
 
@@ -1100,6 +1130,12 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
                         Icons.picture_as_pdf,
                         'PDF 내보내기',
                         _exportToPdf,
+                      ),
+                      const SizedBox(width: 4),
+                      _toolbarButton(
+                        Icons.description_outlined,
+                        '마크다운 내보내기',
+                        _exportToMarkdown,
                       ),
                       const SizedBox(width: 4),
                       Builder(

@@ -39,6 +39,8 @@ dependencies:
   # Google OAuth
   google_sign_in_all_platforms: ^2.0.0
   crypto: ^3.0.3
+  # Evernote(.enex) 가져오기
+  xml: ^6.5.0
   http: ^1.5.0
 
   # 클립보드

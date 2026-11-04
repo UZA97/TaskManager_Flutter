@@ -143,8 +143,13 @@ class NoteRepository {
     return notes.where((n) => noteMatchesQuery(n, keyword)).toList();
   }
 
-  Future<Note> createNote({int? folderId, double sortOrder = 0.0}) async {
-    final now = DateTime.now().toIso8601String();
+  /// [createdAt]: 가져온 메모처럼 원래 만든 시각을 지킬 때
+  Future<Note> createNote({
+    int? folderId,
+    double sortOrder = 0.0,
+    String? createdAt,
+  }) async {
+    final now = createdAt ?? DateTime.now().toIso8601String();
     final id = await _db
         .into(_db.noteTable)
         .insert(

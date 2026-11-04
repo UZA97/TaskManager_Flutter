@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../../core/theme/app_colors.dart';
 import 'editor_block.dart';
@@ -40,13 +41,19 @@ class _TableBlockViewState extends State<TableBlockView> {
 
   /// 열 너비 (null이면 표가 줄 너비를 똑같이 나눠 씀). 크기를 조절하면 저장됨.
   List<double>? _widths;
+
+  /// 행 최소 높이 (null이면 글자에 맞춤). 글자가 더 많으면 행은 그만큼 늘어남.
+  List<double>? _heights;
   bool _resizing = false;
   List<double> _dragStartWidths = const [];
+  List<double> _dragStartHeights = const [];
   double _dragDistance = 0;
+  double _dragDistanceY = 0;
   final _tableKey = GlobalKey();
   late List<GlobalKey> _headerKeys;
 
   static const _minColumnWidth = 48.0;
+  static const _minRowHeight = 32.0;
 
   Map<String, Object?> get _data => widget.block.rawData;
 
@@ -65,6 +72,10 @@ class _TableBlockViewState extends State<TableBlockView> {
     final widths = _data['col_widths'];
     if (widths is List && widths.length == _columns) {
       _widths = [for (final w in widths) (w as num).toDouble()];
+    }
+    final heights = _data['row_heights'];
+    if (heights is List && heights.length == _cells.length) {
+      _heights = [for (final h in heights) (h as num).toDouble()];
     }
     _headerKeys = [for (var c = 0; c < _columns; c++) GlobalKey()];
     _focus.addListener(_onFocusChanged);
@@ -98,6 +109,12 @@ class _TableBlockViewState extends State<TableBlockView> {
     } else {
       _data['col_widths'] = [for (final w in widths) w.roundToDouble()];
     }
+    final heights = _heights;
+    if (heights == null) {
+      _data.remove('row_heights');
+    } else {
+      _data['row_heights'] = [for (final h in heights) h.roundToDouble()];
+    }
     widget.onChanged();
   }
 
@@ -112,6 +129,15 @@ class _TableBlockViewState extends State<TableBlockView> {
           120,
   ];
 
+  /// 지금 화면에 보이는 행 높이
+  List<double> _currentHeights() {
+    final table = _tableKey.currentContext?.findRenderObject();
+    return [
+      for (var r = 0; r < _cells.length; r++)
+        table is RenderTable && table.hasSize ? table.getRowBox(r).height : 36,
+    ];
+  }
+
   /// 표가 쓸 수 있는 최대 너비 (줄 너비)
   double get _maxTableWidth {
     final box = _tableKey.currentContext?.findRenderObject() as RenderBox?;
@@ -121,8 +147,17 @@ class _TableBlockViewState extends State<TableBlockView> {
 
   void _startResize() {
     _dragStartWidths = _widths ?? _currentWidths();
+    _dragStartHeights = _heights ?? _currentHeights();
     _dragDistance = 0;
+    _dragDistanceY = 0;
     setState(() => _resizing = true);
+  }
+
+  /// 칸 아래 경계 끌기: 그 행만 높이거나 낮춤
+  void _resizeRow(int row, double dy) {
+    _dragDistanceY += dy;
+    final height = max(_minRowHeight, _dragStartHeights[row] + _dragDistanceY);
+    setState(() => _heights = [..._dragStartHeights]..[row] = height);
   }
 
   /// 열 경계 끌기: 그 열만 넓히거나 좁힘
@@ -137,9 +172,10 @@ class _TableBlockViewState extends State<TableBlockView> {
     setState(() => _widths = [..._dragStartWidths]..[column] = width);
   }
 
-  /// 오른쪽 아래 손잡이 끌기: 모든 열을 같은 비율로
-  void _resizeTable(double dx) {
-    _dragDistance += dx;
+  /// 오른쪽 아래 손잡이 끌기: 모든 열·행을 같은 비율로
+  void _resizeTable(Offset delta) {
+    _dragDistance += delta.dx;
+    _dragDistanceY += delta.dy;
     final total = _dragStartWidths.fold(0.0, (sum, w) => sum + w);
     final target = (total + _dragDistance)
         .clamp(
@@ -148,7 +184,22 @@ class _TableBlockViewState extends State<TableBlockView> {
         )
         .toDouble();
     final scale = target / total;
-    setState(() => _widths = [for (final w in _dragStartWidths) w * scale]);
+    // 세로로 거의 안 움직였으면 행 높이는 그대로 (글자에 맞춰 줄어드는 상태 유지)
+    final verticalMoved = _dragDistanceY.abs() > 2;
+    final totalHeight = _dragStartHeights.fold(0.0, (sum, h) => sum + h);
+    final targetHeight = max(
+      _minRowHeight * _cells.length,
+      totalHeight + _dragDistanceY,
+    );
+    final scaleY = targetHeight / totalHeight;
+    setState(() {
+      _widths = [for (final w in _dragStartWidths) w * scale];
+      if (verticalMoved) {
+        _heights = [
+          for (final h in _dragStartHeights) max(_minRowHeight, h * scaleY),
+        ];
+      }
+    });
   }
 
   void _endResize() {
@@ -162,6 +213,7 @@ class _TableBlockViewState extends State<TableBlockView> {
       _cells.insert(at, [
         for (var c = 0; c < _columns; c++) TextEditingController(),
       ]);
+      _heights?.insert(at, _minRowHeight);
     });
     _save();
   }
@@ -187,6 +239,7 @@ class _TableBlockViewState extends State<TableBlockView> {
       for (final cell in _cells.removeAt(index)) {
         cell.dispose();
       }
+      _heights?.removeAt(index);
     });
     _save();
   }
@@ -252,27 +305,47 @@ class _TableBlockViewState extends State<TableBlockView> {
       key: row == 0 ? _headerKeys[col] : null,
       onSecondaryTapDown: (details) =>
           _showMenu(details.globalPosition, row, col),
-      child: Stack(
-        children: [
-          _cellField(row, col),
-          // 칸 오른쪽 경계를 끌면 열 너비 조절
-          Positioned(
-            top: 0,
-            bottom: 0,
-            right: 0,
-            width: 6,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.resizeColumn,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onHorizontalDragStart: (_) => _startResize(),
-                onHorizontalDragUpdate: (d) => _resizeColumn(col, d.delta.dx),
-                onHorizontalDragEnd: (_) => _endResize(),
-                onHorizontalDragCancel: _endResize,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: _heights?[row] ?? 0),
+        child: Stack(
+          children: [
+            _cellField(row, col),
+            // 칸 아래 경계를 끌면 행 높이 조절
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 6,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeRow,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onVerticalDragStart: (_) => _startResize(),
+                  onVerticalDragUpdate: (d) => _resizeRow(row, d.delta.dy),
+                  onVerticalDragEnd: (_) => _endResize(),
+                  onVerticalDragCancel: _endResize,
+                ),
               ),
             ),
-          ),
-        ],
+            // 칸 오른쪽 경계를 끌면 열 너비 조절
+            Positioned(
+              top: 0,
+              bottom: 0,
+              right: 0,
+              width: 6,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeColumn,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragStart: (_) => _startResize(),
+                  onHorizontalDragUpdate: (d) => _resizeColumn(col, d.delta.dx),
+                  onHorizontalDragEnd: (_) => _endResize(),
+                  onHorizontalDragCancel: _endResize,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -358,7 +431,7 @@ class _TableBlockViewState extends State<TableBlockView> {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onPanStart: (_) => _startResize(),
-                  onPanUpdate: (d) => _resizeTable(d.delta.dx),
+                  onPanUpdate: (d) => _resizeTable(d.delta),
                   onPanEnd: (_) => _endResize(),
                   onPanCancel: _endResize,
                   child: Container(
@@ -443,12 +516,19 @@ class _TableBlockViewState extends State<TableBlockView> {
               ),
             ),
             const SizedBox(height: 4),
+            // 행 추가 버튼은 표 너비에 맞춤 (오른쪽 열 추가 버튼 자리만큼 비움)
             Padding(
               padding: const EdgeInsets.only(right: 24),
-              child: _addButton(
-                '행 추가',
-                () => _insertRow(_cells.length),
-                wide: true,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: _widths?.fold<double>(0, (sum, w) => sum + w),
+                  child: _addButton(
+                    '행 추가',
+                    () => _insertRow(_cells.length),
+                    wide: true,
+                  ),
+                ),
               ),
             ),
           ],
