@@ -12,6 +12,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/providers/navigation_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../calendar/providers/event_provider.dart';
+import '../../calendar/views/calendar_editor_view.dart';
 import '../../map/services/location_search_result.dart';
 import '../../map/widgets/location_search_dialog.dart';
 import '../data/note_repository.dart';
@@ -24,12 +26,14 @@ import '../services/note_version_service.dart';
 import '../services/pdf_export_service.dart';
 import '../views/memo_editor_widgets.dart';
 import '../widgets/ask_ai_dialog.dart';
+import '../widgets/backlinks_button.dart';
 import '../widgets/memo_tab_bar.dart';
 import '../widgets/note_version_dialog.dart';
 import 'block_editor.dart';
 import 'block_editor_controller.dart';
 import 'editor_block.dart';
 import 'inline_image.dart';
+import 'note_dates.dart';
 import 'find_bar.dart';
 import 'outline_panel.dart';
 
@@ -127,7 +131,10 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
     }
     // 에디터가 그려진 뒤 대기 중인 체크리스트 이동 요청 처리
-    WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocusRequest());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyFocusRequest();
+      _applyLocationRequest();
+    });
     // 열 때의 내용을 버전으로 (편집 전 상태로 되돌릴 수 있게)
     if (note.id != null) {
       NoteVersionService.snapshot(note.id!, note.title, note.content);
@@ -248,6 +255,37 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       if (!mounted || _editor != editor) return;
       editor.focus(block, block.controller.text.length);
     });
+  }
+
+  /// 지도에서 고른 장소를 이 메모 끝에 위치 블록으로 넣음
+  void _applyLocationRequest() {
+    final request = ref.read(memoLocationRequestProvider);
+    final editor = _editor;
+    if (!mounted ||
+        request == null ||
+        editor == null ||
+        request.noteId != _currentNote?.id) {
+      return;
+    }
+    ref.read(memoLocationRequestProvider.notifier).request(null);
+
+    // 끝에 붙이려고 마지막 줄에 커서를 둠 (빈 줄이면 그 자리를 대신함)
+    final last = editor.blocks.last;
+    if (last.isText) {
+      editor.focus(last, last.controller.text.length);
+    } else {
+      editor.insertParagraphAfter(last);
+    }
+    final next = EditorBlock(type: 'paragraph'); // 이어서 쓸 줄
+    editor.insertBlocks([
+      EditorBlock.location(request.name, request.lat, request.lng),
+      next,
+    ], focusTarget: next);
+    // 새 메모면 장소 이름을 제목으로
+    if (_titleController.text.trim().isEmpty) {
+      _titleController.text = request.name;
+    }
+    _onContentChanged();
   }
 
   static bool _samePath(List<int> a, List<int> b) =>
@@ -407,6 +445,97 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       return;
     }
     ref.read(selectedNoteProvider.notifier).select(note);
+  }
+
+  // ───────────── 글 속 날짜 → 캘린더
+
+  static const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+  static const _calendarTab = 1;
+
+  String _dateLabel(DateMention m) {
+    final d = m.date;
+    final day =
+        '${d.year}년 ${d.month}월 ${d.day}일 (${_weekdays[d.weekday - 1]})';
+    if (!m.hasTime) return day;
+    final hour12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final minute = d.minute.toString().padLeft(2, '0');
+    return '$day ${d.hour < 12 ? '오전' : '오후'} $hour12:$minute';
+  }
+
+  /// 날짜를 뺀 그 줄의 글을 일정 제목으로 (없으면 메모 제목)
+  String _eventTitleFrom(EditorBlock block, DateMention m) {
+    final raw = block.controller.text;
+    // 그림 글자를 빼기 전 위치 기준으로 날짜 부분을 잘라냄
+    final title =
+        stripInlineImages(
+              m.end <= raw.length ? raw.replaceRange(m.start, m.end, ' ') : raw,
+            )
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .replaceAll(RegExp(r'^[\s:\-~·,]+|[\s:\-~·,]+$'), '')
+            .trim();
+    if (title.isNotEmpty) return title;
+    return _currentNote?.title.trim() ?? '';
+  }
+
+  Future<void> _onDateTap(
+    DateMention m,
+    EditorBlock block,
+    Offset position,
+  ) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(position) & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          enabled: false,
+          height: 28,
+          child: Text(
+            _dateLabel(m),
+            style: const TextStyle(fontSize: 11, color: Colors.grey),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'event',
+          height: 36,
+          child: _MenuRow(Icons.event_available_outlined, '일정 만들기'),
+        ),
+        const PopupMenuItem(
+          value: 'reminder',
+          height: 36,
+          child: _MenuRow(Icons.notifications_active_outlined, '알림 일정 만들기'),
+        ),
+        const PopupMenuItem(
+          value: 'show',
+          height: 36,
+          child: _MenuRow(Icons.calendar_month_outlined, '캘린더에서 보기'),
+        ),
+      ],
+    );
+    if (!mounted || action == null) return;
+    final date = DateUtils.dateOnly(m.date);
+    if (action == 'show') {
+      ref.read(currentMonthProvider.notifier)
+        ..setYear(date.year)
+        ..setMonth(date.month);
+      ref.read(selectedDateProvider.notifier).select(date);
+      ref.read(navigationProvider.notifier).navigateTo(_calendarTab);
+      return;
+    }
+    final noteTitle = _currentNote?.title.trim() ?? '';
+    await showDialog(
+      context: context,
+      builder: (context) => EventDialog(
+        initialDate: date,
+        initialTitle: _eventTitleFrom(block, m),
+        initialContent: noteTitle.isEmpty ? null : '메모: $noteTitle',
+        initialTime: m.hasTime ? TimeOfDay.fromDateTime(m.date) : null,
+        initialAlarm: action == 'reminder',
+      ),
+    );
   }
 
   // ───────────── 버전 기록
@@ -699,6 +828,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
         onFind: _openFind,
         noteLinkSearch: _searchNoteLinks,
         onOpenNoteLink: _openNoteLink,
+        onDateTap: _onDateTap,
         padding: const EdgeInsets.fromLTRB(44, 0, 36, 0),
       );
     }
@@ -808,6 +938,15 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     });
 
     // 이미 열려 있는 메모의 체크리스트로 이동 (다른 메모면 _initEditor에서 처리)
+    // 이미 열려 있는 메모에 지도 장소 넣기 (다른 메모면 _initEditor에서 처리)
+    ref.listen(memoLocationRequestProvider, (_, next) {
+      if (next != null && next.noteId == _currentNote?.id) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _applyLocationRequest(),
+        );
+      }
+    });
+
     ref.listen(memoFocusRequestProvider, (_, next) {
       if (next != null && next.noteId == _currentNote?.id) {
         WidgetsBinding.instance.addPostFrameCallback(
@@ -1150,7 +1289,15 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
                       const SizedBox(width: 4),
                     ],
                     const Spacer(),
-                    // 글자 수·마지막 수정 (저장될 때마다 갱신)
+                    if (_currentNote?.id != null) ...[
+                      BacklinksButton(
+                        noteId: _currentNote!.id!,
+                        onOpen: (n) =>
+                            ref.read(selectedNoteProvider.notifier).select(n),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    // 글자 수 (저장될 때마다 갱신)
                     ValueListenableBuilder<_SaveStatus>(
                       valueListenable: _saveStatus,
                       builder: (context, _, _) => Text(
@@ -1211,4 +1358,21 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       ),
     );
   }
+}
+
+/// 아이콘 + 글자 메뉴 항목
+class _MenuRow extends StatelessWidget {
+  const _MenuRow(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, size: 18, color: Colors.grey[700]),
+      const SizedBox(width: 10),
+      Text(label, style: const TextStyle(fontSize: 13)),
+    ],
+  );
 }

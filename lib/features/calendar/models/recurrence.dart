@@ -28,7 +28,9 @@ List<Event> expandOccurrences(Event master, DateTime from, DateTime to) {
   final start = _parseDate(master.startDate ?? master.eventDate);
   if (rule == Recurrence.none) return [master];
 
-  final end = _parseDate(master.endDate ?? master.startDate ?? master.eventDate);
+  final end = _parseDate(
+    master.endDate ?? master.startDate ?? master.eventDate,
+  );
   final span = end.difference(start).inDays;
   final until = master.recurrenceUntil != null
       ? _parseDate(master.recurrenceUntil!)

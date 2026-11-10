@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -5,11 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/providers/navigation_provider.dart';
 import '../../calendar/providers/event_provider.dart';
+import '../../calendar/views/calendar_editor_view.dart';
+import '../../memo/providers/note_provider.dart';
 import '../providers/map_event_provider.dart';
 import '../providers/map_provider.dart';
 import '../data/map_repository.dart';
 import '../services/kakao_local_service.dart';
 import '../services/location_search_result.dart';
+import '../widgets/directions_button.dart';
 
 // 카테고리 정의
 class _MapCategory {
@@ -187,6 +191,137 @@ class _MapViewState extends ConsumerState<MapView> {
     ref.read(navigationProvider.notifier).navigateTo(_calendarTab);
   }
 
+  // ───────────── 장소 고르기 → 메모·일정
+
+  static const _memoTab = 0;
+
+  /// 지도 빈 곳을 누름: 그 자리를 고르고 주소를 찾아 채움
+  Future<void> _pickPoint(LatLng position) async {
+    final notifier = ref.read(selectedLocationProvider.notifier);
+    notifier.select(
+      SelectedLocation(name: '선택한 위치', position: position, fromMapTap: true),
+    );
+    // 지도 아이콘은 그림이라 직접 누를 수 없음 → 누른 곳 근처(화면에서 약 24px)의
+    // 장소를 찾아 그곳을 누른 것으로 봄
+    final camera = _mapController.camera;
+    final metersPerPixel =
+        156543.03 * cos(position.latitude * pi / 180) / pow(2, camera.zoom);
+    final radius = (metersPerPixel * 24).round().clamp(15, 300);
+    final service = KakaoLocalService();
+    try {
+      final (place, address) = await (
+        service
+            .nearestPlace(position.latitude, position.longitude, radius: radius)
+            .catchError((Object _) => null),
+        service
+            .coordToAddress(position.latitude, position.longitude)
+            .catchError((Object _) => null),
+      ).wait;
+      // 그사이 다른 곳을 골랐으면 버림
+      if (!mounted ||
+          ref.read(selectedLocationProvider)?.position != position) {
+        return;
+      }
+      if (place != null) {
+        // 그 장소 위치로 핀을 옮기고 지도를 맞춤.
+        // 같은 건물 안의 장소면 건물 이름(예: 서울특별시청)이 더 알맞음
+        final sameBuilding =
+            address != null &&
+            address.name != address.address &&
+            _withoutProvince(address.address) ==
+                _withoutProvince(place.address);
+        final target = LatLng(place.lat, place.lng);
+        notifier.select(
+          SelectedLocation(
+            name: sameBuilding ? address.name : place.name,
+            address: place.address,
+            position: target,
+            fromMapTap: true,
+          ),
+        );
+        _mapController.move(target, max(_mapController.camera.zoom, 17));
+        return;
+      }
+      if (address == null) return;
+      notifier.select(
+        SelectedLocation(
+          name: address.name,
+          address: address.address,
+          position: position,
+          fromMapTap: true,
+        ),
+      );
+    } catch (_) {
+      // 주소를 못 찾아도 좌표로 계속 쓸 수 있음
+    }
+  }
+
+  /// "서울특별시 중구 …"와 "서울 중구 …"를 같게 보려고 첫 단어(시·도)를 뺌
+  static String _withoutProvince(String address) =>
+      address.trim().split(RegExp(r'\s+')).skip(1).join(' ');
+
+  /// 메모에 추가: 지금 메모 또는 새 메모 (메모 탭으로 가서 끝에 위치 블록을 넣음)
+  Future<void> _addToMemo(SelectedLocation place, Offset position) async {
+    final current = ref.read(selectedNoteProvider);
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(position) & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        if (current?.id != null)
+          PopupMenuItem(
+            value: 'current',
+            height: 36,
+            child: Text(
+              '"${current!.title.trim().isEmpty ? '제목 없음' : current.title}" 메모에 추가',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        const PopupMenuItem(
+          value: 'new',
+          height: 36,
+          child: Text('새 메모로 만들기', style: TextStyle(fontSize: 13)),
+        ),
+      ],
+    );
+    if (!mounted || choice == null) return;
+    final int noteId;
+    if (choice == 'new') {
+      await ref.read(noteListProvider.notifier).createNote();
+      final created = ref.read(selectedNoteProvider);
+      if (!mounted || created?.id == null) return;
+      noteId = created!.id!;
+    } else {
+      noteId = current!.id!;
+    }
+    ref.read(memoLocationRequestProvider.notifier).request((
+      noteId: noteId,
+      name: place.name,
+      address: place.address,
+      lat: place.position.latitude,
+      lng: place.position.longitude,
+    ));
+    ref.read(navigationProvider.notifier).navigateTo(_memoTab);
+  }
+
+  Future<void> _addToCalendar(SelectedLocation place) async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    await showDialog(
+      context: context,
+      builder: (context) => EventDialog(
+        initialDate: today,
+        initialTitle: place.name,
+        initialLocationName: place.name,
+        initialLat: place.position.latitude,
+        initialLng: place.position.longitude,
+      ),
+    );
+  }
+
   String _eventTooltip(EventPlace place) {
     final lines = <String>[if (place.name != null) place.name!];
     for (final e in place.events.take(5)) {
@@ -207,13 +342,14 @@ class _MapViewState extends ConsumerState<MapView> {
     final eventPlaces = ref.watch(mapEventPlacesProvider).value ?? [];
     final placesAsync = ref.watch(mapPlaceProvider);
     final tagsAsync = ref.watch(mapTagProvider);
-    // final selectedLocation = ref.watch(selectedLocationProvider);
+    final selectedLocation = ref.watch(selectedLocationProvider);
     final categoryResults = ref.watch(nearbyRestaurantsProvider);
     final activeCategory = ref.watch(activeCategoryProvider);
     final searchResults = ref.watch(searchResultsProvider);
 
     ref.listen(selectedLocationProvider, (prev, next) {
-      if (next != null) {
+      // 지도를 직접 누른 곳이나 주소만 채워진 경우는 지도를 옮기지 않음
+      if (next != null && !next.fromMapTap && next.position != prev?.position) {
         _mapController.move(next.position, _maxZoom);
       }
     });
@@ -236,6 +372,8 @@ class _MapViewState extends ConsumerState<MapView> {
                 : _defaultZoom,
             minZoom: _minZoom,
             maxZoom: _maxZoom,
+            // 빈 곳을 누르면 그 자리를 골라 메모·일정에 넣을 수 있게
+            onTap: (_, point) => _pickPoint(point),
             cameraConstraint: CameraConstraint.containCenter(
               bounds: LatLngBounds(
                 const LatLng(35.75, 125.4), // 남서
@@ -319,6 +457,7 @@ class _MapViewState extends ConsumerState<MapView> {
                             .select(
                               SelectedLocation(
                                 name: place.name,
+                                address: place.address,
                                 position: LatLng(place.lat, place.lng),
                               ),
                             );
@@ -336,6 +475,7 @@ class _MapViewState extends ConsumerState<MapView> {
                               .select(
                                 SelectedLocation(
                                   name: place.name,
+                                  address: place.address,
                                   position: LatLng(place.lat, place.lng),
                                 ),
                               );
@@ -370,6 +510,7 @@ class _MapViewState extends ConsumerState<MapView> {
                             .select(
                               SelectedLocation(
                                 name: r.name,
+                                address: r.address,
                                 position: LatLng(r.lat, r.lng),
                               ),
                             );
@@ -384,6 +525,7 @@ class _MapViewState extends ConsumerState<MapView> {
                               .select(
                                 SelectedLocation(
                                   name: r.name,
+                                  address: r.address,
                                   position: LatLng(r.lat, r.lng),
                                 ),
                               );
@@ -411,6 +553,7 @@ class _MapViewState extends ConsumerState<MapView> {
                             .select(
                               SelectedLocation(
                                 name: r.name,
+                                address: r.address,
                                 position: LatLng(r.lat, r.lng),
                               ),
                             );
@@ -425,6 +568,7 @@ class _MapViewState extends ConsumerState<MapView> {
                               .select(
                                 SelectedLocation(
                                   name: r.name,
+                                  address: r.address,
                                   position: LatLng(r.lat, r.lng),
                                 ),
                               );
@@ -441,24 +585,43 @@ class _MapViewState extends ConsumerState<MapView> {
                 }).toList(),
               ),
 
-            // 선택된 위치 마커
-            // if (selectedLocation != null)
-            //   MarkerLayer(
-            //     markers: [
-            //       Marker(
-            //         point: selectedLocation.position,
-            //         width: 40,
-            //         height: 40,
-            //         child: const Icon(
-            //           Icons.location_pin,
-            //           color: Color(0xFFE53935),
-            //           size: 40,
-            //         ),
-            //       ),
-            //     ],
-            //   ),
+            // 지도를 눌러 고른 곳 (다른 마커가 없는 자리라 핀을 꽂음)
+            if (selectedLocation != null && selectedLocation.fromMapTap)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: selectedLocation.position,
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.topCenter, // 핀 끝이 그 자리에
+                    child: const Icon(
+                      Icons.location_pin,
+                      color: Color(0xFFE53935),
+                      size: 36,
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
+
+        // 고른 장소 카드: 메모에 추가 / 일정 만들기
+        if (selectedLocation != null)
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 20,
+            child: Center(
+              child: _PlaceCard(
+                place: selectedLocation,
+                onAddToMemo: (position) =>
+                    _addToMemo(selectedLocation, position),
+                onAddToCalendar: () => _addToCalendar(selectedLocation),
+                onClose: () =>
+                    ref.read(selectedLocationProvider.notifier).select(null),
+              ),
+            ),
+          ),
 
         // 좌상단 카테고리 버튼들
         Positioned(
@@ -638,6 +801,114 @@ class _HoverMarkerState extends State<_HoverMarker> {
             scale: scale,
             duration: const Duration(milliseconds: 150),
             child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 지도에서 고른 장소 정보와 메모·캘린더 연동 버튼
+class _PlaceCard extends StatelessWidget {
+  const _PlaceCard({
+    required this.place,
+    required this.onAddToMemo,
+    required this.onAddToCalendar,
+    required this.onClose,
+  });
+
+  final SelectedLocation place;
+
+  /// 누른 버튼 위치 (메뉴를 그 자리에 띄움)
+  final void Function(Offset position) onAddToMemo;
+  final VoidCallback onAddToCalendar;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = place.position;
+    final subtitle = place.address.isNotEmpty && place.address != place.name
+        ? place.address
+        : '${p.latitude.toStringAsFixed(5)}, ${p.longitude.toStringAsFixed(5)}';
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 460),
+      child: Material(
+        color: context.popupSurface,
+        elevation: 6,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.place, size: 20, color: context.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          place.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: '닫기',
+                    onPressed: onClose,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Builder(
+                    builder: (buttonContext) => TextButton.icon(
+                      icon: const Icon(Icons.note_add_outlined, size: 18),
+                      label: const Text('메모에 추가'),
+                      onPressed: () {
+                        final box =
+                            buttonContext.findRenderObject() as RenderBox;
+                        onAddToMemo(
+                          box.localToGlobal(box.size.bottomLeft(Offset.zero)),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton.icon(
+                    icon: const Icon(Icons.event_available_outlined, size: 18),
+                    label: const Text('일정 만들기'),
+                    onPressed: onAddToCalendar,
+                  ),
+                  const SizedBox(width: 4),
+                  DirectionsButton(
+                    name: place.name,
+                    lat: p.latitude,
+                    lng: p.longitude,
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),

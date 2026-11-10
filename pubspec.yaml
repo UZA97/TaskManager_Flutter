@@ -17,6 +17,8 @@ dependencies:
   # DB
   drift: ^2.20.0
   drift_flutter: ^0.2.8
+  # Drive에서 받은 DB 파일을 앱이 열기 전에 직접 고침
+  sqlite3: ^2.9.4
 
   window_manager: ^0.5.1
   pdf: ^3.11.0

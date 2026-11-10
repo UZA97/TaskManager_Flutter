@@ -65,6 +65,54 @@ class UpdateService {
     }
   }
 
+  static const _uninstallKey =
+      r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+      r'\{052817F2-E157-48D0-BF2A-AFBBC5A06B65}_is1';
+
+  /// 설치 폴더가 아닌 곳(예전에 복사해 둔 폴더, 바로가기가 가리키는 옛 폴더)의
+  /// 예전 exe로 실행됐고 설치 폴더에 더 새 버전이 있으면 그것을 실행함.
+  /// 바꿔 실행했으면 true (호출한 쪽은 바로 종료해야 함).
+  Future<bool> relaunchInstalledIfNewer() async {
+    if (!Platform.isWindows) return false;
+    final exeDir = p.dirname(Platform.resolvedExecutable);
+    if (exeDir.toLowerCase().contains(r'\build\windows\')) return false;
+    try {
+      String? location;
+      String? version;
+      for (final root in ['HKLM', 'HKCU']) {
+        final result = await Process.run('reg', [
+          'query',
+          '$root\\$_uninstallKey',
+        ]).timeout(const Duration(seconds: 5));
+        if (result.exitCode != 0) continue;
+        String? value(String name) => RegExp(
+          '^\\s*$name\\s+REG_SZ\\s+(.+?)\\s*\$',
+          multiLine: true,
+        ).firstMatch(result.stdout as String)?.group(1);
+        location = value('InstallLocation');
+        version = value('DisplayVersion');
+        if (location != null) break;
+      }
+      if (location == null || version == null) return false;
+      if (p.equals(p.normalize(location), p.normalize(exeDir))) return false;
+
+      final installedExe = File(
+        p.join(location, p.basename(Platform.resolvedExecutable)),
+      );
+      final current = (await PackageInfo.fromPlatform()).version;
+      if (!await installedExe.exists() || !_isNewer(version, current)) {
+        return false;
+      }
+      // --restart: 새 프로세스가 이 프로세스가 끝날 때까지 기다렸다 시작
+      await Process.start(installedExe.path, [
+        '--restart',
+      ], mode: ProcessStartMode.detached);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   bool _isNewer(String latest, String current) {
     try {
       final l = latest.split('.').map(int.parse).toList();

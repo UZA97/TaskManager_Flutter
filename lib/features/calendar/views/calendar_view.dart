@@ -6,6 +6,7 @@ import '../providers/google_calendar_provider.dart';
 import '../../../core/auth/google_account_provider.dart';
 import '../models/event_tag.dart';
 import 'calendar_editor_view.dart';
+import '../../map/widgets/directions_button.dart';
 
 class CalendarView extends ConsumerWidget {
   const CalendarView({super.key});
@@ -618,14 +619,24 @@ class _SelectedDateEventList extends ConsumerWidget {
                                           color: Colors.grey[400],
                                         ),
                                         const SizedBox(width: 2),
-                                        Text(
-                                          event.locationName!,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey[400],
+                                        Flexible(
+                                          child: Text(
+                                            event.locationName!,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey[400],
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          overflow: TextOverflow.ellipsis,
                                         ),
+                                        if (event.locationLat != null &&
+                                            event.locationLng != null)
+                                          DirectionsButton(
+                                            name: event.locationName!,
+                                            lat: event.locationLat!,
+                                            lng: event.locationLng!,
+                                            compact: true,
+                                          ),
                                       ],
                                     ),
                                   ],

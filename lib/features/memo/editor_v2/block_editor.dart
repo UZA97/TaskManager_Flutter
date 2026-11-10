@@ -13,6 +13,7 @@ import 'editor_block.dart';
 import 'embed_video_dialog.dart';
 import 'inline_image.dart';
 import 'link_preview.dart';
+import 'note_dates.dart';
 import 'object_blocks.dart';
 import 'table_block.dart';
 import 'todo_due.dart';
@@ -70,6 +71,7 @@ class BlockEditor extends StatefulWidget {
     this.onFind,
     this.noteLinkSearch,
     this.onOpenNoteLink,
+    this.onDateTap,
     this.padding = const EdgeInsets.symmetric(horizontal: 36),
   });
 
@@ -89,6 +91,10 @@ class BlockEditor extends StatefulWidget {
 
   /// 메모 링크(note://id)를 눌렀을 때
   final void Function(int noteId)? onOpenNoteLink;
+
+  /// 글 속의 날짜를 눌렀을 때 (일정 만들기 등). [position]은 화면 좌표.
+  final void Function(DateMention date, EditorBlock block, Offset position)?
+  onDateTap;
 
   final EdgeInsets padding;
 
@@ -1941,7 +1947,7 @@ class _BlockEditorState extends State<BlockEditor> {
   EditorBlock? _dragBase;
 
   /// 링크 위에서 누른 곳 (떼면 그 링크를 엶)
-  (String, Offset)? _linkDown;
+  (Object, Offset, EditorBlock)? _linkDown;
   int _dragBaseOffset = 0;
 
   RenderEditable? _renderEditableOf(EditorBlock block) {
@@ -1987,7 +1993,8 @@ class _BlockEditorState extends State<BlockEditor> {
   }
 
   /// 포인터 아래 글자의 링크 주소
-  String? _linkAt(EditorBlock block, Offset global) {
+  /// 누른 곳의 링크 주소(String) 또는 날짜(DateMention)
+  Object? _linkAt(EditorBlock block, Offset global) {
     final editable = _renderEditableOf(block);
     if (editable == null ||
         !(editable.localToGlobal(Offset.zero) & editable.size).contains(
@@ -2000,7 +2007,8 @@ class _BlockEditorState extends State<BlockEditor> {
     final index = position.affinity == TextAffinity.upstream
         ? position.offset - 1
         : position.offset;
-    return block.controller.linkAt(index);
+    return block.controller.linkAt(index) ??
+        (widget.onDateTap == null ? null : block.controller.dateAt(index));
   }
 
   void _onPointerDown(PointerDownEvent event) {
@@ -2016,7 +2024,7 @@ class _BlockEditorState extends State<BlockEditor> {
     _linkDown = null;
     final href = block == null ? null : _linkAt(block, event.position);
     if (href != null && !HardwareKeyboard.instance.isShiftPressed) {
-      _linkDown = (href, event.position);
+      _linkDown = (href, event.position, block!);
     }
     final active = _c.activeBlock;
     if (HardwareKeyboard.instance.isShiftPressed &&
@@ -2081,13 +2089,21 @@ class _BlockEditorState extends State<BlockEditor> {
   void _onPointerUp(PointerUpEvent event) {
     final link = _linkDown;
     _linkDown = null;
-    if (link != null) {
-      final noteId = noteIdOfLink(link.$1);
-      if (noteId == null) {
-        openLink(link.$1);
-      } else {
-        widget.onOpenNoteLink?.call(noteId);
-      }
+    switch (link) {
+      case (final DateMention date, final position, final block):
+        // 커서가 먼저 자리 잡은 뒤에 메뉴를 띄움
+        final onDateTap = widget.onDateTap;
+        if (onDateTap != null) {
+          scheduleMicrotask(() => onDateTap(date, block, position));
+        }
+      case (final String href, _, _):
+        final noteId = noteIdOfLink(href);
+        if (noteId == null) {
+          openLink(href);
+        } else {
+          widget.onOpenNoteLink?.call(noteId);
+        }
+      case _:
     }
     _dragBase = null;
     if (_c.selection != null) scheduleMicrotask(_c.applySelectionHighlights);

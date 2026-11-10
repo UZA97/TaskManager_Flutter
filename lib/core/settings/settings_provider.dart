@@ -34,6 +34,7 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
       startScreen: (int.tryParse(map['start_screen'] ?? '') ?? 0).clamp(0, 3),
       briefingAutoShow: map['briefing_auto_show'] != 'false',
       trashRetentionDays: int.tryParse(map['trash_retention_days'] ?? '') ?? 30,
+      quickMemoHotKey: map['quick_memo_hotkey'] ?? 'control,alt|M',
     );
   }
 
@@ -148,6 +149,12 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<void> setTrashRetentionDays(int days) async {
     await _put('trash_retention_days', '$days');
     state = AsyncData(state.requireValue.copyWith(trashRetentionDays: days));
+  }
+
+  // 빠른 메모 단축키 (QuickMemoShortcut.spec, 'off'면 사용 안 함)
+  Future<void> setQuickMemoHotKey(String spec) async {
+    await _put('quick_memo_hotkey', spec);
+    state = AsyncData(state.requireValue.copyWith(quickMemoHotKey: spec));
   }
 
   Future<void> setTrayMode(bool enabled) async {

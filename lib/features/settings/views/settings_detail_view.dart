@@ -16,6 +16,7 @@ import '../../memo/providers/note_provider.dart';
 import '../../memo/services/note_import_export_service.dart';
 import '../../../core/database/database_provider.dart';
 import '../views/google_drive_sync_service.dart';
+import '../widgets/quick_memo_hotkey_row.dart';
 
 class SettingsDetailView extends ConsumerWidget {
   const SettingsDetailView({super.key});
@@ -254,6 +255,7 @@ class _GeneralSettings extends ConsumerWidget {
             ),
           ),
           const _AutostartRow(),
+          const QuickMemoHotKeyRow(),
           _SettingsRow(
             title: '오늘의 브리핑 자동 표시',
             subtitle: '하루 처음 실행할 때 브리핑 띄우기',

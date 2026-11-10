@@ -3,7 +3,9 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
 import 'inline_image.dart';
+import 'note_dates.dart';
 
 /// 글자 하나의 서식 (appflowy delta의 attributes와 같은 키: bold, italic, font_color ...)
 typedef Marks = Map<String, Object?>;
@@ -283,6 +285,36 @@ class StyledTextController extends TextEditingController {
     return _marks[offset]['href'] as String?;
   }
 
+  // ───────────── 글 속의 날짜 (저장되지 않음, 글자가 바뀔 때만 다시 찾음)
+
+  String? _datesText;
+  int _datesRevision = -1;
+  List<DateMention> _dates = const [];
+
+  /// 링크·코드가 아닌 곳의 날짜들
+  List<DateMention> get dateMentions {
+    if (_datesText != text || _datesRevision != _marksRevision) {
+      _datesText = text;
+      _datesRevision = _marksRevision;
+      _dates = findDateMentions(text)
+          .where(
+            (m) => !_marks
+                .sublist(m.start, m.end)
+                .any((k) => k['href'] != null || k['code'] == true),
+          )
+          .toList();
+    }
+    return _dates;
+  }
+
+  /// [offset] 글자가 속한 날짜
+  DateMention? dateAt(int offset) {
+    for (final m in dateMentions) {
+      if (offset >= m.start && offset < m.end) return m;
+    }
+    return null;
+  }
+
   // ───────────── 여러 줄 선택 표시 (포커스가 없는 줄은 입력창이 선택을 그리지 않음)
 
   TextRange? _selectionHighlight;
@@ -326,6 +358,17 @@ class StyledTextController extends TextEditingController {
     bool inComposing(int i) => i >= composing.start && i < composing.end;
     final overlays = _overlayColors();
     Color? overlayAt(int i) => overlays?[i];
+    // 날짜는 점선 밑줄 (누르면 일정 만들기 메뉴)
+    final dates = dateMentions;
+    List<bool>? dateFlags;
+    if (dates.isNotEmpty) {
+      dateFlags = List.filled(text.length, false);
+      for (final m in dates) {
+        dateFlags.fillRange(m.start, min(m.end, text.length), true);
+      }
+    }
+    bool inDate(int i) => dateFlags?[i] ?? false;
+    final dateColor = context.accent;
 
     final children = <InlineSpan>[];
     var i = 0;
@@ -340,7 +383,8 @@ class StyledTextController extends TextEditingController {
           !_isObjectAt(j) &&
           mapEquals(_marks[j], _marks[i]) &&
           inComposing(j) == inComposing(i) &&
-          overlayAt(j) == overlayAt(i)) {
+          overlayAt(j) == overlayAt(i) &&
+          inDate(j) == inDate(i)) {
         j++;
       }
       var spanStyle = _styleFor(_marks[i], inComposing(i));
@@ -348,12 +392,23 @@ class StyledTextController extends TextEditingController {
       if (overlay != null) {
         spanStyle = spanStyle.copyWith(backgroundColor: overlay);
       }
+      final isDate = inDate(i);
+      if (isDate) {
+        spanStyle = spanStyle.copyWith(
+          decoration: TextDecoration.combine([
+            ?spanStyle.decoration,
+            TextDecoration.underline,
+          ]),
+          decorationStyle: TextDecorationStyle.dotted,
+          decorationColor: dateColor,
+        );
+      }
       children.add(
         TextSpan(
           text: text.substring(i, j),
           style: spanStyle,
-          // 링크 위에서는 손가락 모양 (누르면 열림)
-          mouseCursor: _marks[i]['href'] != null
+          // 링크·날짜 위에서는 손가락 모양 (누르면 열림)
+          mouseCursor: _marks[i]['href'] != null || isDate
               ? SystemMouseCursors.click
               : MouseCursor.defer,
         ),

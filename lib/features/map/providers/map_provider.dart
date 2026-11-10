@@ -6,7 +6,19 @@ import '../services/location_search_result.dart';
 class SelectedLocation {
   final String name;
   final LatLng position;
-  const SelectedLocation({required this.name, required this.position});
+
+  /// 모르면 빈 문자열
+  final String address;
+
+  /// 지도를 직접 눌러 고른 곳 (지도를 옮기지 않음, 주소는 나중에 채움)
+  final bool fromMapTap;
+
+  const SelectedLocation({
+    required this.name,
+    required this.position,
+    this.address = '',
+    this.fromMapTap = false,
+  });
 }
 
 class SelectedLocationNotifier extends Notifier<SelectedLocation?> {

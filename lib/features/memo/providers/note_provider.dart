@@ -43,6 +43,27 @@ final memoFocusRequestProvider =
       MemoFocusRequestNotifier.new,
     );
 
+/// 지도에서 고른 장소를 메모에 넣어 달라는 요청 (메모 에디터가 열리면 처리)
+typedef MemoLocationRequest = ({
+  int noteId,
+  String name,
+  String address,
+  double lat,
+  double lng,
+});
+
+class MemoLocationRequestNotifier extends Notifier<MemoLocationRequest?> {
+  @override
+  MemoLocationRequest? build() => null;
+
+  void request(MemoLocationRequest? value) => state = value;
+}
+
+final memoLocationRequestProvider =
+    NotifierProvider<MemoLocationRequestNotifier, MemoLocationRequest?>(
+      MemoLocationRequestNotifier.new,
+    );
+
 // 메모 목록 상태
 class NoteListNotifier extends AsyncNotifier<List<Note>> {
   @override

@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/providers/navigation_provider.dart';
 import '../../map/providers/map_provider.dart';
 import '../../map/services/vworld_service.dart';
+import '../../map/widgets/directions_button.dart';
 import 'editor_block.dart';
 
 // 기존 에디터의 이미지·파일·위치·코드 블록과 같은 모양.
@@ -125,6 +126,13 @@ class LocationBlockView extends ConsumerWidget {
                       color: context.accent,
                       decoration: TextDecoration.underline,
                     ),
+                  ),
+                  const SizedBox(width: 2),
+                  DirectionsButton(
+                    name: name,
+                    lat: lat,
+                    lng: lng,
+                    compact: true,
                   ),
                 ],
               ),

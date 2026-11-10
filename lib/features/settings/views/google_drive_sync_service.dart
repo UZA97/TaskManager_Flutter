@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 import '../../../core/database/database.dart';
 import '../../../core/sync/sync_meta.dart';
@@ -18,6 +19,17 @@ class GoogleDriveSyncService {
   static const _metaFileName = 'sync_meta.json';
   static const _appDataFolder = 'appDataFolder';
   static const _hashCacheFileName = 'sync_hash_cache.json';
+
+  /// 기기마다 다른 설정. 다운로드로 DB를 바꿔도 이 PC의 값을 유지함
+  /// (다른 PC의 구글 토큰·메일 계정·기기 id가 덮어쓰지 않도록).
+  static const _deviceLocalKeys = [
+    'google_access_token',
+    'google_refresh_token',
+    'google_email',
+    'mail_account',
+    'sync_device_id',
+    'quick_memo_hotkey', // 다른 프로그램과 겹치는지는 PC마다 다름
+  ];
 
   final String accessToken;
 
@@ -495,6 +507,13 @@ class GoogleDriveSyncService {
       hasBackup = true;
     }
 
+    final deviceSettings = {
+      for (final row in await (db.select(
+        db.settingTable,
+      )..where((t) => t.key.isIn(_deviceLocalKeys))).get())
+        row.key: row.value,
+    };
+
     await db.close();
     // 여기부터는 DB가 닫혔으므로 무슨 일이 있어도 재시작
     try {
@@ -507,6 +526,13 @@ class GoogleDriveSyncService {
           await _replaceDbFile(dbFile, await backupFile.readAsBytes());
         }
         rethrow;
+      }
+
+      try {
+        _restoreDeviceSettings(dbFile, deviceSettings);
+      } catch (e) {
+        // 실패하면 다른 PC의 로그인 정보가 남음 (다시 로그인하면 됨)
+        debugPrint('기기 설정 복원 실패: $e');
       }
 
       try {
@@ -525,6 +551,32 @@ class GoogleDriveSyncService {
       await Future.delayed(const Duration(seconds: 2));
     } finally {
       await _restartApp();
+    }
+  }
+
+  /// 받은 DB에 이 PC의 기기별 설정을 되돌려 넣음 (이 PC에 없던 값은 지움)
+  static void _restoreDeviceSettings(File dbFile, Map<String, String> values) {
+    final raw = sqlite.sqlite3.open(dbFile.path);
+    try {
+      raw.execute('BEGIN');
+      raw.execute(
+        'DELETE FROM settings WHERE key IN '
+        '(${List.filled(_deviceLocalKeys.length, '?').join(', ')})',
+        _deviceLocalKeys,
+      );
+      final insert = raw.prepare(
+        'INSERT INTO settings (key, value) VALUES (?, ?)',
+      );
+      for (final entry in values.entries) {
+        insert.execute([entry.key, entry.value]);
+      }
+      insert.dispose();
+      raw.execute('COMMIT');
+    } catch (_) {
+      if (!raw.autocommit) raw.execute('ROLLBACK');
+      rethrow;
+    } finally {
+      raw.dispose();
     }
   }
 

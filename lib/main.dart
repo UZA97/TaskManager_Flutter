@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'core/config/app_config.dart';
 import 'package:flutter/services.dart';
 import 'core/auth/google_account_provider.dart';
@@ -11,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
+import 'core/hotkey/quick_memo_hotkey.dart';
 import 'core/notification/notification_service.dart';
 import 'core/tray/tray_service.dart';
 import 'core/settings/settings_provider.dart';
@@ -41,6 +43,9 @@ import 'features/briefing/briefing_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 옛 폴더의 예전 exe로 켜졌으면 설치된 새 버전으로 바꿔 실행
+  // (바로가기가 옛 폴더를 가리켜 업데이트해도 예전 버전이 뜨는 문제)
+  if (await UpdateService().relaunchInstalledIfNewer()) exit(0);
   // 구글 OAuth·Gemini 키 (config/*.json 에셋)
   await AppConfig.load();
 
@@ -232,24 +237,14 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     setState(() => _isLocked = true);
   }
 
-  /// 어디서든 Ctrl+Alt+M: 빠른 메모 창 (트레이에 있었으면 저장 후 다시 트레이로)
-  static final _quickMemoHotKey = HotKey(
-    key: PhysicalKeyboardKey.keyM,
-    modifiers: [HotKeyModifier.control, HotKeyModifier.alt],
-    scope: HotKeyScope.system,
-  );
+  /// 어디서든 빠른 메모 단축키(기본 Ctrl+Alt+M, 설정에서 변경):
+  /// 빠른 메모 창 (트레이에 있었으면 저장 후 다시 트레이로)
   bool _quickMemoOpen = false;
 
-  Future<void> _registerQuickMemoHotKey() async {
-    try {
-      await hotKeyManager.register(
-        _quickMemoHotKey,
-        keyDownHandler: (_) => _openQuickMemo(),
+  Future<void> _applyQuickMemoHotKey(String? spec) =>
+      QuickMemoHotKeyService.instance.apply(
+        QuickMemoShortcut.parse(spec ?? QuickMemoShortcut.defaultSpec),
       );
-    } catch (e) {
-      print('빠른 메모 단축키 등록 실패: $e');
-    }
-  }
 
   Future<void> _openQuickMemo() async {
     if (_quickMemoOpen || !mounted) return;
@@ -285,7 +280,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     super.initState();
     windowManager.addListener(this);
     _initTray();
-    _registerQuickMemoHotKey();
+    QuickMemoHotKeyService.instance.onPressed = _openQuickMemo;
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -302,6 +297,14 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
         print('설정 읽기 실패: $e');
       }
       if (!mounted) return;
+      _applyQuickMemoHotKey(settings?.quickMemoHotKey);
+      // 설정에서 단축키를 바꾸면 바로 다시 등록
+      ref.listenManual(
+        settingsProvider.select((s) => s.value?.quickMemoHotKey),
+        (prev, next) {
+          if (next != null && next != prev) _applyQuickMemoHotKey(next);
+        },
+      );
       // 설정한 시작 화면으로
       final startScreen = settings?.startScreen ?? 0;
       if (startScreen != 0) {
@@ -550,7 +553,9 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
-    hotKeyManager.unregister(_quickMemoHotKey);
+    QuickMemoHotKeyService.instance
+      ..onPressed = null
+      ..apply(null);
     _alarmTimer?.cancel();
     windowManager.removeListener(this);
     _focusModeTimer?.cancel();

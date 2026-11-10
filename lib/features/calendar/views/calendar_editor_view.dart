@@ -415,7 +415,29 @@ class EventDialog extends ConsumerStatefulWidget {
   final DateTime initialDate;
   final Event? event;
 
-  const EventDialog({required this.initialDate, this.event});
+  /// 새 일정의 미리 채울 값 (메모의 날짜에서 만들 때)
+  final String? initialTitle;
+  final String? initialContent;
+  final TimeOfDay? initialTime;
+  final bool initialAlarm;
+
+  /// 지도에서 만들 때의 장소
+  final String? initialLocationName;
+  final double? initialLat;
+  final double? initialLng;
+
+  const EventDialog({
+    this.initialLocationName,
+    this.initialLat,
+    this.initialLng,
+    super.key,
+    required this.initialDate,
+    this.event,
+    this.initialTitle,
+    this.initialContent,
+    this.initialTime,
+    this.initialAlarm = false,
+  });
 
   @override
   ConsumerState<EventDialog> createState() => _EventDialogState();
@@ -481,6 +503,21 @@ class _EventDialogState extends ConsumerState<EventDialog> {
     } else {
       _startDate = widget.initialDate;
       _endDate = widget.initialDate;
+      _titleController.text = widget.initialTitle ?? '';
+      _contentController.text = widget.initialContent ?? '';
+      final time = widget.initialTime;
+      if (time != null) {
+        _isAllDay = false;
+        _startTime = time;
+        // 기본 1시간 (자정을 넘기지 않게)
+        _endTime = time.hour >= 23
+            ? const TimeOfDay(hour: 23, minute: 59)
+            : TimeOfDay(hour: time.hour + 1, minute: time.minute);
+      }
+      if (widget.initialAlarm) _alarmMinutesBefore = 30;
+      _locationController.text = widget.initialLocationName ?? '';
+      _locationLat = widget.initialLat;
+      _locationLng = widget.initialLng;
     }
 
     // 태그 로드

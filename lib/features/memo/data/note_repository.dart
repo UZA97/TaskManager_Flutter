@@ -65,6 +65,22 @@ class NoteRepository {
     return _withTags(rows);
   }
 
+  /// 본문에 이 메모 링크(href "note://id")가 있는 메모들 (휴지통·자기 자신 제외, 최근 수정 순)
+  Future<List<Note>> getBacklinks(int id) async {
+    final rows =
+        await (_db.select(_db.noteTable)
+              ..where(
+                (t) =>
+                    t.deletedAt.isNull() &
+                    t.id.equals(id).not() &
+                    // 닫는 따옴표까지 넣어 note://12가 note://123에 걸리지 않게
+                    t.content.like('%"note://$id"%'),
+              )
+              ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+            .get();
+    return _withTags(rows);
+  }
+
   /// id로 메모 조회 (검색 필터와 무관, 휴지통 메모 제외)
   Future<Note?> getNoteById(int id) async {
     final row = await (_db.select(
