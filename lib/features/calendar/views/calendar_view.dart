@@ -13,12 +13,52 @@ class CalendarView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final isGoogleLinked = ref.watch(
+      googleAccountProvider.select((a) => a.valueOrNull != null),
+    );
     return Column(
       children: [
+        // 상단: 제목과 구글 캘린더 동기화 버튼
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 6),
+          child: SizedBox(
+            height: 30,
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '캘린더',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if (isGoogleLinked)
+                  IconButton(
+                    tooltip: '구글 캘린더 동기화',
+                    onPressed: () =>
+                        ref.read(eventListProvider.notifier).syncNow(),
+                    icon: const Icon(Icons.sync, size: 17),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 30,
+                      height: 30,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: scheme.surfaceContainerHigh,
+                      foregroundColor: scheme.onSurface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
         _MiniCalendar(),
-        const Divider(height: 1),
+        Divider(height: 1, color: context.lineSubtle),
         _TagFilterSection(),
-        const Divider(height: 1),
+        Divider(height: 1, color: context.lineSubtle),
         Expanded(child: _SelectedDateEventList()),
       ],
     );
@@ -31,9 +71,7 @@ class _MiniCalendar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentMonth = ref.watch(currentMonthProvider);
     final eventsAsync = ref.watch(eventListProvider);
-    final isGoogleLinked = ref.watch(
-      googleAccountProvider.select((a) => a.valueOrNull != null),
-    );
+    final scheme = Theme.of(context).colorScheme;
     final selectedDate = ref.watch(selectedDateProvider);
     final eventDates = <String>{};
     for (final event in eventsAsync.value ?? []) {
@@ -51,55 +89,57 @@ class _MiniCalendar extends ConsumerWidget {
       }
     }
 
+    // 월 이동 버튼 (작은 둥근 사각형)
+    Widget navButton(IconData icon, String tooltip, VoidCallback onPressed) =>
+        IconButton(
+          tooltip: tooltip,
+          icon: Icon(icon, size: 18),
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+          style: IconButton.styleFrom(
+            foregroundColor: scheme.onSurfaceVariant,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+
     return Padding(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       child: Column(
         children: [
           // 월 네비게이션
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left, size: 18),
-                onPressed: () =>
-                    ref.read(currentMonthProvider.notifier).prevMonth(),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              navButton(
+                Icons.chevron_left,
+                '이전 달',
+                () => ref.read(currentMonthProvider.notifier).prevMonth(),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 연도 클릭 시 팝업
-                  GestureDetector(
-                    onTap: () => _showYearPicker(context, ref, currentMonth),
-                    child: Text(
-                      '${currentMonth.year}년 ${currentMonth.month}월',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
+              // 연도 클릭 시 팝업
+              InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: () => _showYearPicker(context, ref, currentMonth),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  child: Text(
+                    '${currentMonth.year}년 ${currentMonth.month}월',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  // 구글 캘린더 수동 동기화
-                  if (isGoogleLinked) ...[
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.sync, size: 14),
-                      tooltip: '구글 캘린더 동기화',
-                      onPressed: () =>
-                          ref.read(eventListProvider.notifier).syncNow(),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ],
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right, size: 18),
-                onPressed: () =>
-                    ref.read(currentMonthProvider.notifier).nextMonth(),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              navButton(
+                Icons.chevron_right,
+                '다음 달',
+                () => ref.read(currentMonthProvider.notifier).nextMonth(),
               ),
             ],
           ),
@@ -120,7 +160,7 @@ class _MiniCalendar extends ConsumerWidget {
                               ? Colors.red
                               : e.key == 6
                               ? Colors.blue
-                              : Colors.grey,
+                              : scheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -156,6 +196,7 @@ class _MiniCalendar extends ConsumerWidget {
       0,
     ).day;
     final startWeekday = firstDay.weekday % 7;
+    final onAccent = Theme.of(context).colorScheme.onPrimary;
 
     final cells = <Widget>[];
     for (int i = 0; i < startWeekday; i++) {
@@ -188,7 +229,7 @@ class _MiniCalendar extends ConsumerWidget {
                   : isToday
                   ? context.accent.withValues(alpha: 0.18)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -198,7 +239,7 @@ class _MiniCalendar extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 11,
                     color: isSelected
-                        ? Colors.white
+                        ? onAccent
                         : weekday == 0
                         ? Colors.red
                         : weekday == 6
@@ -211,7 +252,7 @@ class _MiniCalendar extends ConsumerWidget {
                     width: 3,
                     height: 3,
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : context.accent,
+                      color: isSelected ? onAccent : context.accent,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -265,7 +306,9 @@ class _MiniCalendar extends ConsumerWidget {
                       '$year',
                       style: TextStyle(
                         fontSize: 13,
-                        color: isSelected ? Colors.white : null,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : null,
                         fontWeight: isSelected ? FontWeight.bold : null,
                       ),
                     ),
@@ -286,40 +329,38 @@ class _TagFilterSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tagsAsync = ref.watch(eventTagProvider);
     final tagFilter = ref.watch(tagFilterProvider);
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Padding(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text(
-                '태그 필터',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
+              Text('태그 필터', style: TextStyle(fontSize: 11, color: muted)),
               const Spacer(),
-              GestureDetector(
-                onTap: () => _showAddTagDialog(context, ref),
-                child: const Icon(Icons.add, size: 16, color: Colors.grey),
-              ),
               if (tagFilter.isNotEmpty) ...[
-                const SizedBox(width: 4),
                 GestureDetector(
-                  onTap: () {
-                    print('현재 필터: ${ref.read(tagFilterProvider)}');
-                    ref.read(tagFilterProvider.notifier).clear();
-                  },
+                  onTap: () => ref.read(tagFilterProvider.notifier).clear(),
                   child: Text(
                     '초기화',
-                    style: TextStyle(fontSize: 10, color: context.accent),
+                    style: TextStyle(fontSize: 11, color: context.accent),
                   ),
                 ),
+                const SizedBox(width: 6),
               ],
+              Tooltip(
+                message: '태그 추가',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () => _showAddTagDialog(context, ref),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Icon(Icons.add, size: 16, color: muted),
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -327,10 +368,7 @@ class _TagFilterSection extends ConsumerWidget {
             loading: () => const SizedBox(),
             error: (e, _) => const SizedBox(),
             data: (tags) => tags.isEmpty
-                ? const Text(
-                    '태그 없음',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  )
+                ? Text('태그 없음', style: TextStyle(fontSize: 11, color: muted))
                 : Wrap(
                     spacing: 4,
                     runSpacing: 4,
@@ -349,18 +387,17 @@ class _TagFilterSection extends ConsumerWidget {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: isSelected ? color : color.withOpacity(0.15),
+                            color: isSelected
+                                ? color
+                                : color.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: color,
-                              width: isSelected ? 0 : 1,
-                            ),
                           ),
                           child: Text(
                             tag.name,
                             style: TextStyle(
                               fontSize: 11,
                               color: isSelected ? Colors.white : color,
+                              fontWeight: isSelected ? FontWeight.w600 : null,
                             ),
                           ),
                         ),
@@ -422,7 +459,10 @@ class _TagFilterSection extends ConsumerWidget {
                         color: color,
                         shape: BoxShape.circle,
                         border: isSelected
-                            ? Border.all(color: Colors.black, width: 2)
+                            ? Border.all(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                width: 2,
+                              )
                             : null,
                       ),
                     ),
@@ -486,30 +526,25 @@ class _SelectedDateEventList extends ConsumerWidget {
     final selectedEvents = ref.watch(selectedDateEventsProvider);
     final dateStr =
         '${selectedDate.year}년 ${selectedDate.month}월 ${selectedDate.day}일';
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          child: Text(
-            dateStr,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+          child: Text(dateStr, style: TextStyle(fontSize: 11, color: muted)),
         ),
         Expanded(
           child: selectedEvents.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     '일정 없음',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                    style: TextStyle(color: muted, fontSize: 12),
                   ),
                 )
               : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 12),
                   itemCount: selectedEvents.length,
                   itemBuilder: (context, index) {
                     final event = selectedEvents[index];
@@ -531,15 +566,15 @@ class _SelectedDateEventList extends ConsumerWidget {
                       ),
                       child: Container(
                         margin: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
+                          horizontal: 6,
+                          vertical: 2,
                         ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: tagColor.withOpacity(0.08),
+                          color: tagColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border(
                             left: BorderSide(color: tagColor, width: 3),
@@ -593,9 +628,7 @@ class _SelectedDateEventList extends ConsumerWidget {
                                       decoration: event.isCompleted
                                           ? TextDecoration.lineThrough
                                           : null,
-                                      color: event.isCompleted
-                                          ? Colors.grey
-                                          : null,
+                                      color: event.isCompleted ? muted : null,
                                     ),
                                   ),
                                   if (!event.isAllDay &&
@@ -605,7 +638,7 @@ class _SelectedDateEventList extends ConsumerWidget {
                                       '${event.startTime} ${event.endTime != null ? '~ ${event.endTime}' : ''}',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: tagColor.withOpacity(0.8),
+                                        color: tagColor.withValues(alpha: 0.8),
                                       ),
                                     ),
                                   ],
@@ -616,7 +649,7 @@ class _SelectedDateEventList extends ConsumerWidget {
                                         Icon(
                                           Icons.location_on,
                                           size: 11,
-                                          color: Colors.grey[400],
+                                          color: muted,
                                         ),
                                         const SizedBox(width: 2),
                                         Flexible(
@@ -624,7 +657,7 @@ class _SelectedDateEventList extends ConsumerWidget {
                                             event.locationName!,
                                             style: TextStyle(
                                               fontSize: 11,
-                                              color: Colors.grey[400],
+                                              color: muted,
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -648,11 +681,7 @@ class _SelectedDateEventList extends ConsumerWidget {
                               onTap: () => ref
                                   .read(eventListProvider.notifier)
                                   .deleteEvent(event.id!),
-                              child: Icon(
-                                Icons.close,
-                                size: 14,
-                                color: Colors.grey[400],
-                              ),
+                              child: Icon(Icons.close, size: 14, color: muted),
                             ),
                           ],
                         ),

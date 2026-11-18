@@ -402,6 +402,7 @@ class _TodoRowState extends ConsumerState<_TodoRow> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
+                    flex: 3,
                     child: Text(
                       todo.text,
                       maxLines: 2,
@@ -423,14 +424,18 @@ class _TodoRowState extends ConsumerState<_TodoRow> {
                   ],
                   if (widget.showNote) ...[
                     const SizedBox(width: 6),
-                    Tooltip(
-                      message: '메모 열기',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => openNoteFromTodo(ref, todo.note),
-                        child: _Chip(
-                          icon: Icons.description_outlined,
-                          label: _noteTitle(todo.note),
+                    // 좁은 창에서는 메모 제목 칩이 줄어듦
+                    Flexible(
+                      flex: 2,
+                      child: Tooltip(
+                        message: '메모 열기',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => openNoteFromTodo(ref, todo.note),
+                          child: _Chip(
+                            icon: Icons.description_outlined,
+                            label: _noteTitle(todo.note),
+                          ),
                         ),
                       ),
                     ),

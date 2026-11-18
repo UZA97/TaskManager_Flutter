@@ -299,7 +299,6 @@ class MemoEditorColorDropdown extends StatelessWidget {
           if (renderBox == null) return;
 
           final offset = renderBox.localToGlobal(Offset.zero);
-          print(offset);
           final selected = await showMenu<Color>(
             context: context,
             position: RelativeRect.fromLTRB(

@@ -1254,7 +1254,14 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
                   Text('저장 중', style: TextStyle(fontSize: 12, color: muted)),
                 ],
                 _SaveStatus.saved => [
-                  const Icon(Icons.check, size: 14, color: Color(0xFF6FCF97)),
+                  Icon(
+                    Icons.check,
+                    size: 14,
+                    // 밝은 배경에서는 진한 초록
+                    color: context.isDark
+                        ? const Color(0xFF6FCF97)
+                        : const Color(0xFF2E9D5B),
+                  ),
                   const SizedBox(width: 4),
                   Text('저장됨', style: TextStyle(fontSize: 12, color: muted)),
                 ],

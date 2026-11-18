@@ -94,29 +94,47 @@ class _MailListViewState extends ConsumerState<MailListView> {
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ),
-        IconButton(
+        _headerButton(
           icon: _isDeleting
               ? const SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.delete_outline, size: 18),
+              : const Icon(Icons.delete_outline, size: 17),
           tooltip: '삭제',
-          color: Colors.red,
+          foreground: Colors.red,
           onPressed: _checked.isEmpty || _isDeleting ? null : _deleteChecked,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
         ),
-        const SizedBox(width: 12),
-        IconButton(
-          icon: const Icon(Icons.close, size: 18),
+        const SizedBox(width: 6),
+        _headerButton(
+          icon: const Icon(Icons.close, size: 17),
           tooltip: '선택 취소',
           onPressed: _isDeleting ? null : _exitSelectMode,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
         ),
       ],
+    );
+  }
+
+  /// 헤더의 작은 둥근 사각형 버튼 (메모 목록 상단과 같은 모양)
+  Widget _headerButton({
+    required Widget icon,
+    required String tooltip,
+    required VoidCallback? onPressed,
+    Color? foreground,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: icon,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      style: IconButton.styleFrom(
+        backgroundColor: scheme.surfaceContainerHigh,
+        foregroundColor: foreground ?? scheme.onSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 
@@ -201,59 +219,82 @@ class _MailListViewState extends ConsumerState<MailListView> {
   }
 
   Widget _buildNotLoggedIn() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.mail_outline, size: 48, color: Colors.grey[300]),
-            const SizedBox(height: 12),
-            const Text(
-              '메일 서비스를 이용하려면\n로그인이 필요합니다',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () => showMailLoginDialog(context),
-              icon: const Icon(Icons.login, size: 18),
-              label: const Text('로그인'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(14, 16, 14, 12),
+          child: Text(
+            '메일',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.mail_outline,
+                    size: 48,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '메일 서비스를 이용하려면\n로그인이 필요합니다',
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () => showMailLoginDialog(context),
+                    icon: const Icon(Icons.login, size: 18),
+                    label: const Text('로그인'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: context.accent,
+                      foregroundColor: scheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildMailList() {
     final messagesAsync = ref.watch(mailMessagesProvider);
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Column(
       children: [
-        // 헤더
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: context.line)),
-          ),
+        // 헤더: 제목과 모두 읽음·선택 삭제·새로고침 버튼
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
           child: _selectMode
               ? _buildSelectHeader(messagesAsync.value ?? const [])
               : Row(
                   children: [
                     const Text(
-                      '받은편지함',
+                      '메일',
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -265,10 +306,7 @@ class _MailListViewState extends ConsumerState<MailListView> {
                           if (account == null) return const SizedBox();
                           return Text(
                             account.email,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 11, color: muted),
                             overflow: TextOverflow.ellipsis,
                           );
                         },
@@ -283,38 +321,39 @@ class _MailListViewState extends ConsumerState<MailListView> {
                     //   constraints: const BoxConstraints(),
                     // ),
                     // const SizedBox(width: 8),
-                    IconButton(
+                    _headerButton(
                       icon: _isMarkingAllRead
                           ? const SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.done_all, size: 18),
+                          : const Icon(Icons.done_all, size: 17),
                       tooltip: '모두 읽음',
                       onPressed: _isMarkingAllRead ? null : _markAllAsRead,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
-                    const SizedBox(width: 12),
-                    IconButton(
-                      icon: const Icon(Icons.checklist, size: 18),
+                    const SizedBox(width: 6),
+                    _headerButton(
+                      icon: const Icon(Icons.checklist, size: 17),
                       tooltip: '선택해서 삭제',
                       onPressed: () => setState(() => _selectMode = true),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
-                    const SizedBox(width: 12),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, size: 18),
+                    const SizedBox(width: 6),
+                    _headerButton(
+                      icon: const Icon(Icons.refresh, size: 17),
                       tooltip: '새로고침',
                       onPressed: () =>
                           ref.read(mailMessagesProvider.notifier).refresh(),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('받은편지함', style: TextStyle(fontSize: 11, color: muted)),
+          ),
         ),
 
         // 목록
@@ -322,19 +361,17 @@ class _MailListViewState extends ConsumerState<MailListView> {
           child: messagesAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
-              child: Text(
-                '$e',
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
+              child: Text('$e', style: TextStyle(color: muted, fontSize: 12)),
             ),
             data: (messages) {
               if (messages.isEmpty) {
-                return const Center(
-                  child: Text('메일이 없어요', style: TextStyle(color: Colors.grey)),
+                return Center(
+                  child: Text('메일이 없어요', style: TextStyle(color: muted)),
                 );
               }
               return ListView.builder(
                 controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 12),
                 itemCount: messages.length + 1,
                 itemBuilder: (context, index) {
                   if (index == messages.length) {
@@ -398,88 +435,94 @@ class _MailListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? context.selectedTint : Colors.transparent,
-          border: Border(bottom: BorderSide(color: context.lineSubtle)),
-        ),
-        child: Row(
-          children: [
-            if (checked != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Checkbox(
-                  value: checked,
-                  visualDensity: VisualDensity.compact,
-                  onChanged: (_) => onTap(),
-                ),
-              ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      if (!message.isRead)
-                        Container(
-                          width: 6,
-                          height: 6,
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: context.accent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      Expanded(
-                        child: Text(
-                          message.from,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: message.isRead
-                                ? FontWeight.normal
-                                : FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        _formatDate(message.date),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    message.subject,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: message.isRead
-                          ? FontWeight.normal
-                          : FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (message.preview.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      message.preview,
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      child: Material(
+        color: isSelected ? context.selectedTint : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: _buildContent(context, muted),
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, Color muted) {
+    return Row(
+      children: [
+        if (checked != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Checkbox(
+              value: checked,
+              visualDensity: VisualDensity.compact,
+              onChanged: (_) => onTap(),
+            ),
+          ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (!message.isRead)
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: context.accent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      message.from,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: message.isRead
+                            ? FontWeight.normal
+                            : FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    _formatDate(message.date),
+                    style: TextStyle(fontSize: 10, color: muted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                message.subject,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: message.isRead
+                      ? FontWeight.normal
+                      : FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (message.preview.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  message.preview,
+                  style: TextStyle(fontSize: 11, color: muted),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 

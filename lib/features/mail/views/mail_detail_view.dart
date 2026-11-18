@@ -11,16 +11,16 @@ class MailDetailView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final accountAsync = ref.watch(mailAccountProvider);
     final selectedMail = ref.watch(selectedMailProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurfaceVariant;
 
     if (accountAsync.value == null) {
-      return Center(
-        child: Icon(Icons.mail_outline, size: 64, color: Colors.grey[300]),
-      );
+      return Center(child: Icon(Icons.mail_outline, size: 64, color: muted));
     }
 
     if (selectedMail == null) {
-      return const Center(
-        child: Text('메일을 선택하세요', style: TextStyle(color: Colors.grey)),
+      return Center(
+        child: Text('메일을 선택하세요', style: TextStyle(color: muted)),
       );
     }
 
@@ -31,26 +31,33 @@ class MailDetailView extends ConsumerWidget {
       });
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 제목 (할 일 화면과 같은 큰 제목)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(36, 24, 24, 12),
+          child: Text(
             selectedMail.subject,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(36, 0, 24, 0),
+          child: Row(
             children: [
               Container(
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: context.accent.withOpacity(0.1),
+                  color: scheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: Icon(Icons.person, color: context.accent, size: 18),
+                child: Icon(Icons.person, color: muted, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -61,14 +68,14 @@ class MailDetailView extends ConsumerWidget {
                       selectedMail.from,
                       style: const TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
                       '${selectedMail.date.year}.${selectedMail.date.month}.${selectedMail.date.day} '
                       '${selectedMail.date.hour.toString().padLeft(2, '0')}:'
                       '${selectedMail.date.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      style: TextStyle(fontSize: 12, color: muted),
                     ),
                   ],
                 ),
@@ -76,7 +83,19 @@ class MailDetailView extends ConsumerWidget {
               // 삭제 (Gmail 휴지통으로 이동)
               IconButton(
                 tooltip: '삭제',
-                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                style: IconButton.styleFrom(
+                  backgroundColor: scheme.surfaceContainerHigh,
+                  foregroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
                 onPressed: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
@@ -115,9 +134,9 @@ class MailDetailView extends ConsumerWidget {
                   }
                 },
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               // 답장 버튼
-              ElevatedButton.icon(
+              FilledButton.icon(
                 onPressed: () async {
                   final url = Uri.parse('https://mail.google.com/');
                   if (await canLaunchUrl(url)) {
@@ -126,28 +145,33 @@ class MailDetailView extends ConsumerWidget {
                 },
                 icon: const Icon(Icons.reply, size: 16),
                 label: const Text('답장'),
-                style: ElevatedButton.styleFrom(
+                style: FilledButton.styleFrom(
                   backgroundColor: context.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                  foregroundColor: scheme.onPrimary,
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ),
             ],
           ),
-          const Divider(height: 24),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Text(
-                selectedMail.preview.isEmpty ? '(내용 없음)' : selectedMail.preview,
-                style: const TextStyle(fontSize: 14, height: 1.6),
-              ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(36, 16, 24, 0),
+          child: Divider(height: 1, color: context.lineSubtle),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(36, 16, 24, 32),
+            child: Text(
+              selectedMail.preview.isEmpty ? '(내용 없음)' : selectedMail.preview,
+              style: const TextStyle(fontSize: 14, height: 1.6),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

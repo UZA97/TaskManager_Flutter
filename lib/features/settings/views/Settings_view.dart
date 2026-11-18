@@ -62,29 +62,88 @@ class SettingsView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(settingsCategoryProvider);
 
-    return ListView(
-      children: _categoryItems.map((item) {
-        final isSelected = selected == item.category;
-        return ListTile(
-          leading: Icon(
-            item.icon,
-            size: 18,
-            color: isSelected ? context.accent : Colors.grey,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(14, 16, 14, 12),
+          child: Text(
+            '설정',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
-          title: Text(
-            item.label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              color: isSelected ? context.accent : null,
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 12),
+            children: [
+              for (final item in _categoryItems)
+                _CategoryTile(
+                  item: item,
+                  selected: selected == item.category,
+                  onTap: () => ref
+                      .read(settingsCategoryProvider.notifier)
+                      .select(item.category),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 카테고리 한 줄 (할 일 사이드 패널과 같은 둥근 선택 표시)
+class _CategoryTile extends StatelessWidget {
+  final _SettingsCategoryItem item;
+  final bool selected;
+  final VoidCallback onTap;
+  const _CategoryTile({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      child: Material(
+        color: selected ? context.selectedTint : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: SizedBox(
+            height: 34,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    item.icon,
+                    size: 17,
+                    color: selected ? context.accent : muted,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          selected: isSelected,
-          selectedTileColor: context.selectedTint,
-          onTap: () =>
-              ref.read(settingsCategoryProvider.notifier).select(item.category),
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 }

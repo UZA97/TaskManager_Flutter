@@ -95,61 +95,66 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    // 탭 하나 (선택되면 옅은 테마색 바탕)
+    Widget tab(String label, bool selected, VoidCallback onTap) => Expanded(
+      child: Material(
+        color: selected ? context.selectedTint : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  color: selected ? context.accent : scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
     return Column(
       children: [
-        // 탭 토글
+        // 상단: 제목
+        const Padding(
+          padding: EdgeInsets.fromLTRB(14, 16, 14, 10),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '지도',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+        // 탭 토글 (묶음 컨테이너)
         Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _isSearchTab = true),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _isSearchTab ? context.accent : Colors.transparent,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: context.accent),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '검색',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _isSearchTab ? Colors.white : context.accent,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _isSearchTab = false),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    decoration: BoxDecoration(
-                      color: !_isSearchTab
-                          ? context.accent
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: context.accent),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '저장된 장소',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: !_isSearchTab ? Colors.white : context.accent,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                tab('검색', _isSearchTab, () {
+                  setState(() => _isSearchTab = true);
+                }),
+                const SizedBox(width: 3),
+                tab('저장된 장소', !_isSearchTab, () {
+                  setState(() => _isSearchTab = false);
+                }),
+              ],
+            ),
           ),
         ),
 
@@ -160,70 +165,75 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
   }
 
   Widget _buildSearchTab() {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return Expanded(
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: TextField(
               controller: _searchController,
+              style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
                 hintText: '장소 검색',
-                prefixIcon: const Icon(Icons.search, size: 18),
+                prefixIcon: const Icon(Icons.search, size: 17),
+                prefixIconConstraints: const BoxConstraints(minWidth: 34),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.arrow_forward, size: 18),
+                  icon: const Icon(Icons.arrow_forward, size: 17),
+                  tooltip: '검색',
                   onPressed: _search,
                 ),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: context.accent),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 9),
                 isDense: true,
               ),
               onSubmitted: (_) => _search(),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _results.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       '장소를 검색하세요',
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: muted, fontSize: 12),
                     ),
                   )
                 : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 12),
                     itemCount: _results.length,
                     itemBuilder: (context, index) {
                       final result = _results[index];
-                      return ListTile(
-                        dense: true,
-                        leading: const Icon(
-                          Icons.place,
-                          size: 16,
-                          color: Colors.grey,
-                        ),
-                        title: Text(
-                          result.name,
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        subtitle: Text(
-                          result.address,
-                          style: const TextStyle(fontSize: 11),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      return _PlaceRow(
+                        name: result.name,
+                        address: result.address,
+                        iconColor: muted,
+                        onTap: () => _selectResult(result),
                         trailing: IconButton(
                           icon: Icon(
-                            Icons.label,
+                            Icons.label_outline,
                             size: 16,
                             color: context.accent,
                           ),
                           tooltip: '태그 저장',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 28,
+                            height: 28,
+                          ),
                           onPressed: () => _showTagSaveDialog(result),
                         ),
-                        onTap: () => _selectResult(result),
                       );
                     },
                   ),
@@ -237,33 +247,30 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
     final tagsAsync = ref.watch(mapTagProvider);
     final activeTags = ref.watch(activeMapTagsProvider);
     final placesAsync = ref.watch(mapPlaceProvider);
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Expanded(
       child: Column(
         children: [
           // 태그 목록
           Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.fromLTRB(14, 4, 12, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Text(
-                      '태그',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
+                    Text('태그', style: TextStyle(fontSize: 11, color: muted)),
                     const Spacer(),
-                    GestureDetector(
-                      onTap: () => _showCreateTagDialog(),
-                      child: const Icon(
-                        Icons.add,
-                        size: 16,
-                        color: Colors.grey,
+                    Tooltip(
+                      message: '태그 추가',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () => _showCreateTagDialog(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(Icons.add, size: 16, color: muted),
+                        ),
                       ),
                     ),
                   ],
@@ -273,9 +280,9 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                   loading: () => const SizedBox(),
                   error: (e, _) => const SizedBox(),
                   data: (tags) => tags.isEmpty
-                      ? const Text(
+                      ? Text(
                           '태그 없음',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                          style: TextStyle(fontSize: 11, color: muted),
                         )
                       : Wrap(
                           spacing: 4,
@@ -299,8 +306,11 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                                   MaterialTapTargetSize.shrinkWrap,
                               backgroundColor: isActive
                                   ? color
-                                  : color.withOpacity(0.15),
-                              side: BorderSide(color: color),
+                                  : color.withValues(alpha: 0.12),
+                              side: BorderSide.none,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               onPressed: () => ref
                                   .read(activeMapTagsProvider.notifier)
                                   .toggle(tag.id!),
@@ -318,7 +328,7 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: context.lineSubtle),
           // 장소 목록
           Expanded(
             child: placesAsync.when(
@@ -332,15 +342,16 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                           .toList();
 
                 if (filtered.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       '저장된 장소 없음',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      style: TextStyle(color: muted, fontSize: 12),
                     ),
                   );
                 }
 
                 return ListView.builder(
+                  padding: const EdgeInsets.only(top: 6, bottom: 12),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final place = filtered[index];
@@ -351,23 +362,17 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                     );
                     final color = _hexToColor(tag.color);
 
-                    return ListTile(
-                      dense: true,
-                      leading: Icon(Icons.place, size: 16, color: color),
-                      title: Text(
-                        place.name,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      subtitle: Text(
-                        place.address,
-                        style: const TextStyle(fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    return _PlaceRow(
+                      name: place.name,
+                      address: place.address,
+                      iconColor: color,
                       trailing: IconButton(
-                        icon: const Icon(
-                          Icons.close,
-                          size: 14,
-                          color: Colors.grey,
+                        icon: Icon(Icons.close, size: 14, color: muted),
+                        tooltip: '삭제',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 28,
+                          height: 28,
                         ),
                         onPressed: () => ref
                             .read(mapPlaceProvider.notifier)
@@ -433,7 +438,10 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                         color: color,
                         shape: BoxShape.circle,
                         border: selectedColor == hex
-                            ? Border.all(color: Colors.black, width: 2)
+                            ? Border.all(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                width: 2,
+                              )
                             : null,
                       ),
                     ),
@@ -547,6 +555,7 @@ class _TagSelectDialogState extends State<_TagSelectDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return AlertDialog(
       title: Text('"${widget.result.name}" 저장'),
       content: SizedBox(
@@ -555,9 +564,9 @@ class _TagSelectDialogState extends State<_TagSelectDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '태그 선택',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -574,15 +583,15 @@ class _TagSelectDialogState extends State<_TagSelectDialog> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: isSelected ? color : color.withOpacity(0.15),
+                      color: isSelected ? color : color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: color),
                     ),
                     child: Text(
                       tag.name,
                       style: TextStyle(
                         fontSize: 12,
                         color: isSelected ? Colors.white : color,
+                        fontWeight: isSelected ? FontWeight.w600 : null,
                       ),
                     ),
                   ),
@@ -620,7 +629,7 @@ class _TagSelectDialogState extends State<_TagSelectDialog> {
                         color: color,
                         shape: BoxShape.circle,
                         border: _newTagColor == hex
-                            ? Border.all(color: Colors.black, width: 2)
+                            ? Border.all(color: scheme.onSurface, width: 2)
                             : null,
                       ),
                     ),
@@ -658,20 +667,83 @@ class _TagSelectDialogState extends State<_TagSelectDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('취소'),
         ),
-        ElevatedButton(
+        FilledButton(
           onPressed: _selectedTagId == null
               ? null
               : () async {
                   await widget.onSave(_selectedTagId!);
                   if (context.mounted) Navigator.pop(context);
                 },
-          style: ElevatedButton.styleFrom(
+          style: FilledButton.styleFrom(
             backgroundColor: context.accent,
-            foregroundColor: Colors.white,
+            foregroundColor: scheme.onPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('저장'),
         ),
       ],
+    );
+  }
+}
+
+/// 장소 한 줄 (둥근 모서리, 메모 목록과 같은 간격)
+class _PlaceRow extends StatelessWidget {
+  final String name;
+  final String address;
+  final Color iconColor;
+  final Widget trailing;
+  final VoidCallback onTap;
+  const _PlaceRow({
+    required this.name,
+    required this.address,
+    required this.iconColor,
+    required this.trailing,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 7, 4, 7),
+            child: Row(
+              children: [
+                Icon(Icons.place, size: 16, color: iconColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      if (address.isNotEmpty)
+                        Text(
+                          address,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11, color: muted),
+                        ),
+                    ],
+                  ),
+                ),
+                trailing,
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

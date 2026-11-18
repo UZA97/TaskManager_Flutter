@@ -51,8 +51,9 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
     final accountAsync = ref.watch(googleAccountProvider);
 
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: _pagePadding,
       children: [
+        const _PageTitle(title: '고급'),
         const _SectionHeader(title: 'Google 계정'),
         accountAsync.when(
           loading: () => const CircularProgressIndicator(),
@@ -67,7 +68,10 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               _statusMessage!,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         if (_isSyncing)
@@ -77,24 +81,18 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
           ),
         Row(
           children: [
-            ElevatedButton.icon(
+            FilledButton.icon(
               onPressed: _isSyncing ? null : _upload,
               icon: const Icon(Icons.cloud_upload, size: 16),
               label: const Text('업로드'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accent,
-                foregroundColor: Colors.white,
-              ),
+              style: _filledStyle(context),
             ),
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
               onPressed: _isSyncing ? null : _download,
               icon: const Icon(Icons.cloud_download, size: 16),
               label: const Text('다운로드'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
+              style: _outlinedStyle(context),
             ),
           ],
         ),
@@ -103,10 +101,12 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
   }
 
   Widget _buildConnected(GoogleAccount account) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: context.line),
+        color: scheme.surfaceContainerLowest,
+        border: Border.all(color: context.lineSubtle),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -115,19 +115,22 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: context.accent.withOpacity(0.1),
+              color: scheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(Icons.account_circle, color: context.accent),
+            child: Icon(Icons.account_circle, color: scheme.onSurfaceVariant),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '연결됨',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
                 Text(
                   account.email,
@@ -141,10 +144,7 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
           ),
           OutlinedButton(
             onPressed: () => ref.read(googleAccountProvider.notifier).signOut(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red,
-              side: const BorderSide(color: Colors.red),
-            ),
+            style: _outlinedStyle(context, foreground: Colors.red),
             child: const Text('연결 해제'),
           ),
         ],
@@ -153,13 +153,13 @@ class _AdvancedSettingsState extends ConsumerState<_AdvancedSettings> {
   }
 
   Widget _buildDisconnected() {
-    return ElevatedButton.icon(
-      onPressed: () => ref.read(googleAccountProvider.notifier).signIn(),
-      icon: const Icon(Icons.login, size: 16),
-      label: const Text('Google 계정 연동'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: context.accent,
-        foregroundColor: Colors.white,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: FilledButton.icon(
+        onPressed: () => ref.read(googleAccountProvider.notifier).signIn(),
+        icon: const Icon(Icons.login, size: 16),
+        label: const Text('Google 계정 연동'),
+        style: _filledStyle(context),
       ),
     );
   }
@@ -242,9 +242,9 @@ class _GeneralSettings extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('오류: $e')),
       data: (settings) => ListView(
-        padding: const EdgeInsets.all(24),
+        padding: _pagePadding,
         children: [
-          const _SectionHeader(title: '일반'),
+          const _PageTitle(title: '일반'),
           _SettingsRow(
             title: '트레이 모드',
             subtitle: '창 닫기 시 트레이로 최소화',
@@ -403,14 +403,18 @@ class _ImportExportSectionState extends ConsumerState<_ImportExportSection> {
           onPressed: busy ? null : onPressed,
           icon: Icon(icon, size: 16),
           label: Text(label),
+          style: _outlinedStyle(context),
         );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           '마크다운(.md)·텍스트 파일, Evernote(.enex)를 메모로 가져오거나 '
           '모든 메모를 마크다운 파일로 내보냅니다. 그림·첨부파일도 함께 옮겨집니다.',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -531,11 +535,14 @@ class _TrashSectionState extends ConsumerState<_TrashSection> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('오류: $e')),
             data: (notes) => notes.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.all(8),
+                ? Padding(
+                    padding: const EdgeInsets.all(8),
                     child: Text(
                       '휴지통이 비어있습니다',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
                     ),
                   )
                 : Column(
@@ -656,9 +663,9 @@ class _AppearanceSettings extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('오류: $e')),
       data: (settings) => ListView(
-        padding: const EdgeInsets.all(24),
+        padding: _pagePadding,
         children: [
-          const _SectionHeader(title: '외관'),
+          const _PageTitle(title: '외관'),
           _SettingsRow(
             title: '다크 모드',
             subtitle: '어두운 테마 사용',
@@ -699,7 +706,34 @@ class _PlaceholderSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text('$label 설정', style: const TextStyle(color: Colors.grey)),
+      child: Text(
+        '$label 설정',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+    );
+  }
+}
+
+/// 설정 페이지 여백 (할 일 화면처럼 왼쪽 36)
+const _pagePadding = EdgeInsets.fromLTRB(36, 24, 36, 32);
+
+/// 설정 페이지 큰 제목 (할 일 화면 제목과 같은 모양)
+class _PageTitle extends StatelessWidget {
+  final String title;
+  const _PageTitle({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+        ),
+      ),
     );
   }
 }
@@ -714,16 +748,30 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey,
-          letterSpacing: 0.8,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );
   }
 }
+
+/// 테마색으로 채운 버튼 (글자는 onPrimary)
+ButtonStyle _filledStyle(BuildContext context) => FilledButton.styleFrom(
+  backgroundColor: context.accent,
+  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+);
+
+/// 테두리 버튼 (구분선 색 테두리)
+ButtonStyle _outlinedStyle(BuildContext context, {Color? foreground}) =>
+    OutlinedButton.styleFrom(
+      foregroundColor: foreground ?? Theme.of(context).colorScheme.onSurface,
+      side: BorderSide(color: context.line),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    );
 
 class _ThemeColorPicker extends ConsumerWidget {
   static const _colors = [
@@ -852,20 +900,18 @@ class _InfoSettingsState extends State<_InfoSettings> {
 
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: _pagePadding,
       children: [
-        const _SectionHeader(title: '정보'),
+        const _PageTitle(title: '정보'),
         FutureBuilder<PackageInfo>(
           future: PackageInfo.fromPlatform(),
           builder: (context, snapshot) {
             final version = snapshot.data?.version ?? '-';
             return _SettingsRow(
               title: '버전',
-              trailing: Text(
-                version,
-                style: const TextStyle(color: Colors.grey),
-              ),
+              trailing: Text(version, style: TextStyle(color: muted)),
             );
           },
         ),
@@ -878,9 +924,7 @@ class _InfoSettingsState extends State<_InfoSettings> {
               _statusMessage!,
               style: TextStyle(
                 fontSize: 12,
-                color: _checkResult?.hasUpdate == true
-                    ? Colors.green
-                    : Colors.grey,
+                color: _checkResult?.hasUpdate == true ? Colors.green : muted,
               ),
             ),
           ),
@@ -890,17 +934,18 @@ class _InfoSettingsState extends State<_InfoSettings> {
             child: LinearProgressIndicator(value: _downloadProgress),
           ),
         if (_checkResult?.hasUpdate == true && !_isDownloading)
-          ElevatedButton.icon(
-            onPressed: _startUpdate,
-            icon: const Icon(Icons.download, size: 16),
-            label: Text('${_checkResult!.latestVersion}으로 업데이트'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: context.accent,
-              foregroundColor: Colors.white,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: _startUpdate,
+              icon: const Icon(Icons.download, size: 16),
+              label: Text('${_checkResult!.latestVersion}으로 업데이트'),
+              style: _filledStyle(context),
             ),
           )
         else if (!_isChecking && !_isDownloading)
           OutlinedButton.icon(
+            style: _outlinedStyle(context),
             onPressed: _checkUpdate,
             icon: _isChecking
                 ? const SizedBox(
@@ -925,9 +970,9 @@ class _NotificationSettings extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('오류: $e')),
       data: (settings) => ListView(
-        padding: const EdgeInsets.all(24),
+        padding: _pagePadding,
         children: [
-          const _SectionHeader(title: '알림'),
+          const _PageTitle(title: '알림'),
           _SettingsRow(
             title: '알림 활성화',
             subtitle: '모든 알림을 켜거나 끕니다',
@@ -987,7 +1032,12 @@ class _NotificationSettings extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                const Text('~', style: TextStyle(color: Colors.grey)),
+                Text(
+                  '~',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(width: 16),
                 GestureDetector(
                   onTap: () async {
@@ -1026,7 +1076,10 @@ class _NotificationSettings extends ConsumerWidget {
             const SizedBox(height: 8),
             Text(
               '${settings.focusModeStart} ~ ${settings.focusModeEnd} 동안 알림이 비활성화됩니다',
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ],
@@ -1060,7 +1113,10 @@ class _SettingsRow extends StatelessWidget {
                 if (subtitle != null)
                   Text(
                     subtitle!,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
               ],
             ),
@@ -1097,8 +1153,9 @@ class _SecuritySettingsState extends ConsumerState<_SecuritySettings> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('오류: $e')),
       data: (settings) => ListView(
-        padding: const EdgeInsets.all(24),
+        padding: _pagePadding,
         children: [
+          const _PageTitle(title: '보안'),
           const _SectionHeader(title: '앱 잠금'),
           FutureBuilder<bool>(
             future: _hasPassword(),
@@ -1139,12 +1196,14 @@ class _SecuritySettingsState extends ConsumerState<_SecuritySettings> {
                     children: [
                       if (!hasPw)
                         OutlinedButton.icon(
+                          style: _outlinedStyle(context),
                           onPressed: () => _showPasswordDialog(isChange: false),
                           icon: const Icon(Icons.lock_outline, size: 16),
                           label: const Text('비밀번호 등록'),
                         ),
                       if (hasPw)
                         OutlinedButton.icon(
+                          style: _outlinedStyle(context),
                           onPressed: () => _showPasswordDialog(isChange: true),
                           icon: const Icon(Icons.edit, size: 16),
                           label: const Text('비밀번호 변경'),
@@ -1231,7 +1290,11 @@ class _PasswordDialogState extends ConsumerState<_PasswordDialog> {
           children: [
             Text(
               widget.isChange ? '비밀번호 변경' : '비밀번호 등록',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+              ),
             ),
             const SizedBox(height: 20),
             if (widget.isChange) ...[
@@ -1300,17 +1363,15 @@ class _PasswordDialogState extends ConsumerState<_PasswordDialog> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
+                    style: _outlinedStyle(context),
                     child: const Text('취소'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
+                  child: FilledButton(
                     onPressed: _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: context.accent,
-                      foregroundColor: Colors.white,
-                    ),
+                    style: _filledStyle(context),
                     child: const Text('저장'),
                   ),
                 ),

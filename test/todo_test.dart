@@ -1,8 +1,13 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:taskmanager/features/briefing/briefing_todos.dart';
+import 'package:taskmanager/features/memo/models/note.dart';
 import 'package:taskmanager/features/todo/todo_provider.dart';
+import 'package:taskmanager/features/todo/todo_views.dart';
 
 String _doc(List<Map<String, Object?>> children) => jsonEncode({
   'document': {'type': 'page', 'children': children},
@@ -69,6 +74,61 @@ void main() {
     expect(todoBucketOf(DateTime(2026, 11, 24), now), TodoBucket.week);
     expect(todoBucketOf(DateTime(2026, 11, 25), now), TodoBucket.later);
   });
+
+  // 라이트·다크 모드, 좁은 창에서도 오류 없이 그려지는지
+  for (final dark in [false, true]) {
+    for (final width in [900.0, 560.0]) {
+      testWidgets('todo tab renders (${dark ? 'dark' : 'light'}, $width)', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 700);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        const note = Note(
+          id: 1,
+          title: '아주 긴 메모 제목이 들어가서 칩이 넘치는지 확인하는 메모',
+          content: '',
+          createdAt: '',
+          updatedAt: '',
+        );
+        final today = DateTime.now();
+        final todos = [
+          MemoTodo(note, '지난 일', const [0], today.subtract(const Duration(days: 2))),
+          MemoTodo(note, '오늘 할 일 ' * 12, const [1], today),
+          const MemoTodo(note, '기한 없는 일', [2], null),
+        ];
+        ColorScheme scheme(Brightness b) =>
+            ColorScheme.fromSeed(seedColor: appSeedColor, brightness: b);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              allMemoTodosProvider.overrideWith((ref) async => todos),
+            ],
+            child: MaterialApp(
+              theme: ThemeData(colorScheme: scheme(Brightness.light)),
+              darkTheme: ThemeData(
+                colorScheme: withDarkColors(scheme(Brightness.dark)),
+              ),
+              themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+              home: const Scaffold(
+                body: Row(
+                  children: [
+                    SizedBox(width: 240, child: TodoSidebarView()),
+                    Expanded(child: TodoView()),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('지난 일'), findsOneWidget);
+        expect(find.text('기한 지남'), findsWidgets);
+        expect(find.text('3개 남음'), findsOneWidget);
+      });
+    }
+  }
 
   test('uncheckedTodos reads due dates for the todo tab', () {
     final todos = uncheckedTodos(

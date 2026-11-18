@@ -21,22 +21,21 @@ class CalendarEditorView extends ConsumerWidget {
     final eventsAsync = ref.watch(eventListProvider);
     final memoTodos = ref.watch(memoDueTodosProvider).value ?? const [];
     final tagFilter = ref.watch(tagFilterProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     return Column(
       children: [
-        // 헤더
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: context.line)),
-          ),
+        // 헤더: 큰 제목 (할 일 화면과 같은 모양)과 오늘·일정 추가 버튼
+        Padding(
+          padding: const EdgeInsets.fromLTRB(36, 24, 24, 14),
           child: Row(
             children: [
               Text(
                 '${currentMonth.year}년 ${currentMonth.month}월',
                 style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
                 ),
               ),
               const Spacer(),
@@ -49,26 +48,29 @@ class CalendarEditorView extends ConsumerWidget {
                   ref.read(selectedDateProvider.notifier).select(now);
                 },
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
+                  foregroundColor: scheme.onSurface,
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   side: BorderSide(color: context.line),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: const Text('오늘', style: TextStyle(fontSize: 12)),
               ),
               const SizedBox(width: 8),
               // 일정 추가 버튼
-              ElevatedButton.icon(
+              FilledButton.icon(
                 onPressed: () => _showEventDialog(context, ref, null),
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('일정 추가', style: TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
+                style: FilledButton.styleFrom(
                   backgroundColor: context.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
+                  foregroundColor: scheme.onPrimary,
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ),
@@ -99,7 +101,7 @@ class CalendarEditorView extends ConsumerWidget {
                                 ? Colors.red
                                 : e.key == 6
                                 ? Colors.blue
-                                : Colors.grey[600],
+                                : scheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -330,7 +332,7 @@ class _CalendarCell extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                       color: isToday
-                          ? Colors.white
+                          ? Theme.of(context).colorScheme.onPrimary
                           : isSunday
                           ? Colors.red
                           : isSaturday
@@ -355,9 +357,9 @@ class _CalendarCell extends StatelessWidget {
                       padding: const EdgeInsets.only(left: 4),
                       child: Text(
                         '+${total - 2}개',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
-                          color: Colors.grey,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     );
@@ -378,9 +380,13 @@ class _CalendarCell extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: event.tagColor != null
-                            ? _hexToColor(event.tagColor!).withOpacity(0.8)
-                            : context.accent.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(3),
+                            ? _hexToColor(
+                                event.tagColor!,
+                              ).withValues(alpha: 0.8)
+                            : Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         event.title.isEmpty ? '(제목 없음)' : event.title,
@@ -732,6 +738,8 @@ class _EventDialogState extends ConsumerState<EventDialog> {
   @override
   Widget build(BuildContext context) {
     final tagsAsync = ref.watch(eventTagProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurfaceVariant;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -748,7 +756,8 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                 widget.event != null ? '일정 편집' : '일정 추가',
                 style: const TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
                 ),
               ),
               const SizedBox(height: 20),
@@ -787,9 +796,9 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           '시작',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                          style: TextStyle(fontSize: 11, color: muted),
                         ),
                         const SizedBox(height: 4),
                         MouseRegion(
@@ -831,9 +840,7 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                                     : '시간 선택',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: _startTime == null
-                                      ? Colors.grey
-                                      : null,
+                                  color: _startTime == null ? muted : null,
                                 ),
                               ),
                             ),
@@ -842,18 +849,18 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                       ],
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('~', style: TextStyle(color: Colors.grey)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('~', style: TextStyle(color: muted)),
                   ),
                   // 종료
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           '종료',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                          style: TextStyle(fontSize: 11, color: muted),
                         ),
                         const SizedBox(height: 4),
                         MouseRegion(
@@ -895,7 +902,7 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                                     : '시간 선택',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: _endTime == null ? Colors.grey : null,
+                                  color: _endTime == null ? muted : null,
                                 ),
                               ),
                             ),
@@ -947,18 +954,15 @@ class _EventDialogState extends ConsumerState<EventDialog> {
               const SizedBox(height: 12),
 
               // 태그
-              const Text(
-                '태그',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
+              Text('태그', style: TextStyle(fontSize: 11, color: muted)),
               const SizedBox(height: 6),
               tagsAsync.when(
                 loading: () => const SizedBox(),
                 error: (e, _) => const SizedBox(),
                 data: (tags) => tags.isEmpty
-                    ? const Text(
+                    ? Text(
                         '태그 없음',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                        style: TextStyle(fontSize: 11, color: muted),
                       )
                     : Wrap(
                         spacing: 6,
@@ -979,15 +983,17 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? color
-                                    : color.withOpacity(0.15),
+                                    : color.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: color),
                               ),
                               child: Text(
                                 tag.name,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: isSelected ? Colors.white : color,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : null,
                                 ),
                               ),
                             ),
@@ -1106,14 +1112,24 @@ class _EventDialogState extends ConsumerState<EventDialog> {
                   const Spacer(),
                   OutlinedButton(
                     onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: scheme.onSurface,
+                      side: BorderSide(color: context.line),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     child: const Text('취소'),
                   ),
                   const SizedBox(width: 8),
-                  ElevatedButton(
+                  FilledButton(
                     onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
+                    style: FilledButton.styleFrom(
                       backgroundColor: context.accent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: scheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: const Text('저장'),
                   ),
