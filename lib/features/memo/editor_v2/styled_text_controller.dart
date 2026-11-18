@@ -238,6 +238,28 @@ class StyledTextController extends TextEditingController {
   bool rangeHas(String key, Object value, int start, int end) =>
       _marks.sublist(start, end).every((m) => m[key] == value);
 
+  /// [start, end) 범위의 [key] 값. 비었거나 값이 섞여 있으면 null.
+  Object? rangeValue(String key, int start, int end) {
+    if (start < 0 || end > _marks.length || start >= end) return null;
+    final value = _marks[start][key];
+    for (var i = start + 1; i < end; i++) {
+      if (_marks[i][key] != value) return null;
+    }
+    return value;
+  }
+
+  /// 선택 범위의 [key] 값 (커서만 있으면 다음에 입력할 글자의 값). 툴바 표시용.
+  Object? markAtSelection(String key) {
+    final sel = selection;
+    if (!sel.isValid) return null;
+    if (!sel.isCollapsed) return rangeValue(key, sel.start, sel.end);
+    final pending = _pending;
+    if (pending != null) return pending[key];
+    return sel.start > 0 && sel.start <= _marks.length
+        ? _marks[sel.start - 1][key]
+        : null;
+  }
+
   /// [start, end) 범위의 [key]를 [value]로 (null이면 해제)
   void applyMark(String key, Object? value, int start, int end) {
     for (var i = start; i < end; i++) {
@@ -520,6 +542,9 @@ class StyledTextController extends TextEditingController {
       fontFamily: marks['code'] == true ? 'monospace' : null,
     );
   }
+
+  /// 서식에 저장된 색 값을 색으로
+  static Color? parseColor(Object? value) => _parseColor(value);
 
   static Color? _parseColor(Object? value) {
     if (value is! String) return null;

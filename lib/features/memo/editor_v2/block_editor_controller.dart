@@ -45,6 +45,20 @@ class FindMatch {
   final int end;
 }
 
+class _FormatNotifier extends ChangeNotifier {
+  bool _disposed = false;
+
+  void notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
 /// 블록 목록과 편집 명령. 툴바·단축키·메뉴가 모두 이 명령을 사용.
 class BlockEditorController extends ChangeNotifier {
   BlockEditorController(List<EditorBlock> blocks)
@@ -90,9 +104,63 @@ class BlockEditorController extends ChangeNotifier {
       } else {
         _activeObject = block;
       }
+      _format.notify();
+    });
+    // 커서 이동·선택·글자 서식 변경
+    block.controller.addListener(() {
+      if (identical(block, _active) || _selection != null) _format.notify();
     });
     return block;
   }
+
+  // ───────────── 툴바 표시 (지금 줄·선택에 적용된 서식)
+
+  final _format = _FormatNotifier();
+
+  /// 커서가 옮겨지거나 서식·줄 종류가 바뀔 때마다 알림
+  Listenable get formatState => _format;
+
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    _format.notify();
+  }
+
+  /// 선택 범위(여러 줄 포함) 또는 커서 위치의 글자 서식 값. 섞여 있으면 null.
+  Object? activeMarkValue(String key) {
+    if (_selection != null) {
+      Object? value;
+      var first = true;
+      for (final (block, start, end) in selectedParts) {
+        if (!block.isText || start >= end) continue;
+        final v = block.controller.rangeValue(key, start, end);
+        if (v == null || (!first && v != value)) return null;
+        value = v;
+        first = false;
+      }
+      return value;
+    }
+    return activeBlock?.controller.markAtSelection(key);
+  }
+
+  bool isMarkActive(String key) => activeMarkValue(key) == true;
+
+  /// 커서가 있는 줄(여러 줄 선택이면 선택한 줄 전부)이 그 종류인지
+  bool isBlockTypeActive(String type, {int? level}) {
+    final targets = _selection != null
+        ? [
+            for (final (block, _, _) in selectedParts)
+              if (block.isText && !block.isSection) block,
+          ]
+        : [?activeBlock];
+    return targets.isNotEmpty &&
+        targets.every(
+          (b) => b.type == type && (level == null || b.level == level),
+        );
+  }
+
+  /// 커서가 있는 줄의 정렬 (left / center / right)
+  String get activeAlign => activeBlock?.align ?? 'left';
 
   /// 새로 만든 블록을 에디터에 연결
   EditorBlock register(EditorBlock block) => _register(block);
@@ -118,6 +186,7 @@ class BlockEditorController extends ChangeNotifier {
     for (final block in blocks) {
       block.dispose();
     }
+    _format.dispose();
     super.dispose();
   }
 
@@ -214,6 +283,7 @@ class BlockEditorController extends ChangeNotifier {
     if (block == null) return;
     block.controller.toggleMark(key);
     textChanged();
+    _format.notify(); // 커서만 있을 때는 입력창이 알리지 않음
     refocus(block);
   }
 

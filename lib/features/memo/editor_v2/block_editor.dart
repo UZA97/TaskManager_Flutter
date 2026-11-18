@@ -1380,6 +1380,8 @@ class _BlockEditorState extends State<BlockEditor> {
   bool _caretOnEdgeLine(EditorBlock block, bool first, {bool extent = false}) {
     final controller = block.controller;
     if (!extent && !controller.selection.isCollapsed) return false;
+    // 빈 줄은 첫 줄이자 마지막 줄 (빈 글자에서는 줄 범위가 비어 있어 아래 판정이 틀림)
+    if (controller.text.isEmpty) return true;
     // 화면에 그려진 입력창의 줄 나눔 그대로 (줄 안의 그림 높이까지 반영됨)
     final editable = _renderEditableOf(block);
     if (editable == null || !editable.attached || !editable.hasSize) {
@@ -1513,11 +1515,23 @@ class _BlockEditorState extends State<BlockEditor> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => _c.toggleTodo(block),
+          // 모서리가 둥근 체크박스
           child: box(
-            Icon(
-              block.checked ? Icons.check_box : Icons.check_box_outline_blank,
-              size: 20,
-              color: block.checked ? _todoColor : Colors.grey.shade600,
+            Center(
+              child: Container(
+                width: 17,
+                height: 17,
+                decoration: BoxDecoration(
+                  color: block.checked ? _todoColor : null,
+                  borderRadius: BorderRadius.circular(5),
+                  border: block.checked
+                      ? null
+                      : Border.all(color: Colors.grey.shade600, width: 1.6),
+                ),
+                child: block.checked
+                    ? const Icon(Icons.check, size: 13, color: Colors.white)
+                    : null,
+              ),
             ),
           ),
         ),
@@ -1595,7 +1609,9 @@ class _BlockEditorState extends State<BlockEditor> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ?leading,
-              Expanded(child: field),
+              // 키로 고정: 머리 기호·마감일 버튼이 생기거나 사라져도 입력창을
+              // 새로 만들지 않음 (새로 만들면 Ctrl+1~6 뒤에 커서가 사라짐)
+              Expanded(key: const ValueKey('field'), child: field),
               if (block.type == 'todo_list')
                 TodoDueButton(block: block, onChanged: _c.contentChanged),
             ],
