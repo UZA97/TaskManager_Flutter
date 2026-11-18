@@ -156,7 +156,14 @@ class _MemoEditorTagDialogState extends ConsumerState<MemoEditorTagDialog> {
 /// 에디터 정렬 드롭다운 메뉴 위젯입니다.
 class MemoEditorAlignDropdown extends StatelessWidget {
   final void Function(String align) onAlign;
-  const MemoEditorAlignDropdown({required this.onAlign, super.key});
+
+  /// 커서가 있는 줄의 정렬 (아이콘으로 표시)
+  final String current;
+  const MemoEditorAlignDropdown({
+    required this.onAlign,
+    this.current = 'left',
+    super.key,
+  });
 
   /// 드롭다운으로 문단 정렬 방식을 선택합니다.
   @override
@@ -165,7 +172,18 @@ class MemoEditorAlignDropdown extends StatelessWidget {
       tooltip: '정렬',
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
-      icon: const Icon(Icons.format_align_left, size: 18),
+      icon: Icon(
+        switch (current) {
+          'center' => Icons.format_align_center,
+          'right' => Icons.format_align_right,
+          _ => Icons.format_align_left,
+        },
+        size: 18,
+        // 기본(왼쪽)이 아니면 적용된 것으로 표시
+        color: current == 'center' || current == 'right'
+            ? context.accent
+            : null,
+      ),
       onSelected: onAlign,
       itemBuilder: (context) => [
         const PopupMenuItem(
@@ -211,6 +229,9 @@ class MemoEditorColorDropdown extends StatelessWidget {
   final VoidCallback? onOpen;
   final bool isHighlight;
 
+  /// 커서 위치·선택에 적용된 색 (있으면 아이콘 아래에 그 색 막대)
+  final Color? activeColor;
+
   static const _textColors = [
     (Color(0xFFE53935), '빨강'),
     (Color(0xFFFF9800), '주황'),
@@ -239,6 +260,7 @@ class MemoEditorColorDropdown extends StatelessWidget {
     required this.onColorSelected,
     required this.onOpen,
     required this.isHighlight,
+    this.activeColor,
     super.key,
   });
 
@@ -253,7 +275,25 @@ class MemoEditorColorDropdown extends StatelessWidget {
         tooltip: tooltip,
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
-        icon: Icon(icon, size: 18),
+        icon: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
+          children: [
+            Icon(icon, size: 18),
+            if (activeColor != null)
+              Positioned(
+                bottom: -3,
+                child: Container(
+                  width: 16,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: activeColor,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                ),
+              ),
+          ],
+        ),
         onPressed: () async {
           final renderBox = context.findRenderObject() as RenderBox?;
           if (renderBox == null) return;

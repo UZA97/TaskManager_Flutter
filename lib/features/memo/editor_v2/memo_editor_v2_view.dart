@@ -36,6 +36,7 @@ import 'inline_image.dart';
 import 'note_dates.dart';
 import 'find_bar.dart';
 import 'outline_panel.dart';
+import 'styled_text_controller.dart';
 
 /// 새 에디터를 쓰는 메모 화면. 화면 구성(탭·제목·토글·태그·하단 툴바)은 기존과 같음.
 class MemoEditorV2View extends ConsumerStatefulWidget {
@@ -715,22 +716,6 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     editor.focus(block, 0);
   }
 
-  // ───────────── 글자 수
-
-  String _statusText(BlockEditorController editor) {
-    var count = 0;
-    for (final block in editor.blocks) {
-      if (block.isText) {
-        count += stripInlineImages(block.controller.text).length;
-      }
-    }
-    final digits = count.toString().replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (_) => ',',
-    );
-    return '$digits자';
-  }
-
   Future<void> _exportToPdf() async {
     final editor = _editor;
     if (_currentNote == null || editor == null) return;
@@ -870,6 +855,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
 
   // ───────────── 화면
 
+  /// 메모 상태 토글 (즐겨찾기·고정·중요). 켜져 있으면 그 색으로 옅은 배경
   Widget _buildToggleButton({
     required IconData icon,
     required Color activeColor,
@@ -877,35 +863,407 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     required String tooltip,
     required VoidCallback onTap,
   }) {
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: isActive
-                ? activeColor.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: isActive ? activeColor : Colors.grey,
-          ),
-        ),
+    return _toolbarButton(
+      icon,
+      tooltip,
+      onTap,
+      active: isActive,
+      activeColor: activeColor,
+      size: 32,
+    );
+  }
+
+  Widget _toolbarButton(
+    IconData icon,
+    String tooltip,
+    VoidCallback onPressed, {
+    bool active = false,
+    Color? activeColor,
+    double size = 30,
+  }) {
+    final color = activeColor ?? context.accent;
+    // 지금 줄·선택에 적용된 서식은 테마색으로 표시
+    return IconButton(
+      icon: Icon(icon, size: 18, color: active ? color : null),
+      tooltip: tooltip,
+      padding: EdgeInsets.zero,
+      constraints: BoxConstraints.tightFor(width: size, height: size),
+      style: IconButton.styleFrom(
+        backgroundColor: active ? color.withValues(alpha: 0.18) : null,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      onPressed: onPressed,
+    );
+  }
+
+  /// 커서가 있는 줄·선택에 적용돼 있으면 켜진 모양으로 보이는 서식 버튼
+  Widget _formatButton(
+    BlockEditorController editor,
+    IconData icon,
+    String tooltip,
+    VoidCallback onPressed,
+    bool Function() isActive,
+  ) {
+    return ListenableBuilder(
+      listenable: editor.formatState,
+      builder: (context, _) =>
+          _toolbarButton(icon, tooltip, onPressed, active: isActive()),
+    );
+  }
+
+  /// 관련 버튼끼리 묶는 둥근 칸
+  Widget _toolGroup(List<Widget> children, {double radius = 8}) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(width: 2),
+            children[i],
+          ],
+        ],
       ),
     );
   }
 
-  Widget _toolbarButton(IconData icon, String tooltip, VoidCallback onPressed) {
-    return IconButton(
-      icon: Icon(icon),
-      tooltip: tooltip,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(),
-      onPressed: onPressed,
+  /// 드롭다운 버튼을 다른 버튼과 같은 크기 칸에 맞춤
+  Widget _toolCell(Widget child) =>
+      SizedBox(width: 30, height: 30, child: Center(child: child));
+
+  // ───────────── 제목 줄
+
+  Widget _buildHeader(bool hasTags) {
+    final note = _currentNote;
+    return Padding(
+      // 태그가 있으면 태그와 제목 사이를 좁게
+      padding: EdgeInsets.fromLTRB(36, hasTags ? 6 : 20, 24, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _titleController,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+              ),
+              decoration: const InputDecoration(
+                hintText: '제목 없음',
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 6),
+                hintStyle: TextStyle(color: Colors.grey),
+              ),
+              onChanged: (_) => _onContentChanged(),
+            ),
+          ),
+          if (note != null)
+            _toolGroup(radius: 10, [
+              _buildToggleButton(
+                icon: Icons.star,
+                activeColor: Colors.amber,
+                isActive: note.isFavorite,
+                tooltip: note.isFavorite ? '즐겨찾기 해제' : '즐겨찾기',
+                onTap: () => ref
+                    .read(noteListProvider.notifier)
+                    .toggleFavorite(note.id!, !note.isFavorite),
+              ),
+              _buildToggleButton(
+                icon: Icons.push_pin,
+                activeColor: context.accent,
+                isActive: note.isPinned,
+                tooltip: note.isPinned ? '고정 해제' : '고정',
+                onTap: () => ref
+                    .read(noteListProvider.notifier)
+                    .togglePin(note.id!, !note.isPinned),
+              ),
+              _buildToggleButton(
+                icon: Icons.priority_high,
+                activeColor: Colors.orange,
+                isActive: note.isImportant,
+                tooltip: note.isImportant ? '중요 해제' : '중요',
+                onTap: () => ref
+                    .read(noteListProvider.notifier)
+                    .toggleImportant(note.id!, !note.isImportant),
+              ),
+              _toolbarButton(
+                Icons.search,
+                '찾기/바꾸기 [Ctrl+F]',
+                () => _openFind(false),
+                size: 32,
+              ),
+              _toolbarButton(
+                Icons.toc,
+                _outlineOpen ? '목차 닫기' : '목차',
+                () => setState(() => _outlineOpen = !_outlineOpen),
+                active: _outlineOpen,
+                size: 32,
+              ),
+            ]),
+        ],
+      ),
+    );
+  }
+
+  // ───────────── 하단 툴바
+
+  /// 내보내기·템플릿·버전 기록을 한 메뉴로
+  Future<void> _showMoreMenu(BuildContext buttonContext) async {
+    final box = buttonContext.findRenderObject() as RenderBox;
+    final overlay =
+        Overlay.of(buttonContext).context.findRenderObject() as RenderBox;
+    final rect = box.localToGlobal(Offset.zero, ancestor: overlay) & box.size;
+    PopupMenuItem<String> item(String value, IconData icon, String label) =>
+        PopupMenuItem(
+          value: value,
+          height: 36,
+          child: Row(
+            children: [
+              Icon(icon, size: 16),
+              const SizedBox(width: 8),
+              Text(label),
+            ],
+          ),
+        );
+    final choice = await showMenu<String>(
+      context: context,
+      // 툴바가 화면 아래에 있으므로 버튼 위로 펼침
+      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
+      items: [
+        item('pdf', Icons.picture_as_pdf, 'PDF 내보내기'),
+        item('md', Icons.description_outlined, '마크다운 내보내기'),
+        const PopupMenuDivider(),
+        item('template', Icons.dashboard_customize_outlined, '템플릿'),
+        item('versions', Icons.history, '버전 기록'),
+      ],
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'pdf':
+        await _exportToPdf();
+      case 'md':
+        await _exportToMarkdown();
+      case 'template':
+        if (buttonContext.mounted) await _showTemplateMenu(buttonContext);
+      case 'versions':
+        await _showVersions();
+    }
+  }
+
+  Widget _buildToolbar(BlockEditorController editor) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        border: Border(top: BorderSide(color: context.line)),
+      ),
+      child: Row(
+        children: [
+          _toolbarButton(
+            _isToolbarExpanded ? Icons.expand_more : Icons.expand_less,
+            _isToolbarExpanded ? '툴바 접기' : '툴바 펼치기',
+            () => setState(() => _isToolbarExpanded = !_isToolbarExpanded),
+          ),
+          const SizedBox(width: 6),
+          if (_isToolbarExpanded)
+            Expanded(
+              // 창이 좁으면 툴바만 가로로 스크롤
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _toolGroup([
+                      _toolbarButton(Icons.attach_file, '파일 첨부', _pickFile),
+                      _toolCell(
+                        ListenableBuilder(
+                          listenable: editor.formatState,
+                          builder: (context, _) => MemoEditorAlignDropdown(
+                            onAlign: editor.setAlign,
+                            current: editor.activeAlign,
+                          ),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(width: 8),
+                    _toolGroup([
+                      _formatButton(
+                        editor,
+                        Icons.format_bold,
+                        '굵게 [Ctrl+B]',
+                        () => editor.toggleMark('bold'),
+                        () => editor.isMarkActive('bold'),
+                      ),
+                      _formatButton(
+                        editor,
+                        Icons.format_italic,
+                        '기울임 [Ctrl+I]',
+                        () => editor.toggleMark('italic'),
+                        () => editor.isMarkActive('italic'),
+                      ),
+                      _formatButton(
+                        editor,
+                        Icons.format_underline,
+                        '밑줄 [Ctrl+U]',
+                        () => editor.toggleMark('underline'),
+                        () => editor.isMarkActive('underline'),
+                      ),
+                      _formatButton(
+                        editor,
+                        Icons.format_strikethrough,
+                        '취소선 [Ctrl+Shift+X]',
+                        () => editor.toggleMark('strikethrough'),
+                        () => editor.isMarkActive('strikethrough'),
+                      ),
+                      _toolCell(
+                        ListenableBuilder(
+                          listenable: editor.formatState,
+                          builder: (context, _) => MemoEditorColorDropdown(
+                            tooltip: '글자색 [Alt+1~8]',
+                            icon: Icons.format_color_text,
+                            onOpen: null,
+                            isHighlight: false,
+                            activeColor: StyledTextController.parseColor(
+                              editor.activeMarkValue('font_color'),
+                            ),
+                            onColorSelected: (color) =>
+                                editor.toggleColor('font_color', color),
+                          ),
+                        ),
+                      ),
+                      _toolCell(
+                        ListenableBuilder(
+                          listenable: editor.formatState,
+                          builder: (context, _) => MemoEditorColorDropdown(
+                            tooltip: '하이라이트 [Alt+↑+1~8]',
+                            icon: Icons.highlight,
+                            isHighlight: true,
+                            onOpen: null,
+                            activeColor: StyledTextController.parseColor(
+                              editor.activeMarkValue('bg_color'),
+                            ),
+                            onColorSelected: (color) =>
+                                editor.toggleColor('bg_color', color),
+                          ),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(width: 8),
+                    _toolGroup([
+                      _formatButton(
+                        editor,
+                        Icons.format_list_bulleted,
+                        '불릿 목록 [Ctrl+4]',
+                        () => editor.toggleBlockType('bulleted_list'),
+                        () => editor.isBlockTypeActive('bulleted_list'),
+                      ),
+                      _formatButton(
+                        editor,
+                        Icons.format_list_numbered,
+                        '번호 목록 [Ctrl+5]',
+                        () => editor.toggleBlockType('numbered_list'),
+                        () => editor.isBlockTypeActive('numbered_list'),
+                      ),
+                      _formatButton(
+                        editor,
+                        Icons.check_box_outlined,
+                        '체크박스 [Ctrl+6]',
+                        () => editor.toggleBlockType('todo_list'),
+                        () => editor.isBlockTypeActive('todo_list'),
+                      ),
+                    ]),
+                    const SizedBox(width: 8),
+                    _toolGroup([
+                      _toolbarButton(
+                        Icons.horizontal_rule,
+                        '구분선 [Ctrl+Shift+H]',
+                        () => editor.insertBlocks([EditorBlock.divider()]),
+                      ),
+                      _toolbarButton(
+                        Icons.code,
+                        '코드 블록 [Ctrl+Shift+C]',
+                        () => editor.insertBlocks([EditorBlock.code()]),
+                      ),
+                      _toolbarButton(
+                        Icons.unfold_less,
+                        '접기 섹션',
+                        editor.insertSection,
+                      ),
+                      _toolbarButton(
+                        Icons.label_outline,
+                        '태그',
+                        _showTagDialog,
+                      ),
+                    ]),
+                    const SizedBox(width: 8),
+                    Builder(
+                      builder: (buttonContext) => TextButton.icon(
+                        onPressed: () => _showMoreMenu(buttonContext),
+                        icon: const Icon(Icons.ios_share, size: 16),
+                        label: const Text(
+                          '내보내기 · 템플릿 · 기록',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSurface,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerLowest,
+                          minimumSize: const Size(0, 34),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            const Spacer(),
+          const SizedBox(width: 8),
+          if (_currentNote?.id != null) ...[
+            BacklinksButton(
+              noteId: _currentNote!.id!,
+              onOpen: (n) => ref.read(selectedNoteProvider.notifier).select(n),
+            ),
+            const SizedBox(width: 8),
+          ],
+          // 저장 상태
+          ValueListenableBuilder<_SaveStatus>(
+            valueListenable: _saveStatus,
+            builder: (context, status, _) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: switch (status) {
+                _SaveStatus.saving => [
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 6),
+                  Text('저장 중', style: TextStyle(fontSize: 12, color: muted)),
+                ],
+                _SaveStatus.saved => [
+                  const Icon(Icons.check, size: 14, color: Color(0xFF6FCF97)),
+                  const SizedBox(width: 4),
+                  Text('저장됨', style: TextStyle(fontSize: 12, color: muted)),
+                ],
+                _SaveStatus.idle => const [],
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1052,88 +1410,8 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
                     ),
                   ),
                 ),
-              Padding(
-                // 태그가 있으면 태그와 제목 사이를 좁게
-                padding: EdgeInsets.fromLTRB(24, hasTags ? 4 : 20, 24, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _titleController,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: '제목 없음',
-                          border: InputBorder.none,
-                          hintStyle: TextStyle(color: Colors.grey),
-                        ),
-                        onChanged: (_) => _onContentChanged(),
-                      ),
-                    ),
-                    // 토글 버튼들
-                    if (_currentNote != null) ...[
-                      _buildToggleButton(
-                        icon: Icons.star,
-                        activeColor: Colors.amber,
-                        isActive: _currentNote!.isFavorite,
-                        tooltip: _currentNote!.isFavorite ? '즐겨찾기 해제' : '즐겨찾기',
-                        onTap: () => ref
-                            .read(noteListProvider.notifier)
-                            .toggleFavorite(
-                              _currentNote!.id!,
-                              !_currentNote!.isFavorite,
-                            ),
-                      ),
-                      const SizedBox(width: 4),
-                      _buildToggleButton(
-                        icon: Icons.push_pin,
-                        activeColor: context.accent,
-                        isActive: _currentNote!.isPinned,
-                        tooltip: _currentNote!.isPinned ? '고정 해제' : '고정',
-                        onTap: () => ref
-                            .read(noteListProvider.notifier)
-                            .togglePin(
-                              _currentNote!.id!,
-                              !_currentNote!.isPinned,
-                            ),
-                      ),
-                      const SizedBox(width: 4),
-                      _buildToggleButton(
-                        icon: Icons.priority_high,
-                        activeColor: Colors.orange,
-                        isActive: _currentNote!.isImportant,
-                        tooltip: _currentNote!.isImportant ? '중요 해제' : '중요',
-                        onTap: () => ref
-                            .read(noteListProvider.notifier)
-                            .toggleImportant(
-                              _currentNote!.id!,
-                              !_currentNote!.isImportant,
-                            ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.search, size: 18),
-                        tooltip: '찾기/바꾸기 [Ctrl+F]',
-                        onPressed: () => _openFind(false),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.toc,
-                          size: 20,
-                          color: _outlineOpen ? context.accent : null,
-                        ),
-                        tooltip: _outlineOpen ? '목차 닫기' : '목차',
-                        onPressed: () =>
-                            setState(() => _outlineOpen = !_outlineOpen),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: context.line),
-
-              const SizedBox(height: 24), // 제목 <-> 내용 간격
+              _buildHeader(hasTags),
+              const SizedBox(height: 8), // 제목 <-> 내용 간격
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1149,185 +1427,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
                   ],
                 ),
               ),
-              // 하단 툴바
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: context.line)),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        _isToolbarExpanded
-                            ? Icons.expand_more
-                            : Icons.expand_less,
-                        size: 18,
-                      ),
-                      tooltip: _isToolbarExpanded ? '툴바 접기' : '툴바 펼치기',
-                      onPressed: () => setState(
-                        () => _isToolbarExpanded = !_isToolbarExpanded,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    if (_isToolbarExpanded) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.attach_file, size: 18),
-                        tooltip: '파일 첨부',
-                        onPressed: _pickFile,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 4),
-                      MemoEditorAlignDropdown(onAlign: editor.setAlign),
-                      _toolbarButton(
-                        Icons.format_bold,
-                        '굵게 [Ctrl+B]',
-                        () => editor.toggleMark('bold'),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.format_italic,
-                        '기울임 [Ctrl+I]',
-                        () => editor.toggleMark('italic'),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.format_underline,
-                        '밑줄 [Ctrl+U]',
-                        () => editor.toggleMark('underline'),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.format_strikethrough,
-                        '취소선 [Ctrl+Shift+X]',
-                        () => editor.toggleMark('strikethrough'),
-                      ),
-                      const SizedBox(width: 4),
-                      MemoEditorColorDropdown(
-                        tooltip: '글자색 [Alt+1~8]',
-                        icon: Icons.format_color_text,
-                        onOpen: null,
-                        isHighlight: false,
-                        onColorSelected: (color) =>
-                            editor.toggleColor('font_color', color),
-                      ),
-                      const SizedBox(width: 4),
-                      MemoEditorColorDropdown(
-                        tooltip: '하이라이트 [Alt+↑+1~8]',
-                        icon: Icons.highlight,
-                        isHighlight: true,
-                        onOpen: null,
-                        onColorSelected: (color) =>
-                            editor.toggleColor('bg_color', color),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.format_list_bulleted,
-                        '불릿 목록 [Ctrl+4]',
-                        () => editor.toggleBlockType('bulleted_list'),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.format_list_numbered,
-                        '번호 목록 [Ctrl+5]',
-                        () => editor.toggleBlockType('numbered_list'),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.check_box_outline_blank,
-                        '체크박스 [Ctrl+6]',
-                        () => editor.toggleBlockType('todo_list'),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.horizontal_rule,
-                        '구분선 [Ctrl+Shift+H]',
-                        () => editor.insertBlocks([EditorBlock.divider()]),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.code,
-                        '코드 블록 [Ctrl+Shift+C]',
-                        () => editor.insertBlocks([EditorBlock.code()]),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.unfold_less,
-                        '접기 섹션',
-                        editor.insertSection,
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(Icons.label_outline, '태그', _showTagDialog),
-                      const SizedBox(width: 8),
-                      _toolbarButton(
-                        Icons.picture_as_pdf,
-                        'PDF 내보내기',
-                        _exportToPdf,
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(
-                        Icons.description_outlined,
-                        '마크다운 내보내기',
-                        _exportToMarkdown,
-                      ),
-                      const SizedBox(width: 4),
-                      Builder(
-                        builder: (buttonContext) => _toolbarButton(
-                          Icons.dashboard_customize_outlined,
-                          '템플릿',
-                          () => _showTemplateMenu(buttonContext),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      _toolbarButton(Icons.history, '버전 기록', _showVersions),
-                      const SizedBox(width: 4),
-                    ],
-                    const Spacer(),
-                    if (_currentNote?.id != null) ...[
-                      BacklinksButton(
-                        noteId: _currentNote!.id!,
-                        onOpen: (n) =>
-                            ref.read(selectedNoteProvider.notifier).select(n),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    // 글자 수 (저장될 때마다 갱신)
-                    ValueListenableBuilder<_SaveStatus>(
-                      valueListenable: _saveStatus,
-                      builder: (context, _, _) => Text(
-                        _statusText(editor),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ValueListenableBuilder<_SaveStatus>(
-                      valueListenable: _saveStatus,
-                      builder: (context, status, _) => switch (status) {
-                        _SaveStatus.saving => const SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        _SaveStatus.saved => const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Colors.blueGrey,
-                        ),
-                        _SaveStatus.idle => const SizedBox.shrink(),
-                      },
-                    ),
-                  ],
-                ),
-              ),
+              _buildToolbar(editor),
             ],
           ),
           if (_isDragging)

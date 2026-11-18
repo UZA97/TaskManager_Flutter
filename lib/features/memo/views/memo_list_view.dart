@@ -20,19 +20,19 @@ class MemoListView extends ConsumerWidget {
 
     return Column(
       children: [
-        // 상단 액션 바: 폴더와 메모 생성 버튼을 한눈에 보여줍니다.
+        // 상단: 제목과 새 폴더·새 메모 버튼
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
           child: _buildActionBar(context, ref),
         ),
 
         // 검색창: 현재 메모 목록을 빠르게 필터링합니다.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: _buildSearchField(context, ref),
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
         // 트리 형태의 폴더/메모 구조를 렌더링합니다.
         Expanded(
@@ -54,32 +54,39 @@ class MemoListView extends ConsumerWidget {
 
   /// 메모 목록 상단의 폴더/메모 생성 버튼을 구성합니다.
   Widget _buildActionBar(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    ButtonStyle square(Color? background, Color? foreground) =>
+        IconButton.styleFrom(
+          backgroundColor: background,
+          foregroundColor: foreground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        );
     return Row(
       children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => _showCreateFolderDialog(context, ref, null),
-            icon: const Icon(Icons.create_new_folder, size: 14),
-            label: const Text('폴더', style: TextStyle(fontSize: 12)),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              side: BorderSide(color: context.line),
-              foregroundColor: Colors.grey[700],
-            ),
+        const Expanded(
+          child: Text(
+            '메모',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ),
+        IconButton(
+          tooltip: '새 폴더',
+          onPressed: () => _showCreateFolderDialog(context, ref, null),
+          icon: const Icon(Icons.create_new_folder_outlined, size: 17),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+          style: square(scheme.surfaceContainerHigh, scheme.onSurface),
+        ),
         const SizedBox(width: 6),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () => ref.read(noteListProvider.notifier).createNote(),
-            icon: const Icon(Icons.note_add, size: 14),
-            label: const Text('메모', style: TextStyle(fontSize: 12)),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              backgroundColor: context.accent,
-              foregroundColor: Colors.white,
-            ),
-          ),
+        IconButton(
+          tooltip: '새 메모',
+          onPressed: () => ref.read(noteListProvider.notifier).createNote(),
+          icon: const Icon(Icons.add, size: 18),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+          style: square(context.accent, scheme.onPrimary),
         ),
       ],
     );
@@ -160,14 +167,22 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
   Widget build(BuildContext context) {
     return TextField(
       controller: _controller,
+      style: const TextStyle(fontSize: 13),
       decoration: InputDecoration(
         hintText: '검색',
-        prefixIcon: const Icon(Icons.search, size: 18),
+        prefixIcon: const Icon(Icons.search, size: 17),
+        prefixIconConstraints: const BoxConstraints(minWidth: 34),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: context.line),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: context.accent),
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 9),
         isDense: true,
       ),
       onChanged: _onChanged,
@@ -287,14 +302,20 @@ class _FolderTree extends ConsumerWidget {
     }
 
     return ListView(
+      padding: const EdgeInsets.only(bottom: 12),
       children: [
-        // 즐겨찾기 섹션 (항상 표시)
-        const _FavoriteSectionHeader(),
-        ...favWidgets,
-        const Divider(
-          height: 1,
-          thickness: 1.5,
-          color: Color.fromARGB(255, 180, 180, 180),
+        // 즐겨찾기 섹션 (항상 표시): 둥근 칸 안에 묶음
+        Container(
+          margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+          padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [const _FavoriteSectionHeader(), ...favWidgets],
+          ),
         ),
         // 일반 트리
         ...normalWidgets,
@@ -574,36 +595,25 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, details.globalPosition),
       child: Container(
-        padding: EdgeInsets.only(
-          left: 8.0 + widget.depth * 16.0,
-          right: 8,
-          top: 4,
-          bottom: 4,
+        height: 30,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        padding: EdgeInsets.only(left: 8.0 + widget.depth * 16.0, right: 6),
+        decoration: BoxDecoration(
+          color: isHovered
+              ? context.accent.withValues(alpha: 0.3)
+              : isSelected
+              ? context.selectedTint
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
-        color: isHovered
-            ? const Color(0xFFBBDEFB)
-            : isSelected
-            ? context.selectedTint
-            : Colors.transparent,
         child: Row(
           children: [
-            SizedBox(
-              width: 16,
-              child: hasChildren
-                  ? Icon(
-                      _isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
-                      size: 16,
-                      color: Colors.grey,
-                    )
-                  : const SizedBox(),
-            ),
-            const SizedBox(width: 4),
             Icon(
-              _isExpanded ? Icons.folder_open : Icons.folder,
-              size: 14,
+              _isExpanded ? Icons.folder_open_outlined : Icons.folder_outlined,
+              size: 15,
               color: context.accent,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 widget.folder.name,
@@ -615,7 +625,25 @@ class _FolderNodeState extends ConsumerState<_FolderNode> {
               ),
             ),
             if (widget.folder.isFavorite)
-              const Icon(Icons.star, size: 10, color: Colors.amber),
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Icon(Icons.star, size: 11, color: Colors.amber),
+              ),
+            // 펼침 표시는 오른쪽 (펼치면 아래로 회전)
+            SizedBox(
+              width: 18,
+              child: hasChildren
+                  ? AnimatedRotation(
+                      turns: _isExpanded ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: const Icon(
+                        Icons.chevron_right,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                    )
+                  : null,
+            ),
           ],
         ),
       ),
@@ -820,22 +848,22 @@ class _NoteNode extends ConsumerWidget {
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
       child: Container(
-        padding: EdgeInsets.only(
-          left: 8.0 + depth * 16.0 + 20,
-          right: 8,
-          top: 4,
-          bottom: 4,
+        height: 28,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        padding: EdgeInsets.only(left: 8.0 + depth * 16.0, right: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? context.selectedTint : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
-        color: isSelected ? context.selectedTint : Colors.transparent,
         child: Row(
           children: [
-            const Icon(Icons.note, size: 14, color: Colors.grey),
-            const SizedBox(width: 6),
+            const Icon(Icons.description_outlined, size: 15, color: Colors.grey),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 note.title.isEmpty ? '제목 없음' : note.title,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 12.5,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -1118,24 +1146,25 @@ class _FavoriteSectionHeader extends ConsumerWidget {
       builder: (context, candidateData, _) {
         final isHovered = candidateData.isNotEmpty;
         return Container(
-          height: 32,
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          color: isHovered
-              ? Colors.amber.withValues(alpha: 0.1)
-              : Colors.transparent,
+          height: 28,
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
+          decoration: BoxDecoration(
+            color: isHovered
+                ? Colors.amber.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: Row(
             children: [
-              const Icon(Icons.star, size: 14, color: Colors.amber),
+              const Icon(Icons.star, size: 12, color: Colors.amber),
               const SizedBox(width: 6),
               Text(
                 '즐겨찾기',
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.bold,
                   color: isHovered
                       ? Colors.amber
-                      : const Color.fromARGB(255, 120, 120, 120),
-                  letterSpacing: 0.8,
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               if (isHovered) ...[
@@ -1146,6 +1175,50 @@ class _FavoriteSectionHeader extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// 즐겨찾기 칸의 한 줄. 지금 열린 항목은 테마색으로 채움
+class _FavoriteRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final bool selected;
+  const _FavoriteRow({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onAccent = Theme.of(context).colorScheme.onPrimary;
+    return Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: selected ? context.accent : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: selected ? onAccent : iconColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                color: selected ? onAccent : null,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1163,26 +1236,18 @@ class _FavoriteItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isSelected = ref.watch(
+      selectedFolderProvider.select((f) => f?.id == folder.id),
+    );
     final child = GestureDetector(
       onTap: () => ref.read(selectedFolderProvider.notifier).select(folder),
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(30, 4, 8, 4),
-        child: Row(
-          children: [
-            Icon(Icons.folder, size: 14, color: context.accent),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                folder.name,
-                style: const TextStyle(fontSize: 13),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // const Icon(Icons.star, size: 10, color: Colors.amber),
-          ],
-        ),
+      child: _FavoriteRow(
+        icon: Icons.folder_outlined,
+        iconColor: context.accent,
+        title: folder.name,
+        selected: isSelected,
       ),
     );
 
@@ -1243,26 +1308,18 @@ class _FavoriteNoteItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isSelected = ref.watch(
+      selectedNoteProvider.select((n) => n?.id == note.id),
+    );
     final child = GestureDetector(
       onTap: () => ref.read(selectedNoteProvider.notifier).select(note),
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, ref, details.globalPosition),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(30, 4, 8, 4),
-        child: Row(
-          children: [
-            const Icon(Icons.note, size: 14, color: Colors.grey),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                note.title.isEmpty ? '제목 없음' : note.title,
-                style: const TextStyle(fontSize: 13),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // const Icon(Icons.star, size: 10, color: Colors.amber),
-          ],
-        ),
+      child: _FavoriteRow(
+        icon: Icons.description_outlined,
+        iconColor: Colors.grey,
+        title: note.title.isEmpty ? '제목 없음' : note.title,
+        selected: isSelected,
       ),
     );
 

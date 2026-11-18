@@ -16,8 +16,14 @@ class AppSettings {
   final bool briefingAutoShow; // 하루 첫 실행 때 오늘 브리핑 띄우기
   final int trashRetentionDays; // 휴지통 보관 기간 (0이면 자동으로 비우지 않음)
   final String quickMemoHotKey; // 빠른 메모 단축키 (QuickMemoShortcut.spec, "off"면 사용 안 함)
+  final double sidePanelWidth; // 사이드 패널 폭 (경계선을 끌어서 조절)
+
+  static const double sidePanelDefaultWidth = 250;
+  static const double sidePanelMinWidth = 200;
+  static const double sidePanelMaxWidth = 500;
 
   const AppSettings({
+    this.sidePanelWidth = sidePanelDefaultWidth,
     this.trayModeEnabled = true,
     this.themeMode = ThemeMode.light,
     this.themeColor = const Color(0xFF4A90E2),
@@ -47,8 +53,10 @@ class AppSettings {
     bool? briefingAutoShow,
     int? trashRetentionDays,
     String? quickMemoHotKey,
+    double? sidePanelWidth,
   }) {
     return AppSettings(
+      sidePanelWidth: sidePanelWidth ?? this.sidePanelWidth,
       trayModeEnabled: trayModeEnabled ?? this.trayModeEnabled,
       themeMode: themeMode ?? this.themeMode,
       themeColor: themeColor ?? this.themeColor,

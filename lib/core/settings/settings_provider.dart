@@ -35,6 +35,13 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
       briefingAutoShow: map['briefing_auto_show'] != 'false',
       trashRetentionDays: int.tryParse(map['trash_retention_days'] ?? '') ?? 30,
       quickMemoHotKey: map['quick_memo_hotkey'] ?? 'control,alt|M',
+      sidePanelWidth:
+          (double.tryParse(map['side_panel_width'] ?? '') ??
+                  AppSettings.sidePanelDefaultWidth)
+              .clamp(
+                AppSettings.sidePanelMinWidth,
+                AppSettings.sidePanelMaxWidth,
+              ),
     );
   }
 
@@ -155,6 +162,12 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<void> setQuickMemoHotKey(String spec) async {
     await _put('quick_memo_hotkey', spec);
     state = AsyncData(state.requireValue.copyWith(quickMemoHotKey: spec));
+  }
+
+  // 사이드 패널 폭 (화면에 먼저 반영한 뒤 저장)
+  Future<void> setSidePanelWidth(double width) async {
+    state = AsyncData(state.requireValue.copyWith(sidePanelWidth: width));
+    await _put('side_panel_width', width.toStringAsFixed(0));
   }
 
   Future<void> setTrayMode(bool enabled) async {

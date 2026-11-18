@@ -165,23 +165,6 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   bool _isLocked = false;
   final Set<String> _notifiedAlarmKeys = {};
 
-  static const _navigationItems = [
-    (Icons.note, '메모'),
-    (Icons.calendar_month, '캘린더'),
-    (Icons.mail, '메일'),
-    (Icons.map, '지도'),
-    (Icons.settings, '설정'),
-  ];
-
-  /// 메인 화면 좌측 네비게이션에 표시할 항목 목록 (선택된 아이콘은 테마색)
-  List<NavigationRailDestination> _navigationDestinations(Color accent) => [
-    for (final (icon, label) in _navigationItems)
-      NavigationRailDestination(
-        icon: Icon(icon, color: Colors.white),
-        selectedIcon: Icon(icon, color: accent),
-        label: Text(label),
-      ),
-  ];
 
   /// 메인 화면 좌측 패널에 보여줄 사이드바 콘텐츠 목록입니다.
   static const List<Widget> _sidePanels = [
@@ -504,26 +487,29 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
       );
     }
 
+    // 사이드 패널 폭: 창이 좁으면 메인 패널이 남도록 최대치를 줄임
+    final maxPanelWidth = (MediaQuery.sizeOf(context).width - 80 - 300).clamp(
+      AppSettings.sidePanelMinWidth,
+      AppSettings.sidePanelMaxWidth,
+    );
+    final sidePanelWidth =
+        (_dragPanelWidth ??
+                ref.watch(settingsProvider).value?.sidePanelWidth ??
+                AppSettings.sidePanelDefaultWidth)
+            .clamp(AppSettings.sidePanelMinWidth, maxPanelWidth);
+
     return Scaffold(
       body: Row(
         children: [
           // 왼쪽 네비게이션 패널
-          NavigationRail(
-            backgroundColor: const Color(0xFF2C2C2C),
-            selectedIndex: ref.watch(navigationProvider),
-            onDestinationSelected: (index) {
-              ref.read(navigationProvider.notifier).navigateTo(index);
-            },
-            labelType: NavigationRailLabelType.none,
-            leading: IconButton(
-              tooltip: '오늘 브리핑',
-              icon: const Icon(Icons.wb_sunny_outlined, color: Colors.white),
-              onPressed: () => showBriefingDialog(context),
-            ),
-            destinations: _navigationDestinations(context.accent),
+          _MainNavRail(
+            selected: ref.watch(navigationProvider),
+            onSelect: (index) =>
+                ref.read(navigationProvider.notifier).navigateTo(index),
+            onBriefing: () => showBriefingDialog(context),
           ),
           Container(
-            width: 250,
+            width: sidePanelWidth,
             color: Theme.of(context).colorScheme.surfaceContainerLow,
             child: // 사이드 패널
             AnimatedSwitcher(
@@ -534,20 +520,62 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
               ),
             ),
           ),
-          VerticalDivider(width: 1, color: context.line),
-          // 메인 패널
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: KeyedSubtree(
-                key: ValueKey(ref.watch(navigationProvider)),
-                child: _detailPanels[ref.watch(navigationProvider)],
-              ),
+            child: Stack(
+              children: [
+                Row(
+                  children: [
+                    VerticalDivider(width: 1, color: context.line),
+                    // 메인 패널
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: KeyedSubtree(
+                          key: ValueKey(ref.watch(navigationProvider)),
+                          child: _detailPanels[ref.watch(navigationProvider)],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                // 경계선을 끌어 사이드 패널 폭 조절 (더블클릭: 기본 폭)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 6,
+                  child: _PanelResizeHandle(
+                    onStart: (x) {
+                      _dragStartX = x;
+                      _dragStartWidth = sidePanelWidth;
+                    },
+                    onUpdate: (x) => setState(() {
+                      _dragPanelWidth = (_dragStartWidth + x - _dragStartX)
+                          .clamp(AppSettings.sidePanelMinWidth, maxPanelWidth);
+                    }),
+                    onEnd: () => _saveSidePanelWidth(_dragPanelWidth),
+                    onReset: () =>
+                        _saveSidePanelWidth(AppSettings.sidePanelDefaultWidth),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  // 끄는 동안의 사이드 패널 폭 (놓으면 설정에 저장)
+  double? _dragPanelWidth;
+  double _dragStartX = 0;
+  double _dragStartWidth = 0;
+
+  Future<void> _saveSidePanelWidth(double? width) async {
+    if (width != null && ref.read(settingsProvider).hasValue) {
+      await ref.read(settingsProvider.notifier).setSidePanelWidth(width);
+    }
+    if (mounted) setState(() => _dragPanelWidth = null);
   }
 
   @override
@@ -617,6 +645,174 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     }
 
     return false;
+  }
+}
+
+/// 왼쪽 주메뉴: 아이콘 아래 이름, 선택된 메뉴는 둥근 배경 + 테마색
+/// (배경은 테마와 상관없이 고정)
+class _MainNavRail extends StatelessWidget {
+  final int selected;
+  final ValueChanged<int> onSelect;
+  final VoidCallback onBriefing;
+  const _MainNavRail({
+    required this.selected,
+    required this.onSelect,
+    required this.onBriefing,
+  });
+
+  static const _background = Color(0xFF2C2C2C);
+
+  // 위쪽 화면 메뉴 (index = navigationProvider 값)
+  static const _items = [
+    (Icons.description_outlined, '메모'),
+    (Icons.calendar_month_outlined, '캘린더'),
+    (Icons.mail_outline, '메일'),
+    (Icons.map_outlined, '지도'),
+  ];
+  static const _settingsIndex = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 76,
+      color: _background,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        children: [
+          for (final (i, (icon, label)) in _items.indexed)
+            _NavButton(
+              icon: icon,
+              label: label,
+              selected: selected == i,
+              onTap: () => onSelect(i),
+            ),
+          const Spacer(),
+          _NavButton(
+            icon: Icons.wb_sunny_outlined,
+            label: '브리핑',
+            tooltip: '오늘 브리핑',
+            selected: false,
+            onTap: onBriefing,
+          ),
+          _NavButton(
+            icon: Icons.settings_outlined,
+            label: '설정',
+            selected: selected == _settingsIndex,
+            onTap: () => onSelect(_settingsIndex),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? tooltip;
+  final bool selected;
+  final VoidCallback onTap;
+  const _NavButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? context.accent : const Color(0xFFB8B8B8);
+    final button = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: selected ? const Color(0xFF3A3A3A) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          hoverColor: Colors.white.withValues(alpha: 0.06),
+          onTap: onTap,
+          child: SizedBox(
+            width: 60,
+            height: 54,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 20, color: color),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return tooltip == null
+        ? button
+        : Tooltip(message: tooltip!, child: button);
+  }
+}
+
+/// 사이드 패널과 메인 패널 사이 경계선의 끌기 손잡이
+class _PanelResizeHandle extends StatefulWidget {
+  final ValueChanged<double> onStart; // 화면 기준 x
+  final ValueChanged<double> onUpdate;
+  final VoidCallback onEnd;
+  final VoidCallback onReset;
+  const _PanelResizeHandle({
+    required this.onStart,
+    required this.onUpdate,
+    required this.onEnd,
+    required this.onReset,
+  });
+
+  @override
+  State<_PanelResizeHandle> createState() => _PanelResizeHandleState();
+}
+
+class _PanelResizeHandleState extends State<_PanelResizeHandle> {
+  bool _hovering = false;
+  bool _dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onDoubleTap: widget.onReset,
+        onHorizontalDragStart: (details) {
+          setState(() => _dragging = true);
+          widget.onStart(details.globalPosition.dx);
+        },
+        onHorizontalDragUpdate: (details) =>
+            widget.onUpdate(details.globalPosition.dx),
+        onHorizontalDragEnd: (_) {
+          setState(() => _dragging = false);
+          widget.onEnd();
+        },
+        onHorizontalDragCancel: () {
+          setState(() => _dragging = false);
+          widget.onEnd();
+        },
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: 2,
+            color: _hovering || _dragging ? context.accent : null,
+          ),
+        ),
+      ),
+    );
   }
 }
 
