@@ -40,6 +40,8 @@ import 'core/database/database_provider.dart';
 import 'core/update/update_service.dart';
 import 'features/briefing/briefing_dialog.dart';
 import 'features/briefing/briefing_provider.dart';
+import 'features/todo/todo_provider.dart';
+import 'features/todo/todo_views.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -173,6 +175,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     MailListView(),
     MapSidebarView(),
     SettingsView(),
+    TodoSidebarView(), // todoTabIndex
   ];
 
   /// 메인 화면 우측 콘텐츠 영역에 보여줄 상세 뷰 목록입니다.
@@ -182,6 +185,7 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
     MailDetailView(),
     MapView(),
     SettingsDetailView(),
+    TodoView(), // todoTabIndex
   ];
 
   @override
@@ -662,12 +666,13 @@ class _MainNavRail extends StatelessWidget {
 
   static const _background = Color(0xFF2C2C2C);
 
-  // 위쪽 화면 메뉴 (index = navigationProvider 값)
+  // 위쪽 화면 메뉴 (보이는 순서, index = navigationProvider 값)
   static const _items = [
-    (Icons.description_outlined, '메모'),
-    (Icons.calendar_month_outlined, '캘린더'),
-    (Icons.mail_outline, '메일'),
-    (Icons.map_outlined, '지도'),
+    (0, Icons.description_outlined, '메모'),
+    (todoTabIndex, Icons.checklist, '할 일'),
+    (1, Icons.calendar_month_outlined, '캘린더'),
+    (2, Icons.mail_outline, '메일'),
+    (3, Icons.map_outlined, '지도'),
   ];
   static const _settingsIndex = 4;
 
@@ -679,7 +684,7 @@ class _MainNavRail extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         children: [
-          for (final (i, (icon, label)) in _items.indexed)
+          for (final (i, icon, label) in _items)
             _NavButton(
               icon: icon,
               label: label,

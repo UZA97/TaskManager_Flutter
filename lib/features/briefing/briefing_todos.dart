@@ -42,6 +42,37 @@ List<({List<int> path, String text, DateTime? due})> uncheckedTodos(
   return result;
 }
 
+/// 메모 본문에서 [path] 위치 체크박스의 체크 여부를 바꾼 새 본문.
+/// 그 자리가 체크박스가 아니거나, [expectedText]와 글자가 다르면(그사이 메모가 바뀜) null.
+String? setTodoCheckedAt(
+  String noteContent,
+  List<int> path,
+  bool checked, {
+  String? expectedText,
+}) {
+  if (path.isEmpty) return null;
+  try {
+    final root = jsonDecode(noteContent) as Map;
+    var nodes = ((root['document'] as Map)['children'] as List?) ?? const [];
+    Map? node;
+    for (final i in path) {
+      if (i < 0 || i >= nodes.length || nodes[i] is! Map) return null;
+      node = nodes[i] as Map;
+      nodes = (node['children'] as List?) ?? const [];
+    }
+    if (node == null || node['type'] != 'todo_list') return null;
+    final data = (node['data'] ??= <String, Object?>{}) as Map;
+    if (expectedText != null &&
+        _plainText(data['delta']).trim() != expectedText) {
+      return null;
+    }
+    data['checked'] = checked;
+    return jsonEncode(root);
+  } catch (_) {
+    return null;
+  }
+}
+
 String _plainText(Object? delta) => delta is List
     ? delta
           .whereType<Map>()

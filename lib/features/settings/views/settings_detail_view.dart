@@ -271,6 +271,7 @@ class _GeneralSettings extends ConsumerWidget {
           SegmentedButton<int>(
             segments: const [
               ButtonSegment(value: 0, label: Text('메모')),
+              ButtonSegment(value: 5, label: Text('할 일')), // todoTabIndex
               ButtonSegment(value: 1, label: Text('캘린더')),
               ButtonSegment(value: 2, label: Text('메일')),
               ButtonSegment(value: 3, label: Text('지도')),

@@ -12,7 +12,7 @@ class AppSettings {
   final bool focusModeEnabled;
   final String focusModeStart; // "22:00"
   final String focusModeEnd; // "08:00"
-  final int startScreen; // 앱을 켰을 때 화면 (0 메모, 1 캘린더, 2 메일, 3 지도)
+  final int startScreen; // 앱을 켰을 때 화면 (0 메모, 1 캘린더, 2 메일, 3 지도, 5 할 일)
   final bool briefingAutoShow; // 하루 첫 실행 때 오늘 브리핑 띄우기
   final int trashRetentionDays; // 휴지통 보관 기간 (0이면 자동으로 비우지 않음)
   final String quickMemoHotKey; // 빠른 메모 단축키 (QuickMemoShortcut.spec, "off"면 사용 안 함)

@@ -31,7 +31,11 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
       focusModeEnabled: map['focus_mode_enabled'] == 'true',
       focusModeStart: map['focus_mode_start'] ?? "22:00",
       focusModeEnd: map['focus_mode_end'] ?? "08:00",
-      startScreen: (int.tryParse(map['start_screen'] ?? '') ?? 0).clamp(0, 3),
+      // 0 메모, 1 캘린더, 2 메일, 3 지도, 5 할 일 (4 설정은 시작 화면이 아님)
+      startScreen: switch (int.tryParse(map['start_screen'] ?? '') ?? 0) {
+        final v when v >= 0 && v <= 3 || v == 5 => v,
+        _ => 0,
+      },
       briefingAutoShow: map['briefing_auto_show'] != 'false',
       trashRetentionDays: int.tryParse(map['trash_retention_days'] ?? '') ?? 30,
       quickMemoHotKey: map['quick_memo_hotkey'] ?? 'control,alt|M',
