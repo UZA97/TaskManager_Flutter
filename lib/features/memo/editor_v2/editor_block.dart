@@ -134,7 +134,9 @@ class EditorBlock {
       ..remove('level')
       ..remove('collapsed')
       ..remove('backgroundColor')
-      ..remove('due');
+      ..remove('due')
+      ..remove('eventId')
+      ..remove('eventDate');
     if (newType == 'todo_list') data['checked'] = false;
     if (newType == 'heading') data['level'] = level ?? 1;
     if (newType == collapsibleSectionType) data['collapsed'] = false;

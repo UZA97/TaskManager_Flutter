@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:taskmanager/features/map/services/location_search_result.dart';
 import '../providers/event_provider.dart';
-import '../../memo/providers/memo_todo_provider.dart';
 import '../models/event.dart';
 import '../models/recurrence.dart';
 import '../data/event_repository.dart';
@@ -19,7 +18,6 @@ class CalendarEditorView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentMonth = ref.watch(currentMonthProvider);
     final eventsAsync = ref.watch(eventListProvider);
-    final memoTodos = ref.watch(memoDueTodosProvider).value ?? const [];
     final tagFilter = ref.watch(tagFilterProvider);
     final scheme = Theme.of(context).colorScheme;
 
@@ -120,8 +118,6 @@ class CalendarEditorView extends ConsumerWidget {
             data: (events) => _CalendarGrid(
               currentMonth: currentMonth,
               events: events,
-              todos: memoTodos,
-              onTodoTap: (todo) => openMemoTodo(ref, todo),
               onDateTap: (date) {
                 ref.read(selectedDateProvider.notifier).select(date);
                 _showEventDialog(context, ref, date);
@@ -157,16 +153,12 @@ class _CalendarGrid extends StatelessWidget {
   final List<Event> events;
   final void Function(DateTime) onDateTap;
   final void Function(Event) onEventTap;
-  final List<MemoDueTodo> todos;
-  final void Function(MemoDueTodo) onTodoTap;
 
   const _CalendarGrid({
     required this.currentMonth,
     required this.events,
     required this.onDateTap,
     required this.onEventTap,
-    required this.todos,
-    required this.onTodoTap,
   });
 
   @override
@@ -227,13 +219,8 @@ class _CalendarGrid extends StatelessWidget {
                   isSunday: colIndex == 0,
                   isSaturday: colIndex == 6,
                   events: dayEvents,
-                  todos: [
-                    for (final t in todos)
-                      if (DateUtils.isSameDay(t.due, date)) t,
-                  ],
                   onTap: () => onDateTap(date),
                   onEventTap: onEventTap,
-                  onTodoTap: onTodoTap,
                 ),
               );
             }),
@@ -252,10 +239,8 @@ class _CalendarCell extends StatelessWidget {
   final bool isSunday;
   final bool isSaturday;
   final List<Event> events;
-  final List<MemoDueTodo> todos;
   final VoidCallback onTap;
   final void Function(Event) onEventTap;
-  final void Function(MemoDueTodo) onTodoTap;
 
   const _CalendarCell({
     required this.date,
@@ -264,43 +249,9 @@ class _CalendarCell extends StatelessWidget {
     required this.isSunday,
     required this.isSaturday,
     required this.events,
-    required this.todos,
     required this.onTap,
     required this.onEventTap,
-    required this.onTodoTap,
   });
-
-  /// 메모 체크리스트 (테두리만 있는 칸, 누르면 메모로 이동)
-  Widget _todoChip(BuildContext context, MemoDueTodo todo) {
-    return GestureDetector(
-      onTap: () => onTodoTap(todo),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-        decoration: BoxDecoration(
-          border: Border.all(color: context.accent.withValues(alpha: 0.6)),
-          borderRadius: BorderRadius.circular(3),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.check_box_outline_blank,
-              size: 10,
-              color: context.accent,
-            ),
-            const SizedBox(width: 2),
-            Expanded(
-              child: Text(
-                todo.text,
-                style: const TextStyle(fontSize: 10),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -347,11 +298,9 @@ class _CalendarCell extends StatelessWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
-                itemCount: events.length + todos.length > 3
-                    ? 3
-                    : events.length + todos.length,
+                itemCount: events.length > 3 ? 3 : events.length,
                 itemBuilder: (context, index) {
-                  final total = events.length + todos.length;
+                  final total = events.length;
                   if (index == 2 && total > 3) {
                     return Padding(
                       padding: const EdgeInsets.only(left: 4),
@@ -363,9 +312,6 @@ class _CalendarCell extends StatelessWidget {
                         ),
                       ),
                     );
-                  }
-                  if (index >= events.length) {
-                    return _todoChip(context, todos[index - events.length]);
                   }
                   final event = events[index];
                   return GestureDetector(
@@ -661,15 +607,16 @@ class _EventDialogState extends ConsumerState<EventDialog> {
     if (_titleController.text.isEmpty || _saving) return;
     setState(() => _saving = true);
     try {
-      await _saveEvent();
-      if (mounted) Navigator.pop(context);
+      final id = await _saveEvent();
+      // 저장한 일정 번호를 돌려줌 (메모 체크리스트와 연결할 때 씀)
+      if (mounted) Navigator.pop(context, id);
     } catch (e) {
       _showError('저장 실패: $e');
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  Future<void> _saveEvent() async {
+  Future<int?> _saveEvent() async {
     final startDateStr = _formatDate(_startDate ?? widget.initialDate);
     final endDateStr = _formatDate(_endDate ?? widget.initialDate);
 
@@ -733,6 +680,7 @@ class _EventDialogState extends ConsumerState<EventDialog> {
         _selectedTagId != null ? [_selectedTagId!] : [],
       );
     }
+    return savedId;
   }
 
   @override

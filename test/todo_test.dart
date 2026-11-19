@@ -1,70 +1,33 @@
-import 'dart:convert';
-
+import 'package:flutter/gestures.dart';
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:taskmanager/core/database/database.dart';
+import 'package:taskmanager/core/database/database_provider.dart';
 import 'package:taskmanager/core/theme/app_colors.dart';
-import 'package:taskmanager/features/briefing/briefing_todos.dart';
-import 'package:taskmanager/features/memo/models/note.dart';
 import 'package:taskmanager/features/todo/todo_provider.dart';
 import 'package:taskmanager/features/todo/todo_views.dart';
 
-String _doc(List<Map<String, Object?>> children) => jsonEncode({
-  'document': {'type': 'page', 'children': children},
-});
+TodoItem _item(int id, String title, {DateTime? due, bool done = false}) =>
+    TodoItem(
+      id: id,
+      title: title,
+      due: due == null ? null : formatTodoDue(due),
+      done: done,
+      doneAt: done ? DateTime.now().toIso8601String() : null,
+      createdAt: '',
+    );
 
-Map<String, Object?> _todo(
-  String text, {
-  bool checked = false,
-  String? due,
-  List<Map<String, Object?>> children = const [],
-}) => {
-  'type': 'todo_list',
-  'data': {
-    'checked': checked,
-    'due': ?due,
-    'delta': [
-      {'insert': text},
-    ],
-  },
-  'children': children,
-};
+class _FakeTodos extends TodoListNotifier {
+  _FakeTodos(this.items);
+  final List<TodoItem> items;
+
+  @override
+  Future<List<TodoItem>> build() async => items;
+}
 
 void main() {
-  group('setTodoCheckedAt', () {
-    final content = _doc([
-      {
-        'type': 'paragraph',
-        'data': {
-          'delta': [
-            {'insert': '머리말'},
-          ],
-        },
-      },
-      _todo('부모', children: [_todo('자식')]),
-    ]);
-
-    test('checks a nested todo and keeps the rest', () {
-      final updated = setTodoCheckedAt(content, [
-        1,
-        0,
-      ], true, expectedText: '자식');
-      expect(updated, isNotNull);
-      final left = uncheckedTodos(updated!).map((t) => t.text).toList();
-      expect(left, ['부모']);
-      // 다시 해제하면 원래대로
-      final restored = setTodoCheckedAt(updated, [1, 0], false);
-      expect(uncheckedTodos(restored!).map((t) => t.text), ['부모', '자식']);
-    });
-
-    test('refuses when the text changed or the spot is not a todo', () {
-      expect(setTodoCheckedAt(content, [1], true, expectedText: '다름'), isNull);
-      expect(setTodoCheckedAt(content, [0], true), isNull); // 문단
-      expect(setTodoCheckedAt(content, [5], true), isNull); // 없는 자리
-      expect(setTodoCheckedAt('not json', [0], true), isNull);
-    });
-  });
-
   test('todoBucketOf groups by due date', () {
     final now = DateTime(2026, 11, 18, 15, 30);
     expect(todoBucketOf(null, now), TodoBucket.none);
@@ -73,6 +36,49 @@ void main() {
     expect(todoBucketOf(DateTime(2026, 11, 19), now), TodoBucket.week);
     expect(todoBucketOf(DateTime(2026, 11, 24), now), TodoBucket.week);
     expect(todoBucketOf(DateTime(2026, 11, 25), now), TodoBucket.later);
+  });
+
+  test('dueLabel', () {
+    final now = DateTime(2026, 11, 18, 9);
+    expect(dueLabel(DateTime(2026, 11, 18), now), '오늘');
+    expect(dueLabel(DateTime(2026, 11, 19), now), '내일');
+    expect(dueLabel(DateTime(2026, 11, 20), now), '11/20 (금)');
+    expect(dueLabel(DateTime(2027, 1, 3), now), '2027/1/3');
+  });
+
+  test('todo list saves to the database', () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+    final todos = container.read(todoListProvider.notifier);
+    await container.read(todoListProvider.future);
+
+    await todos.add('  장보기  ', due: DateTime(2026, 11, 20));
+    await todos.add('   '); // 빈 글은 무시
+    var items = container.read(todoListProvider).value!;
+    expect(items.single.title, '장보기');
+    expect(items.single.dueDate, DateTime(2026, 11, 20));
+
+    final id = items.single.id;
+    await todos.setDue(id, null);
+    await todos.rename(id, '마트 장보기');
+    await todos.setDone(id, true);
+    items = container.read(todoListProvider).value!;
+    expect(items.single.due, isNull);
+    expect(items.single.title, '마트 장보기');
+    expect(items.single.done, isTrue);
+    expect(items.single.doneAt, isNotNull);
+
+    final removed = items.single;
+    await todos.delete(id);
+    expect(container.read(todoListProvider).value, isEmpty);
+    await todos.restore(removed);
+    expect(container.read(todoListProvider).value!.single.title, '마트 장보기');
+    await todos.clearDone();
+    expect(container.read(todoListProvider).value, isEmpty);
   });
 
   // 라이트·다크 모드, 좁은 창에서도 오류 없이 그려지는지
@@ -84,26 +90,18 @@ void main() {
         tester.view.physicalSize = Size(width, 700);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
-        const note = Note(
-          id: 1,
-          title: '아주 긴 메모 제목이 들어가서 칩이 넘치는지 확인하는 메모',
-          content: '',
-          createdAt: '',
-          updatedAt: '',
-        );
         final today = DateTime.now();
-        final todos = [
-          MemoTodo(note, '지난 일', const [0], today.subtract(const Duration(days: 2))),
-          MemoTodo(note, '오늘 할 일 ' * 12, const [1], today),
-          const MemoTodo(note, '기한 없는 일', [2], null),
+        final items = [
+          _item(1, '지난 일', due: today.subtract(const Duration(days: 2))),
+          _item(2, '오늘 할 일 ' * 12, due: today),
+          _item(3, '기한 없는 일'),
+          _item(4, '끝낸 일', done: true),
         ];
         ColorScheme scheme(Brightness b) =>
             ColorScheme.fromSeed(seedColor: appSeedColor, brightness: b);
         await tester.pumpWidget(
           ProviderScope(
-            overrides: [
-              allMemoTodosProvider.overrideWith((ref) async => todos),
-            ],
+            overrides: [todoListProvider.overrideWith(() => _FakeTodos(items))],
             child: MaterialApp(
               theme: ThemeData(colorScheme: scheme(Brightness.light)),
               darkTheme: ThemeData(
@@ -124,20 +122,88 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.text('지난 일'), findsOneWidget);
-        expect(find.text('기한 지남'), findsWidgets);
-        expect(find.text('3개 남음'), findsOneWidget);
+        expect(find.text('끝낸 일'), findsNothing); // 완료는 따로
+        expect(find.text('기한 지남'), findsOneWidget); // 묶음 제목
+        // 사이드 패널은 '할 일'과 '완료' 두 개뿐
+        expect(find.text('전체'), findsNothing);
+        expect(find.text('나중에'), findsNothing);
+        expect(find.text('3개 남음'), findsWidgets);
+        expect(find.text('할 일 추가 (Enter)'), findsOneWidget);
+
+        // 완료 보기
+        await tester.tap(find.text('완료').first);
+        await tester.pumpAndSettle();
+        expect(find.text('끝낸 일'), findsOneWidget);
+        expect(find.text('지난 일'), findsNothing);
+        expect(tester.takeException(), isNull);
       });
     }
   }
 
-  test('uncheckedTodos reads due dates for the todo tab', () {
-    final todos = uncheckedTodos(
-      _doc([
-        _todo('완료됨', checked: true),
-        _todo('마감 있음', due: '2026-11-20'),
-      ]),
+  // 기한을 정하고 추가: 마우스가 다른 할 일 위에 있어도 오류 없이 앞쪽에 들어감
+  testWidgets('add a todo with a due date', (tester) async {
+    tester.view.physicalSize = const Size(1000, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(db)],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                SizedBox(width: 240, child: TodoSidebarView()),
+                Expanded(child: TodoView()),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
-    expect(todos.single.text, '마감 있음');
-    expect(todos.single.due, DateTime(2026, 11, 20));
+    Future<void> settle() async {
+      // DB 작업은 실제 비동기라 runAsync로 기다림
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> add(String text, {String? due}) async {
+      if (due != null) {
+        await tester.tap(find.byKey(const ValueKey('todo-add-due')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(due).last);
+        await tester.pumpAndSettle();
+      }
+      await tester.enterText(find.byType(TextField).first, text);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await settle();
+    }
+
+    await settle();
+    await add('나중 일');
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(
+      tester.getCenter(find.byKey(const ValueKey('todo-check')).first),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await add('오늘 일', due: '오늘');
+
+    expect(tester.takeException(), isNull);
+    final items = await tester.runAsync(() => db.select(db.todoTable).get());
+    final today = DateTime.now();
+    expect(
+      items!.firstWhere((t) => t.title == '오늘 일').dueDate,
+      DateTime(today.year, today.month, today.day),
+    );
+    // 기한 있는 것이 위로
+    expect(
+      tester.getTopLeft(find.text('오늘 일')).dy,
+      lessThan(tester.getTopLeft(find.text('나중 일')).dy),
+    );
   });
 }

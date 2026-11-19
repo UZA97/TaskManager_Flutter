@@ -7,21 +7,20 @@ import '../calendar/models/event.dart';
 import '../calendar/providers/event_provider.dart';
 import '../mail/models/mail_message.dart';
 import '../mail/providers/mail_provider.dart';
-import '../memo/providers/note_provider.dart';
+import '../todo/todo_provider.dart';
 import 'briefing_ai_dialog.dart';
 import 'briefing_provider.dart';
 
 const _weekdays = ['월', '화', '수', '목', '금', '토', '일'];
 
 // 메인 탭 순서 (main.dart의 _navigationDestinations)
-const _memoTab = 0;
 const _calendarTab = 1;
 const _mailTab = 2;
 
 Future<void> showBriefingDialog(BuildContext context) =>
     showDialog(context: context, builder: (_) => const BriefingDialog());
 
-/// 오늘 일정 · 안 읽은 메일 · 미완료 체크리스트를 한 화면에 보여주는 브리핑
+/// 오늘 일정 · 안 읽은 메일 · 할 일을 한 화면에 보여주는 브리핑
 class BriefingDialog extends ConsumerWidget {
   const BriefingDialog({super.key});
 
@@ -119,9 +118,9 @@ class BriefingDialog extends ConsumerWidget {
                     ),
                     _Section(
                       icon: Icons.check_box_outlined,
-                      title: '미완료 체크리스트',
+                      title: '할 일',
                       count: data.totalTodoCount,
-                      empty: '남은 체크리스트가 없어요',
+                      empty: '남은 할 일이 없어요',
                       children: [
                         for (final t in data.todos) _TodoTile(todo: t),
                         if (data.totalTodoCount > data.todos.length)
@@ -292,13 +291,13 @@ class _MailTile extends ConsumerWidget {
 }
 
 class _TodoTile extends ConsumerWidget {
-  final BriefingTodo todo;
+  final TodoItem todo;
 
   const _TodoTile({required this.todo});
 
-  /// 마감일: 오늘 / 지남 / 날짜
+  /// 기한: 오늘 / 지남 / 날짜
   Widget? _dueLabel(BuildContext context) {
-    final due = todo.due;
+    final due = todo.dueDate;
     if (due == null) return null;
     final today = DateUtils.dateOnly(DateTime.now());
     final (label, color) = DateUtils.isSameDay(due, today)
@@ -318,21 +317,11 @@ class _TodoTile extends ConsumerWidget {
         width: 72,
         child: Icon(Icons.check_box_outline_blank, size: 16),
       ),
-      title: Text(todo.text, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        todo.note.title.isEmpty ? '(제목 없음)' : todo.note.title,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: Text(todo.title, overflow: TextOverflow.ellipsis),
       trailing: _dueLabel(context),
       onTap: () {
-        // 메모를 연 뒤 해당 체크리스트로 커서 이동
-        ref.read(memoFocusRequestProvider.notifier).request((
-          noteId: todo.note.id!,
-          path: todo.path,
-          text: todo.text,
-        ));
-        ref.read(selectedNoteProvider.notifier).select(todo.note);
-        ref.read(navigationProvider.notifier).navigateTo(_memoTab);
+        // 할 일 탭으로
+        ref.read(navigationProvider.notifier).navigateTo(todoTabIndex);
         Navigator.pop(context);
       },
     );

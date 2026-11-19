@@ -168,8 +168,24 @@ class PendingEventDeleteTable extends Table {
   Set<Column> get primaryKey => {googleEventId};
 }
 
+// 할 일 탭의 할 일 (메모 체크리스트와 별개)
+@DataClassName('TodoItem')
+class TodoTable extends Table {
+  @override
+  String get tableName => 'todos';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text()();
+  // 기한 (yyyy-MM-dd). null이면 기한 없음
+  TextColumn get due => text().nullable()();
+  BoolColumn get done => boolean().withDefault(const Constant(false))();
+  TextColumn get doneAt => text().nullable()();
+  TextColumn get createdAt => text()();
+}
+
 @DriftDatabase(
   tables: [
+    TodoTable,
     NoteTable,
     TagTable,
     NoteTagTable,
@@ -187,8 +203,11 @@ class PendingEventDeleteTable extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// 테스트용 (메모리 DB 등)
+  AppDatabase.forTesting(super.executor);
+
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   /// 신규 설치와 기존 데이터베이스 업그레이드 모두에서 공통으로 쓰이는
   /// 기본 폴더를 생성하고, 폴더가 비어 있는 메모에 자동으로 연결합니다.
@@ -291,6 +310,9 @@ class AppDatabase extends _$AppDatabase {
         );
         // createTable은 IF NOT EXISTS라 재업그레이드에도 안전
         await m.createTable(pendingEventDeleteTable);
+      }
+      if (from < 12) {
+        await m.createTable(todoTable);
       }
     },
   );

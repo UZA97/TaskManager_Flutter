@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/providers/navigation_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../calendar/data/event_repository.dart';
 import '../../calendar/providers/event_provider.dart';
 import '../../calendar/views/calendar_editor_view.dart';
 import '../../map/services/location_search_result.dart';
@@ -37,6 +38,7 @@ import 'note_dates.dart';
 import 'find_bar.dart';
 import 'outline_panel.dart';
 import 'styled_text_controller.dart';
+import 'todo_due.dart';
 
 /// 새 에디터를 쓰는 메모 화면. 화면 구성(탭·제목·토글·태그·하단 툴바)은 기존과 같음.
 class MemoEditorV2View extends ConsumerStatefulWidget {
@@ -539,6 +541,65 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     );
   }
 
+  /// 체크리스트 줄 오른쪽의 캘린더 버튼: 연결된 일정이 있으면 편집, 없으면 이 줄로
+  /// 새 일정을 만들어 연결. 일정은 캘린더에만 저장됨 (브리핑·할 일 탭과는 별개).
+  Future<void> _onTodoCalendar(EditorBlock block) async {
+    final editor = _editor;
+    if (editor == null) return;
+    final repo = ref.read(eventRepositoryProvider);
+    final linkedId = (block.data[todoEventIdKey] as num?)?.toInt();
+    final existing = linkedId == null
+        ? null
+        : await repo.getEventById(linkedId);
+    if (!mounted) return;
+
+    final noteTitle = _currentNote?.title.trim() ?? '';
+    final savedId = await showDialog<int>(
+      context: context,
+      builder: (context) => existing != null
+          ? EventDialog(
+              initialDate:
+                  DateTime.tryParse(existing.startDate ?? existing.eventDate) ??
+                  DateTime.now(),
+              event: existing,
+            )
+          : EventDialog(
+              // 예전 버전에서 정한 마감일이 있으면 그 날짜로
+              initialDate:
+                  parseDueDate(block.data[todoDueKey]) ??
+                  DateUtils.dateOnly(DateTime.now()),
+              initialTitle: block.controller.text.trim(),
+              initialContent: noteTitle.isEmpty ? null : '메모: $noteTitle',
+            ),
+    );
+
+    // 저장·편집·삭제 결과를 다시 읽어 줄의 연결 정보를 맞춤
+    final eventId = savedId ?? (existing != null ? linkedId : null);
+    final event = eventId == null ? null : await repo.getEventById(eventId);
+    if (!mounted || editor != _editor || !editor.blocks.contains(block)) return;
+    final before = (
+      block.data[todoEventIdKey],
+      block.data[todoEventDateKey],
+      block.data[todoDueKey],
+    );
+    if (event != null) {
+      block.data[todoEventIdKey] = event.id;
+      block.data[todoEventDateKey] = event.startDate ?? event.eventDate;
+      block.data.remove(todoDueKey);
+    } else if (linkedId != null) {
+      // 연결된 일정이 지워짐
+      block.data
+        ..remove(todoEventIdKey)
+        ..remove(todoEventDateKey);
+    }
+    final after = (
+      block.data[todoEventIdKey],
+      block.data[todoEventDateKey],
+      block.data[todoDueKey],
+    );
+    if (before != after) editor.contentChanged();
+  }
+
   // ───────────── 버전 기록
 
   Future<void> _showVersions() async {
@@ -814,6 +875,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
         noteLinkSearch: _searchNoteLinks,
         onOpenNoteLink: _openNoteLink,
         onDateTap: _onDateTap,
+        onTodoCalendar: _onTodoCalendar,
         padding: const EdgeInsets.fromLTRB(44, 0, 36, 0),
       );
     }
@@ -1194,11 +1256,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
                         '접기 섹션',
                         editor.insertSection,
                       ),
-                      _toolbarButton(
-                        Icons.label_outline,
-                        '태그',
-                        _showTagDialog,
-                      ),
+                      _toolbarButton(Icons.label_outline, '태그', _showTagDialog),
                     ]),
                     const SizedBox(width: 8),
                     Builder(

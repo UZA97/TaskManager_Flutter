@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -166,4 +167,81 @@ void main() {
       await tester.pump(const Duration(seconds: 1)); // 실행 취소 기록 타이머
     });
   }
+
+  // 줄 끝에 있는 링크: 줄의 빈 곳을 누르면 열리지 않고, 링크 글자를 누르면 열림
+  testWidgets('link at line end opens only when its text is clicked', (
+    tester,
+  ) async {
+    final opened = <int>[];
+    final controller = BlockEditorController([
+      EditorBlock(
+        type: 'paragraph',
+        delta: [
+          {'insert': 'see '},
+          {
+            'insert': 'other',
+            'attributes': {'href': '${noteLinkScheme}7'},
+          },
+        ],
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BlockEditor(controller: controller, onOpenNoteLink: opened.add),
+        ),
+      ),
+    );
+    final line = find.byType(EditableText).first;
+    // 줄 오른쪽 끝의 빈 곳
+    await tester.tapAt(tester.getTopRight(line) + const Offset(-20, 8));
+    await tester.pumpAndSettle();
+    expect(opened, isEmpty);
+
+    // 링크 글자 위
+    final editable = tester.state<EditableTextState>(line).renderEditable;
+    final box = editable
+        .getBoxesForSelection(
+          const TextSelection(baseOffset: 6, extentOffset: 7),
+        )
+        .first
+        .toRect();
+    await tester.tapAt(editable.localToGlobal(box.center));
+    await tester.pumpAndSettle();
+    expect(opened, [7]);
+  });
+
+  // 체크리스트 줄의 캘린더 버튼: 누르는 순간 포커스가 풀려 버튼이 사라지지 않고 눌림
+  testWidgets(
+    'todo calendar button responds to a click',
+    (tester) async {
+      final tapped = <EditorBlock>[];
+      final controller = BlockEditorController([
+        _line('todo_list', 'buy milk'),
+      ]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BlockEditor(
+              controller: controller,
+              onTodoCalendar: tapped.add,
+            ),
+          ),
+        ),
+      );
+      final block = controller.blocks.single;
+      controller.focus(block, 0);
+      await tester.pumpAndSettle();
+      // 실제처럼 누른 뒤 한 프레임 그리고 뗌 (그 사이 포커스가 풀리면 버튼이 사라짐)
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byIcon(Icons.event_outlined)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(tapped, [block]);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
 }

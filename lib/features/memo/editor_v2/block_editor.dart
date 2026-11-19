@@ -72,6 +72,7 @@ class BlockEditor extends StatefulWidget {
     this.noteLinkSearch,
     this.onOpenNoteLink,
     this.onDateTap,
+    this.onTodoCalendar,
     this.padding = const EdgeInsets.symmetric(horizontal: 36),
   });
 
@@ -95,6 +96,10 @@ class BlockEditor extends StatefulWidget {
   /// 글 속의 날짜를 눌렀을 때 (일정 만들기 등). [position]은 화면 좌표.
   final void Function(DateMention date, EditorBlock block, Offset position)?
   onDateTap;
+
+  /// 체크리스트 줄 오른쪽의 캘린더 버튼을 눌렀을 때 (일정 만들기·편집).
+  /// null이면 버튼을 그리지 않음.
+  final void Function(EditorBlock block)? onTodoCalendar;
 
   final EdgeInsets padding;
 
@@ -1612,8 +1617,11 @@ class _BlockEditorState extends State<BlockEditor> {
               // 키로 고정: 머리 기호·마감일 버튼이 생기거나 사라져도 입력창을
               // 새로 만들지 않음 (새로 만들면 Ctrl+1~6 뒤에 커서가 사라짐)
               Expanded(key: const ValueKey('field'), child: field),
-              if (block.type == 'todo_list')
-                TodoDueButton(block: block, onChanged: _c.contentChanged),
+              if (block.type == 'todo_list' && widget.onTodoCalendar != null)
+                TodoCalendarButton(
+                  block: block,
+                  onOpen: widget.onTodoCalendar!,
+                ),
             ],
           ),
           // 유튜브 링크가 있으면 미리보기 (없으면 빈 칸)
@@ -1913,6 +1921,8 @@ class _BlockEditorState extends State<BlockEditor> {
           _numbers[block],
           selected,
           block.data[todoDueKey],
+          block.data[todoEventDateKey],
+          block.data[todoEventIdKey],
           Theme.of(context).brightness, // 다크 모드 전환 시 글자색 다시
         );
         final cached = _rowCache[block];
@@ -2023,6 +2033,16 @@ class _BlockEditorState extends State<BlockEditor> {
     final index = position.affinity == TextAffinity.upstream
         ? position.offset - 1
         : position.offset;
+    if (index < 0 || index >= block.controller.text.length) return null;
+    // 그 글자 위를 실제로 눌렀을 때만 (줄 끝 뒤의 빈 곳을 누르면 마지막 글자로
+    // 잡히므로, 링크가 줄 끝에 있으면 줄 아무 데나 눌러도 열리던 문제)
+    final local = editable.globalToLocal(global);
+    final boxes = editable.getBoxesForSelection(
+      TextSelection(baseOffset: index, extentOffset: index + 1),
+    );
+    if (!boxes.any((box) => box.toRect().inflate(1).contains(local))) {
+      return null;
+    }
     return block.controller.linkAt(index) ??
         (widget.onDateTap == null ? null : block.controller.dateAt(index));
   }

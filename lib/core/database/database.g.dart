@@ -3,6 +3,398 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
+class $TodoTableTable extends TodoTable
+    with TableInfo<$TodoTableTable, TodoItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TodoTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dueMeta = const VerificationMeta('due');
+  @override
+  late final GeneratedColumn<String> due = GeneratedColumn<String>(
+    'due',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _doneMeta = const VerificationMeta('done');
+  @override
+  late final GeneratedColumn<bool> done = GeneratedColumn<bool>(
+    'done',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("done" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _doneAtMeta = const VerificationMeta('doneAt');
+  @override
+  late final GeneratedColumn<String> doneAt = GeneratedColumn<String>(
+    'done_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    due,
+    done,
+    doneAt,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'todos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TodoItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('due')) {
+      context.handle(
+        _dueMeta,
+        due.isAcceptableOrUnknown(data['due']!, _dueMeta),
+      );
+    }
+    if (data.containsKey('done')) {
+      context.handle(
+        _doneMeta,
+        done.isAcceptableOrUnknown(data['done']!, _doneMeta),
+      );
+    }
+    if (data.containsKey('done_at')) {
+      context.handle(
+        _doneAtMeta,
+        doneAt.isAcceptableOrUnknown(data['done_at']!, _doneAtMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TodoItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TodoItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      due: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}due'],
+      ),
+      done: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}done'],
+      )!,
+      doneAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}done_at'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TodoTableTable createAlias(String alias) {
+    return $TodoTableTable(attachedDatabase, alias);
+  }
+}
+
+class TodoItem extends DataClass implements Insertable<TodoItem> {
+  final int id;
+  final String title;
+  final String? due;
+  final bool done;
+  final String? doneAt;
+  final String createdAt;
+  const TodoItem({
+    required this.id,
+    required this.title,
+    this.due,
+    required this.done,
+    this.doneAt,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || due != null) {
+      map['due'] = Variable<String>(due);
+    }
+    map['done'] = Variable<bool>(done);
+    if (!nullToAbsent || doneAt != null) {
+      map['done_at'] = Variable<String>(doneAt);
+    }
+    map['created_at'] = Variable<String>(createdAt);
+    return map;
+  }
+
+  TodoTableCompanion toCompanion(bool nullToAbsent) {
+    return TodoTableCompanion(
+      id: Value(id),
+      title: Value(title),
+      due: due == null && nullToAbsent ? const Value.absent() : Value(due),
+      done: Value(done),
+      doneAt: doneAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(doneAt),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory TodoItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TodoItem(
+      id: serializer.fromJson<int>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      due: serializer.fromJson<String?>(json['due']),
+      done: serializer.fromJson<bool>(json['done']),
+      doneAt: serializer.fromJson<String?>(json['doneAt']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'title': serializer.toJson<String>(title),
+      'due': serializer.toJson<String?>(due),
+      'done': serializer.toJson<bool>(done),
+      'doneAt': serializer.toJson<String?>(doneAt),
+      'createdAt': serializer.toJson<String>(createdAt),
+    };
+  }
+
+  TodoItem copyWith({
+    int? id,
+    String? title,
+    Value<String?> due = const Value.absent(),
+    bool? done,
+    Value<String?> doneAt = const Value.absent(),
+    String? createdAt,
+  }) => TodoItem(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    due: due.present ? due.value : this.due,
+    done: done ?? this.done,
+    doneAt: doneAt.present ? doneAt.value : this.doneAt,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  TodoItem copyWithCompanion(TodoTableCompanion data) {
+    return TodoItem(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      due: data.due.present ? data.due.value : this.due,
+      done: data.done.present ? data.done.value : this.done,
+      doneAt: data.doneAt.present ? data.doneAt.value : this.doneAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TodoItem(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('due: $due, ')
+          ..write('done: $done, ')
+          ..write('doneAt: $doneAt, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, title, due, done, doneAt, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TodoItem &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.due == this.due &&
+          other.done == this.done &&
+          other.doneAt == this.doneAt &&
+          other.createdAt == this.createdAt);
+}
+
+class TodoTableCompanion extends UpdateCompanion<TodoItem> {
+  final Value<int> id;
+  final Value<String> title;
+  final Value<String?> due;
+  final Value<bool> done;
+  final Value<String?> doneAt;
+  final Value<String> createdAt;
+  const TodoTableCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.due = const Value.absent(),
+    this.done = const Value.absent(),
+    this.doneAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  TodoTableCompanion.insert({
+    this.id = const Value.absent(),
+    required String title,
+    this.due = const Value.absent(),
+    this.done = const Value.absent(),
+    this.doneAt = const Value.absent(),
+    required String createdAt,
+  }) : title = Value(title),
+       createdAt = Value(createdAt);
+  static Insertable<TodoItem> custom({
+    Expression<int>? id,
+    Expression<String>? title,
+    Expression<String>? due,
+    Expression<bool>? done,
+    Expression<String>? doneAt,
+    Expression<String>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (due != null) 'due': due,
+      if (done != null) 'done': done,
+      if (doneAt != null) 'done_at': doneAt,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  TodoTableCompanion copyWith({
+    Value<int>? id,
+    Value<String>? title,
+    Value<String?>? due,
+    Value<bool>? done,
+    Value<String?>? doneAt,
+    Value<String>? createdAt,
+  }) {
+    return TodoTableCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      due: due ?? this.due,
+      done: done ?? this.done,
+      doneAt: doneAt ?? this.doneAt,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (due.present) {
+      map['due'] = Variable<String>(due.value);
+    }
+    if (done.present) {
+      map['done'] = Variable<bool>(done.value);
+    }
+    if (doneAt.present) {
+      map['done_at'] = Variable<String>(doneAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TodoTableCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('due: $due, ')
+          ..write('done: $done, ')
+          ..write('doneAt: $doneAt, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $FolderTableTable extends FolderTable
     with TableInfo<$FolderTableTable, FolderTableData> {
   @override
@@ -4751,6 +5143,7 @@ class PendingEventDeleteTableCompanion
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final $TodoTableTable todoTable = $TodoTableTable(this);
   late final $FolderTableTable folderTable = $FolderTableTable(this);
   late final $NoteTableTable noteTable = $NoteTableTable(this);
   late final $TagTableTable tagTable = $TagTableTable(this);
@@ -4772,6 +5165,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    todoTable,
     folderTable,
     noteTable,
     tagTable,
@@ -4787,6 +5181,213 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ];
 }
 
+typedef $$TodoTableTableCreateCompanionBuilder =
+    TodoTableCompanion Function({
+      Value<int> id,
+      required String title,
+      Value<String?> due,
+      Value<bool> done,
+      Value<String?> doneAt,
+      required String createdAt,
+    });
+typedef $$TodoTableTableUpdateCompanionBuilder =
+    TodoTableCompanion Function({
+      Value<int> id,
+      Value<String> title,
+      Value<String?> due,
+      Value<bool> done,
+      Value<String?> doneAt,
+      Value<String> createdAt,
+    });
+
+class $$TodoTableTableFilterComposer
+    extends Composer<_$AppDatabase, $TodoTableTable> {
+  $$TodoTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get due => $composableBuilder(
+    column: $table.due,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get doneAt => $composableBuilder(
+    column: $table.doneAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TodoTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $TodoTableTable> {
+  $$TodoTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get due => $composableBuilder(
+    column: $table.due,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get doneAt => $composableBuilder(
+    column: $table.doneAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TodoTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TodoTableTable> {
+  $$TodoTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get due =>
+      $composableBuilder(column: $table.due, builder: (column) => column);
+
+  GeneratedColumn<bool> get done =>
+      $composableBuilder(column: $table.done, builder: (column) => column);
+
+  GeneratedColumn<String> get doneAt =>
+      $composableBuilder(column: $table.doneAt, builder: (column) => column);
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$TodoTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TodoTableTable,
+          TodoItem,
+          $$TodoTableTableFilterComposer,
+          $$TodoTableTableOrderingComposer,
+          $$TodoTableTableAnnotationComposer,
+          $$TodoTableTableCreateCompanionBuilder,
+          $$TodoTableTableUpdateCompanionBuilder,
+          (TodoItem, BaseReferences<_$AppDatabase, $TodoTableTable, TodoItem>),
+          TodoItem,
+          PrefetchHooks Function()
+        > {
+  $$TodoTableTableTableManager(_$AppDatabase db, $TodoTableTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TodoTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TodoTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TodoTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> due = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<String?> doneAt = const Value.absent(),
+                Value<String> createdAt = const Value.absent(),
+              }) => TodoTableCompanion(
+                id: id,
+                title: title,
+                due: due,
+                done: done,
+                doneAt: doneAt,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String title,
+                Value<String?> due = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<String?> doneAt = const Value.absent(),
+                required String createdAt,
+              }) => TodoTableCompanion.insert(
+                id: id,
+                title: title,
+                due: due,
+                done: done,
+                doneAt: doneAt,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TodoTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TodoTableTable,
+      TodoItem,
+      $$TodoTableTableFilterComposer,
+      $$TodoTableTableOrderingComposer,
+      $$TodoTableTableAnnotationComposer,
+      $$TodoTableTableCreateCompanionBuilder,
+      $$TodoTableTableUpdateCompanionBuilder,
+      (TodoItem, BaseReferences<_$AppDatabase, $TodoTableTable, TodoItem>),
+      TodoItem,
+      PrefetchHooks Function()
+    >;
 typedef $$FolderTableTableCreateCompanionBuilder =
     FolderTableCompanion Function({
       Value<int> id,
@@ -8994,6 +9595,8 @@ typedef $$PendingEventDeleteTableTableProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $$TodoTableTableTableManager get todoTable =>
+      $$TodoTableTableTableManager(_db, _db.todoTable);
   $$FolderTableTableTableManager get folderTable =>
       $$FolderTableTableTableManager(_db, _db.folderTable);
   $$NoteTableTableTableManager get noteTable =>
