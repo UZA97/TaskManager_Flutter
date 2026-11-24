@@ -73,6 +73,26 @@ class $TodoTableTable extends TodoTable
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<int> parentId = GeneratedColumn<int>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<int> noteId = GeneratedColumn<int>(
+    'note_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -81,6 +101,8 @@ class $TodoTableTable extends TodoTable
     done,
     doneAt,
     createdAt,
+    parentId,
+    noteId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -131,6 +153,18 @@ class $TodoTableTable extends TodoTable
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    }
     return context;
   }
 
@@ -164,6 +198,14 @@ class $TodoTableTable extends TodoTable
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
       )!,
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}parent_id'],
+      ),
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}note_id'],
+      ),
     );
   }
 
@@ -180,6 +222,8 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
   final bool done;
   final String? doneAt;
   final String createdAt;
+  final int? parentId;
+  final int? noteId;
   const TodoItem({
     required this.id,
     required this.title,
@@ -187,6 +231,8 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
     required this.done,
     this.doneAt,
     required this.createdAt,
+    this.parentId,
+    this.noteId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -201,6 +247,12 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
       map['done_at'] = Variable<String>(doneAt);
     }
     map['created_at'] = Variable<String>(createdAt);
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<int>(parentId);
+    }
+    if (!nullToAbsent || noteId != null) {
+      map['note_id'] = Variable<int>(noteId);
+    }
     return map;
   }
 
@@ -214,6 +266,12 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
           ? const Value.absent()
           : Value(doneAt),
       createdAt: Value(createdAt),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
+      noteId: noteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(noteId),
     );
   }
 
@@ -229,6 +287,8 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
       done: serializer.fromJson<bool>(json['done']),
       doneAt: serializer.fromJson<String?>(json['doneAt']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
+      parentId: serializer.fromJson<int?>(json['parentId']),
+      noteId: serializer.fromJson<int?>(json['noteId']),
     );
   }
   @override
@@ -241,6 +301,8 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
       'done': serializer.toJson<bool>(done),
       'doneAt': serializer.toJson<String?>(doneAt),
       'createdAt': serializer.toJson<String>(createdAt),
+      'parentId': serializer.toJson<int?>(parentId),
+      'noteId': serializer.toJson<int?>(noteId),
     };
   }
 
@@ -251,6 +313,8 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
     bool? done,
     Value<String?> doneAt = const Value.absent(),
     String? createdAt,
+    Value<int?> parentId = const Value.absent(),
+    Value<int?> noteId = const Value.absent(),
   }) => TodoItem(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -258,6 +322,8 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
     done: done ?? this.done,
     doneAt: doneAt.present ? doneAt.value : this.doneAt,
     createdAt: createdAt ?? this.createdAt,
+    parentId: parentId.present ? parentId.value : this.parentId,
+    noteId: noteId.present ? noteId.value : this.noteId,
   );
   TodoItem copyWithCompanion(TodoTableCompanion data) {
     return TodoItem(
@@ -267,6 +333,8 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
       done: data.done.present ? data.done.value : this.done,
       doneAt: data.doneAt.present ? data.doneAt.value : this.doneAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
     );
   }
 
@@ -278,13 +346,16 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
           ..write('due: $due, ')
           ..write('done: $done, ')
           ..write('doneAt: $doneAt, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('parentId: $parentId, ')
+          ..write('noteId: $noteId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, due, done, doneAt, createdAt);
+  int get hashCode =>
+      Object.hash(id, title, due, done, doneAt, createdAt, parentId, noteId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -294,7 +365,9 @@ class TodoItem extends DataClass implements Insertable<TodoItem> {
           other.due == this.due &&
           other.done == this.done &&
           other.doneAt == this.doneAt &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.parentId == this.parentId &&
+          other.noteId == this.noteId);
 }
 
 class TodoTableCompanion extends UpdateCompanion<TodoItem> {
@@ -304,6 +377,8 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
   final Value<bool> done;
   final Value<String?> doneAt;
   final Value<String> createdAt;
+  final Value<int?> parentId;
+  final Value<int?> noteId;
   const TodoTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -311,6 +386,8 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
     this.done = const Value.absent(),
     this.doneAt = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.noteId = const Value.absent(),
   });
   TodoTableCompanion.insert({
     this.id = const Value.absent(),
@@ -319,6 +396,8 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
     this.done = const Value.absent(),
     this.doneAt = const Value.absent(),
     required String createdAt,
+    this.parentId = const Value.absent(),
+    this.noteId = const Value.absent(),
   }) : title = Value(title),
        createdAt = Value(createdAt);
   static Insertable<TodoItem> custom({
@@ -328,6 +407,8 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
     Expression<bool>? done,
     Expression<String>? doneAt,
     Expression<String>? createdAt,
+    Expression<int>? parentId,
+    Expression<int>? noteId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -336,6 +417,8 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
       if (done != null) 'done': done,
       if (doneAt != null) 'done_at': doneAt,
       if (createdAt != null) 'created_at': createdAt,
+      if (parentId != null) 'parent_id': parentId,
+      if (noteId != null) 'note_id': noteId,
     });
   }
 
@@ -346,6 +429,8 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
     Value<bool>? done,
     Value<String?>? doneAt,
     Value<String>? createdAt,
+    Value<int?>? parentId,
+    Value<int?>? noteId,
   }) {
     return TodoTableCompanion(
       id: id ?? this.id,
@@ -354,6 +439,8 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
       done: done ?? this.done,
       doneAt: doneAt ?? this.doneAt,
       createdAt: createdAt ?? this.createdAt,
+      parentId: parentId ?? this.parentId,
+      noteId: noteId ?? this.noteId,
     );
   }
 
@@ -378,6 +465,12 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
+    if (parentId.present) {
+      map['parent_id'] = Variable<int>(parentId.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<int>(noteId.value);
+    }
     return map;
   }
 
@@ -389,7 +482,9 @@ class TodoTableCompanion extends UpdateCompanion<TodoItem> {
           ..write('due: $due, ')
           ..write('done: $done, ')
           ..write('doneAt: $doneAt, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('parentId: $parentId, ')
+          ..write('noteId: $noteId')
           ..write(')'))
         .toString();
   }
@@ -5189,6 +5284,8 @@ typedef $$TodoTableTableCreateCompanionBuilder =
       Value<bool> done,
       Value<String?> doneAt,
       required String createdAt,
+      Value<int?> parentId,
+      Value<int?> noteId,
     });
 typedef $$TodoTableTableUpdateCompanionBuilder =
     TodoTableCompanion Function({
@@ -5198,6 +5295,8 @@ typedef $$TodoTableTableUpdateCompanionBuilder =
       Value<bool> done,
       Value<String?> doneAt,
       Value<String> createdAt,
+      Value<int?> parentId,
+      Value<int?> noteId,
     });
 
 class $$TodoTableTableFilterComposer
@@ -5236,6 +5335,16 @@ class $$TodoTableTableFilterComposer
 
   ColumnFilters<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get noteId => $composableBuilder(
+    column: $table.noteId,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5278,6 +5387,16 @@ class $$TodoTableTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TodoTableTableAnnotationComposer
@@ -5306,6 +5425,12 @@ class $$TodoTableTableAnnotationComposer
 
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get parentId =>
+      $composableBuilder(column: $table.parentId, builder: (column) => column);
+
+  GeneratedColumn<int> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
 }
 
 class $$TodoTableTableTableManager
@@ -5342,6 +5467,8 @@ class $$TodoTableTableTableManager
                 Value<bool> done = const Value.absent(),
                 Value<String?> doneAt = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
+                Value<int?> parentId = const Value.absent(),
+                Value<int?> noteId = const Value.absent(),
               }) => TodoTableCompanion(
                 id: id,
                 title: title,
@@ -5349,6 +5476,8 @@ class $$TodoTableTableTableManager
                 done: done,
                 doneAt: doneAt,
                 createdAt: createdAt,
+                parentId: parentId,
+                noteId: noteId,
               ),
           createCompanionCallback:
               ({
@@ -5358,6 +5487,8 @@ class $$TodoTableTableTableManager
                 Value<bool> done = const Value.absent(),
                 Value<String?> doneAt = const Value.absent(),
                 required String createdAt,
+                Value<int?> parentId = const Value.absent(),
+                Value<int?> noteId = const Value.absent(),
               }) => TodoTableCompanion.insert(
                 id: id,
                 title: title,
@@ -5365,6 +5496,8 @@ class $$TodoTableTableTableManager
                 done: done,
                 doneAt: doneAt,
                 createdAt: createdAt,
+                parentId: parentId,
+                noteId: noteId,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

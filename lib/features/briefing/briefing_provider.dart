@@ -61,7 +61,7 @@ final briefingProvider = FutureProvider.autoDispose<BriefingData>((ref) async {
   // 할 일 탭의 남은 할 일, 기한 순 (메모 체크리스트는 넣지 않음)
   final all = (await ref.read(
     todoListProvider.future,
-  )).where((t) => !t.done).toList()..sort(compareTodos);
+  )).where((t) => !t.done && t.parentId == null).toList()..sort(compareTodos);
   final todos = all.take(_maxTodos).toList();
   final totalTodoCount = all.length;
   final unreadMail = await unreadMailFuture;

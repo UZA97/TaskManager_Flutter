@@ -17,6 +17,7 @@ import '../../calendar/providers/event_provider.dart';
 import '../../calendar/views/calendar_editor_view.dart';
 import '../../map/services/location_search_result.dart';
 import '../../map/widgets/location_search_dialog.dart';
+import '../../todo/todo_memo.dart';
 import '../data/note_repository.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
@@ -137,6 +138,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyFocusRequest();
       _applyLocationRequest();
+      _applyTodoRequest();
     });
     // 열 때의 내용을 버전으로 (편집 전 상태로 되돌릴 수 있게)
     if (note.id != null) {
@@ -289,6 +291,40 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       _titleController.text = request.name;
     }
     _onContentChanged();
+  }
+
+  /// 할 일 탭에서 보낸 할 일을 고른 목차 맨 아래에 체크리스트로 넣음
+  void _applyTodoRequest() {
+    final request = ref.read(memoTodoRequestProvider);
+    final editor = _editor;
+    if (!mounted ||
+        request == null ||
+        editor == null ||
+        request.noteId != _currentNote?.id) {
+      return;
+    }
+    ref.read(memoTodoRequestProvider.notifier).request(null);
+
+    final blocks = editor.blocks;
+    // 고를 때와 줄 번호가 달라졌으면 같은 이름의 목차를 찾고, 없으면 맨 끝
+    var anchor = request.anchor;
+    if (anchor != null &&
+        !(anchor < blocks.length &&
+            isOutlineBlock(blocks[anchor]) &&
+            outlineTextOf(blocks[anchor]) == request.anchorText)) {
+      final found = blocks.indexWhere(
+        (b) => isOutlineBlock(b) && outlineTextOf(b) == request.anchorText,
+      );
+      anchor = found < 0 ? null : found;
+    }
+    if (anchor != null && blocks[anchor].isSection) {
+      blocks[anchor].data['collapsed'] = false; // 접힌 섹션이면 펼쳐서 보이게
+    }
+    final point = todoInsertPoint(blocks, anchor);
+    editor.insertBlocksAt(
+      point.index,
+      memoTodoBlocks(request.lines, point.depth),
+    );
   }
 
   static bool _samePath(List<int> a, List<int> b) =>
@@ -1366,6 +1402,14 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
       if (next != null && next.noteId == _currentNote?.id) {
         WidgetsBinding.instance.addPostFrameCallback(
           (_) => _applyLocationRequest(),
+        );
+      }
+    });
+
+    ref.listen(memoTodoRequestProvider, (_, next) {
+      if (next != null && next.noteId == _currentNote?.id) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _applyTodoRequest(),
         );
       }
     });

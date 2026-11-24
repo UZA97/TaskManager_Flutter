@@ -94,6 +94,27 @@ class BriefingDialog extends ConsumerWidget {
                   shrinkWrap: true,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
+                    // 할 일을 맨 위에
+                    _Section(
+                      icon: Icons.check_box_outlined,
+                      title: '할 일',
+                      count: data.totalTodoCount,
+                      empty: '남은 할 일이 없어요',
+                      children: [
+                        for (final t in data.todos) _TodoTile(todo: t),
+                        if (data.totalTodoCount > data.todos.length)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(52, 4, 24, 4),
+                            child: Text(
+                              '외 ${data.totalTodoCount - data.todos.length}개',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                     _Section(
                       icon: Icons.event,
                       title: '오늘 일정',
@@ -114,26 +135,6 @@ class BriefingDialog extends ConsumerWidget {
                       children: [
                         for (final m in data.unreadMail?.messages ?? const [])
                           _MailTile(mail: m),
-                      ],
-                    ),
-                    _Section(
-                      icon: Icons.check_box_outlined,
-                      title: '할 일',
-                      count: data.totalTodoCount,
-                      empty: '남은 할 일이 없어요',
-                      children: [
-                        for (final t in data.todos) _TodoTile(todo: t),
-                        if (data.totalTodoCount > data.todos.length)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(52, 4, 24, 4),
-                            child: Text(
-                              '외 ${data.totalTodoCount - data.todos.length}개',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ],

@@ -181,6 +181,10 @@ class TodoTable extends Table {
   BoolColumn get done => boolean().withDefault(const Constant(false))();
   TextColumn get doneAt => text().nullable()();
   TextColumn get createdAt => text()();
+  // 하위 할 일이면 상위 할 일의 id
+  IntColumn get parentId => integer().nullable()();
+  // 연결된 메모 id (메모에 추가했거나 직접 연결한 메모)
+  IntColumn get noteId => integer().nullable()();
 }
 
 @DriftDatabase(
@@ -207,7 +211,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 14;
 
   /// 신규 설치와 기존 데이터베이스 업그레이드 모두에서 공통으로 쓰이는
   /// 기본 폴더를 생성하고, 폴더가 비어 있는 메모에 자동으로 연결합니다.
@@ -313,6 +317,19 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 12) {
         await m.createTable(todoTable);
+      }
+      // 이전 버전 앱으로 열었다가 돌아오면 칸이 이미 있을 수 있어 확인 후 추가
+      if (from >= 12 && from < 14) {
+        await _addColumnIfMissing(
+          m,
+          todoTable,
+          todoTable.parentId as GeneratedColumn,
+        );
+        await _addColumnIfMissing(
+          m,
+          todoTable,
+          todoTable.noteId as GeneratedColumn,
+        );
       }
     },
   );

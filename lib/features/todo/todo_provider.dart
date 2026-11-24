@@ -53,7 +53,16 @@ int compareTodos(TodoItem a, TodoItem b) {
   return a.id.compareTo(b.id);
 }
 
-/// 할 일 전체 (완료 포함). 바꾸면 DB에 저장하고 목록을 다시 읽음.
+extension TodoItemTree on TodoItem {
+  bool get isSubtask => parentId != null;
+}
+
+/// [parentId]의 하위 할 일 (추가한 순서)
+List<TodoItem> subtasksOf(Iterable<TodoItem> all, int parentId) =>
+    all.where((t) => t.parentId == parentId).toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+
+/// 할 일 전체 (완료·하위 할 일 포함). 바꾸면 DB에 저장하고 목록을 다시 읽음.
 class TodoListNotifier extends AsyncNotifier<List<TodoItem>> {
   AppDatabase get _db => ref.read(databaseProvider);
 
@@ -67,7 +76,35 @@ class TodoListNotifier extends AsyncNotifier<List<TodoItem>> {
     state = AsyncData(await _db.select(_db.todoTable).get());
   }
 
-  Future<void> add(String title, {DateTime? due}) async {
+  /// 할 일 추가. [subtasks]는 하위 할 일 제목 (빈 것은 건너뜀).
+  Future<void> add(
+    String title, {
+    DateTime? due,
+    List<String> subtasks = const [],
+    int? noteId,
+  }) async {
+    final text = title.trim();
+    if (text.isEmpty) return;
+    final now = DateTime.now().toIso8601String();
+    await _db.transaction(() async {
+      final id = await _db
+          .into(_db.todoTable)
+          .insert(
+            TodoTableCompanion.insert(
+              title: text,
+              due: Value(due == null ? null : formatTodoDue(due)),
+              createdAt: now,
+              noteId: Value(noteId),
+            ),
+          );
+      for (final sub in subtasks) {
+        await _insertSub(id, sub, now);
+      }
+    });
+    await _reload();
+  }
+
+  Future<void> _insertSub(int parentId, String title, String now) async {
     final text = title.trim();
     if (text.isEmpty) return;
     await _db
@@ -75,10 +112,15 @@ class TodoListNotifier extends AsyncNotifier<List<TodoItem>> {
         .insert(
           TodoTableCompanion.insert(
             title: text,
-            due: Value(due == null ? null : formatTodoDue(due)),
-            createdAt: DateTime.now().toIso8601String(),
+            createdAt: now,
+            parentId: Value(parentId),
           ),
         );
+  }
+
+  /// 하위 할 일 추가
+  Future<void> addSubtask(int parentId, String title) async {
+    await _insertSub(parentId, title, DateTime.now().toIso8601String());
     await _reload();
   }
 
@@ -102,25 +144,49 @@ class TodoListNotifier extends AsyncNotifier<List<TodoItem>> {
     TodoTableCompanion(due: Value(due == null ? null : formatTodoDue(due))),
   );
 
+  /// 메모 연결 (null이면 연결 끊기)
+  Future<void> setNote(int id, int? noteId) =>
+      _update(id, TodoTableCompanion(noteId: Value(noteId)));
+
   Future<void> rename(int id, String title) async {
     final text = title.trim();
     if (text.isEmpty) return;
     await _update(id, TodoTableCompanion(title: Value(text)));
   }
 
-  Future<void> delete(int id) async {
-    await (_db.delete(_db.todoTable)..where((t) => t.id.equals(id))).go();
+  /// 할 일 지우기 (하위 할 일도 함께). 되살릴 수 있게 지운 것들을 돌려줌.
+  Future<List<TodoItem>> delete(int id) async {
+    final removed = await (_db.select(
+      _db.todoTable,
+    )..where((t) => t.id.equals(id) | t.parentId.equals(id))).get();
+    await (_db.delete(
+      _db.todoTable,
+    )..where((t) => t.id.equals(id) | t.parentId.equals(id))).go();
     await _reload();
+    return removed;
   }
 
   /// 지운 할 일 되살리기 (실행 취소)
-  Future<void> restore(TodoItem item) async {
-    await _db.into(_db.todoTable).insertOnConflictUpdate(item);
+  Future<void> restore(Iterable<TodoItem> items) async {
+    await _db.batch((b) {
+      for (final item in items) {
+        b.insert(_db.todoTable, item, mode: InsertMode.insertOrReplace);
+      }
+    });
     await _reload();
   }
 
+  /// 완료한 할 일 모두 지우기 (그 하위 할 일 포함. 남은 할 일의 하위 할 일은 둠)
   Future<void> clearDone() async {
-    await (_db.delete(_db.todoTable)..where((t) => t.done.equals(true))).go();
+    await _db.transaction(() async {
+      final done = await (_db.select(
+        _db.todoTable,
+      )..where((t) => t.done.equals(true) & t.parentId.isNull())).get();
+      final ids = [for (final t in done) t.id];
+      await (_db.delete(
+        _db.todoTable,
+      )..where((t) => t.id.isIn(ids) | t.parentId.isIn(ids))).go();
+    });
     await _reload();
   }
 }
@@ -141,3 +207,40 @@ class TodoShowDoneNotifier extends Notifier<bool> {
 final todoShowDoneProvider = NotifierProvider<TodoShowDoneNotifier, bool>(
   TodoShowDoneNotifier.new,
 );
+
+/// 상세 패널에 연 할 일 id (null이면 패널 닫힘)
+class TodoSelectionNotifier extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void select(int? id) => state = id;
+}
+
+final todoSelectedProvider = NotifierProvider<TodoSelectionNotifier, int?>(
+  TodoSelectionNotifier.new,
+);
+
+/// 접어 둔 것들 (묶음, 하위 할 일 목록)
+class TodoCollapseNotifier<T> extends Notifier<Set<T>> {
+  @override
+  Set<T> build() => {};
+
+  void toggle(T key) =>
+      state = state.contains(key) ? ({...state}..remove(key)) : {...state, key};
+
+  void expand(T key) {
+    if (state.contains(key)) state = {...state}..remove(key);
+  }
+}
+
+/// 접어 둔 기한 묶음
+final todoCollapsedGroupsProvider =
+    NotifierProvider<TodoCollapseNotifier<TodoBucket>, Set<TodoBucket>>(
+      TodoCollapseNotifier<TodoBucket>.new,
+    );
+
+/// 하위 할 일을 접어 둔 할 일 id
+final todoCollapsedTreesProvider =
+    NotifierProvider<TodoCollapseNotifier<int>, Set<int>>(
+      TodoCollapseNotifier<int>.new,
+    );

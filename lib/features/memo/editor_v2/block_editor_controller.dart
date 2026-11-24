@@ -422,6 +422,18 @@ class BlockEditorController extends ChangeNotifier {
     if (target != null) focus(target, target.controller.text.length);
   }
 
+  /// [index] 자리에 블록들을 넣음 (깊이는 블록에 정해진 그대로). 마지막 줄로 커서.
+  void insertBlocksAt(int index, List<EditorBlock> newBlocks) {
+    if (newBlocks.isEmpty) return;
+    for (final block in newBlocks) {
+      _register(block);
+    }
+    blocks.insertAll(index.clamp(0, blocks.length), newBlocks);
+    contentChanged();
+    final last = newBlocks.last;
+    focus(last, last.controller.text.length);
+  }
+
   /// 커서 위치에 그림 (그림·파일 등을 고른 상태면 그 아래 새 줄에)
   void insertImage(String src) => _insertInline(
     (c) => c.insertImage(src),
