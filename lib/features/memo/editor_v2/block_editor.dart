@@ -1054,6 +1054,13 @@ class _BlockEditorState extends State<BlockEditor> {
     LogicalKeyboardKey.metaRight,
   };
 
+  static final _arrowKeys = {
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight,
+  };
+
   static final _nonTypingKeys = {
     ..._modifierKeys,
     LogicalKeyboardKey.capsLock,
@@ -1147,7 +1154,52 @@ class _BlockEditorState extends State<BlockEditor> {
     _c.setSelection(
       BlockSelection(baseBlock, baseOffset, extentBlock, extentOffset),
     );
+    _revealExtent(extentBlock, extentOffset);
     return true;
+  }
+
+  /// 선택 끝(움직이는 쪽)이 화면 밖으로 나가면 그 줄이 보이도록 스크롤
+  void _revealExtent(EditorBlock block, int offset) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients || !_blocks.contains(block)) return;
+      final editable = _renderEditableOf(block);
+      final view = _viewportRect();
+      if (editable == null ||
+          !editable.attached ||
+          !editable.hasSize ||
+          view == null) {
+        // 아직 만들어지지 않은 먼 줄이면 그 항목으로 바로 이동
+        final item = _itemOf[block] ?? _itemOf[_sectionOf(block)];
+        if (item == null || !_list.isAttached) return;
+        _list.jumpToItem(
+          index: item,
+          scrollController: _scroll,
+          alignment: 0.5,
+        );
+        return;
+      }
+      final caret = editable.getLocalRectForCaret(
+        TextPosition(offset: offset.clamp(0, block.controller.text.length)),
+      );
+      final top = editable.localToGlobal(caret.topLeft).dy;
+      final bottom = editable.localToGlobal(caret.bottomLeft).dy;
+      const margin = 8.0;
+      var delta = 0.0;
+      if (top < view.top + margin) {
+        delta = top - view.top - margin;
+      } else if (bottom > view.bottom - margin) {
+        delta = bottom - view.bottom + margin;
+      }
+      if (delta == 0) return;
+      final position = _scroll.position;
+      _scroll.jumpTo(
+        (position.pixels + delta).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        ),
+      );
+    });
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   /// 여러 줄 선택 중의 키 처리. 처리하지 않으면 null.
@@ -1188,7 +1240,11 @@ class _BlockEditorState extends State<BlockEditor> {
         key == LogicalKeyboardKey.delete) {
       return done(_c.deleteSelection);
     }
-    if (shift && _extendSelection(block, key)) return KeyEventResult.handled;
+    if (shift && _arrowKeys.contains(key)) {
+      // 문서 처음/끝이라 더 넓힐 곳이 없으면 선택 그대로 (풀었다 다시 잡는 반복 방지)
+      _extendSelection(block, key);
+      return KeyEventResult.handled;
+    }
     // Shift 등 보조키만 누른 것은 선택 유지 (Shift+Tab 등)
     if (_modifierKeys.contains(key)) return KeyEventResult.ignored;
     if (_nonTypingKeys.contains(key)) {

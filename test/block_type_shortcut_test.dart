@@ -474,6 +474,73 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
 
+  // Shift+↓/↑로 화면 밖까지 선택하면 화면이 선택 끝을 따라감
+  testWidgets(
+    'shift+arrow selection scrolls to keep the extent visible',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = BlockEditorController([
+        for (var i = 0; i < 200; i++) _line('paragraph', 'line $i'),
+      ]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: BlockEditor(controller: controller)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scroll = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      controller.focus(controller.blocks[0], 0);
+      await tester.pumpAndSettle();
+
+      Future<void> shiftArrow(LogicalKeyboardKey key, int times) async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        for (var i = 0; i < times; i++) {
+          await tester.sendKeyEvent(key);
+          await tester.pump();
+        }
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.pumpAndSettle();
+      }
+
+      bool visible(String text) {
+        final rect = tester.getRect(find.text(text));
+        return rect.top >= 0 && rect.bottom <= 400;
+      }
+
+      await shiftArrow(LogicalKeyboardKey.arrowDown, 60);
+      expect(controller.selectedRange!.ei, 60);
+      expect(scroll.pixels, greaterThan(0));
+      expect(visible('line 60'), isTrue);
+
+      await shiftArrow(LogicalKeyboardKey.arrowUp, 55);
+      expect(controller.selectedRange!.ei, 5);
+      expect(visible('line 5'), isTrue);
+
+      // 문서 끝에서 더 눌러도 선택이 풀렸다 잡히는 반복 없이 그대로
+      controller.clearSelection();
+      controller.focus(controller.blocks[196], 0);
+      await tester.pumpAndSettle();
+      for (var i = 0; i < 4; i++) {
+        await shiftArrow(LogicalKeyboardKey.arrowDown, 3 + i);
+        final range = controller.selectedRange!;
+        expect((range.si, range.so), (196, 0));
+        expect((range.ei, range.eo), (199, 'line 199'.length));
+        expect(
+          controller.blocks[196].controller.selection,
+          TextSelection(baseOffset: 0, extentOffset: 'line 196'.length),
+        );
+      }
+      await shiftArrow(LogicalKeyboardKey.arrowRight, 3);
+      expect(controller.selectedRange!.ei, 199);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
   // 들여쓴 빈 체크리스트 줄에서 Enter: 체크박스 해제 → 한 단계씩 내어쓰기 → 새 줄
   testWidgets('enter on an empty indented line steps out one level', (
     tester,
