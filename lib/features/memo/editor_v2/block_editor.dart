@@ -235,14 +235,56 @@ class _BlockEditorState extends State<BlockEditor> {
     _c.focus(target, start ? 0 : target.controller.text.length);
   }
 
-  /// Page Up / Page Down: 한 화면만큼 스크롤하고, 커서는 화면에서 같은 높이의 줄로
-  void _page(EditorBlock block, int direction) {
-    _c.clearSelection();
-    final editable = _renderEditableOf(block);
+  /// Ctrl+Shift+Home / Ctrl+Shift+End: 지금 선택 시작점부터 문서 처음 / 끝까지 선택
+  void _selectToEdge(EditorBlock block, {required bool start}) {
+    final visible = [
+      for (var i = 0; i < _blocks.length; i++)
+        if (_blocks[i].isText && !_c.isHidden(i)) _blocks[i],
+    ];
+    if (visible.isEmpty) return;
+    final target = start ? visible.first : visible.last;
+    if (_scroll.hasClients && _list.isAttached && _items.isNotEmpty) {
+      _list.jumpToItem(
+        index: start ? 0 : _items.length,
+        scrollController: _scroll,
+        alignment: start ? 0 : 1,
+      );
+    }
+    _selectTo(block, target, start ? 0 : target.controller.text.length);
+  }
+
+  /// 선택 시작점은 그대로 두고 끝을 [extentBlock]의 [extentOffset]으로
+  void _selectTo(EditorBlock block, EditorBlock extentBlock, int extentOffset) {
+    final current = _c.selection;
+    _c.setSelection(
+      BlockSelection(
+        current?.baseBlock ?? block,
+        current?.baseOffset ?? block.controller.selection.baseOffset,
+        extentBlock,
+        extentOffset.clamp(0, extentBlock.controller.text.length),
+      ),
+    );
+  }
+
+  /// Page Up / Page Down: 한 화면만큼 스크롤하고, 커서는 화면에서 같은 높이의 줄로.
+  /// [select] (Shift): 커서를 옮기는 대신 그 자리까지 선택을 넓힘
+  void _page(EditorBlock block, int direction, {bool select = false}) {
+    // 선택 중이면 움직이는 쪽(extent) 기준
+    final current = select ? _c.selection : null;
+    var from = current?.extentBlock ?? block;
+    var fromOffset =
+        current?.extentOffset ?? block.controller.selection.extentOffset;
+    if (!select) _c.clearSelection();
+    var editable = from.isText ? _renderEditableOf(from) : null;
+    if (editable == null || !editable.attached || !editable.hasSize) {
+      from = block;
+      fromOffset = block.controller.selection.extentOffset;
+      editable = _renderEditableOf(block);
+    }
     if (!_scroll.hasClients || editable == null) return;
     final position = _scroll.position;
     final caret = editable.getLocalRectForCaret(
-      TextPosition(offset: block.controller.selection.extentOffset),
+      TextPosition(offset: fromOffset.clamp(0, from.controller.text.length)),
     );
     final caretPoint = editable.localToGlobal(caret.center);
     final target =
@@ -252,14 +294,17 @@ class _BlockEditorState extends State<BlockEditor> {
         );
     if (target == position.pixels) {
       // 더 넘길 곳이 없으면 문서 처음/끝으로
-      return _jumpToEdge(start: direction < 0);
+      return select
+          ? _selectToEdge(block, start: direction < 0)
+          : _jumpToEdge(start: direction < 0);
     }
     _scroll.jumpTo(target);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final next = _textBlockAt(caretPoint);
       if (next == null) return;
-      _c.focus(next, _offsetAt(next, caretPoint));
+      final offset = _offsetAt(next, caretPoint);
+      select ? _selectTo(block, next, offset) : _c.focus(next, offset);
     });
   }
 
@@ -1183,6 +1228,26 @@ class _BlockEditorState extends State<BlockEditor> {
     // `/` 메뉴가 열려 있으면 방향키·Enter·Esc는 메뉴용
     if (_slashBlock == block) {
       final result = _onSlashKey(key);
+      if (result != null) return result;
+    }
+
+    // Ctrl+Shift+Home/End: 문서 처음/끝까지 선택, Shift+PageUp/Down: 한 화면만큼 선택
+    if (shift && !alt) {
+      final result = switch (key) {
+        LogicalKeyboardKey.home when ctrl => done(
+          () => _selectToEdge(block, start: true),
+        ),
+        LogicalKeyboardKey.end when ctrl => done(
+          () => _selectToEdge(block, start: false),
+        ),
+        LogicalKeyboardKey.pageUp => done(
+          () => _page(block, -1, select: true),
+        ),
+        LogicalKeyboardKey.pageDown => done(
+          () => _page(block, 1, select: true),
+        ),
+        _ => null,
+      };
       if (result != null) return result;
     }
 

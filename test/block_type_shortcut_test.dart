@@ -410,6 +410,70 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
 
+  // Ctrl+Shift+Home/End: 문서 처음/끝까지, Shift+PageUp/Down: 한 화면씩 선택
+  testWidgets(
+    'ctrl+shift+home/end and shift+page keys extend selection',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = BlockEditorController([
+        for (var i = 0; i < 200; i++) _line('paragraph', 'line $i'),
+      ]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: BlockEditor(controller: controller)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scroll = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+
+      Future<void> press(LogicalKeyboardKey key, {bool ctrl = false}) async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        if (ctrl) await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(key);
+        if (ctrl) await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.pumpAndSettle();
+      }
+
+      controller.focus(controller.blocks[3], 2);
+      await tester.pumpAndSettle();
+
+      await press(LogicalKeyboardKey.end, ctrl: true);
+      var range = controller.selectedRange!;
+      expect((range.si, range.so), (3, 2));
+      expect((range.ei, range.eo), (199, 'line 199'.length));
+      expect(scroll.pixels, scroll.maxScrollExtent);
+
+      await press(LogicalKeyboardKey.home, ctrl: true);
+      range = controller.selectedRange!;
+      expect((range.si, range.so), (0, 0));
+      expect((range.ei, range.eo), (3, 2)); // 시작점은 그대로
+      expect(scroll.pixels, 0);
+
+      // Page: 시작점에서 한 화면씩 넓어지고 줄어듦
+      controller.clearSelection();
+      controller.focus(controller.blocks[0], 0);
+      await tester.pumpAndSettle();
+      await press(LogicalKeyboardKey.pageDown);
+      range = controller.selectedRange!;
+      final first = range.ei;
+      expect((range.si, range.so), (0, 0));
+      expect(first, greaterThan(5));
+      expect(scroll.pixels, greaterThan(0));
+      await press(LogicalKeyboardKey.pageDown);
+      expect(controller.selectedRange!.ei, greaterThan(first));
+      await press(LogicalKeyboardKey.pageUp);
+      expect(controller.selectedRange!.ei, first);
+      expect(controller.selectedRange!.si, 0);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
   // 들여쓴 빈 체크리스트 줄에서 Enter: 체크박스 해제 → 한 단계씩 내어쓰기 → 새 줄
   testWidgets('enter on an empty indented line steps out one level', (
     tester,
