@@ -244,4 +244,218 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
+
+  // 드래그하다 화면 아래 끝을 넘으면 저절로 내려가며 선택이 넓어짐
+  testWidgets(
+    'drag selection auto-scrolls past the bottom edge',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = BlockEditorController([
+        for (var i = 0; i < 80; i++) _line('paragraph', 'line $i'),
+      ]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: BlockEditor(controller: controller)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scroll = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      expect(scroll.pixels, 0);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      final start = tester.getTopLeft(find.text('line 0')) + const Offset(2, 5);
+      await mouse.down(start);
+      await tester.pump();
+      // 창 아래 끝 밖으로 끌고 그대로 잠시 둠
+      await mouse.moveTo(const Offset(100, 395));
+      await mouse.moveTo(const Offset(100, 420));
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final scrolled = scroll.pixels;
+      expect(scrolled, greaterThan(100));
+
+      final range = controller.selectedRange;
+      expect(range, isNotNull);
+      expect(range!.si, 0);
+      // 처음 화면(400px)에 보이던 줄보다 훨씬 아래까지 선택
+      final lastVisibleAtStart = controller.blocks.indexWhere(
+        (b) => b.controller.text == 'line 15',
+      );
+      expect(range.ei, greaterThan(lastVisibleAtStart));
+
+      // 떼면 멈춤
+      await mouse.up();
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(scroll.pixels, scrolled);
+      expect(controller.selection, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  // 메모 맨 끝 아래 빈 곳에서 위로 끌어도 마지막 줄 끝부터 선택되며 위로 굴러감
+  testWidgets(
+    'drag from below the last line selects upward with auto-scroll',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = BlockEditorController([
+        for (var i = 0; i < 80; i++) _line('paragraph', 'line $i'),
+      ]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: BlockEditor(controller: controller)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scroll = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      scroll.jumpTo(scroll.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final bottom = scroll.pixels;
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      final start =
+          tester.getBottomLeft(find.text('line 79')) + const Offset(30, 40);
+      await mouse.down(start);
+      await tester.pump();
+      await mouse.moveTo(Offset(100, start.dy / 2));
+      await mouse.moveTo(const Offset(100, -20));
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(scroll.pixels, lessThan(bottom - 100));
+      final range = controller.selectedRange;
+      expect(range, isNotNull);
+      expect((range!.ei, range.eo), (79, 'line 79'.length)); // 마지막 줄 끝
+      expect(range.si, lessThan(70));
+      await mouse.up();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  // 드래그 중 굴러간 뒤 마우스를 조금 움직여도 시작한 줄로 되돌아가지 않음,
+  // 누른 채 휠로 멀리 굴린 뒤 움직여도 오류 없음
+  testWidgets(
+    'drag keeps scroll position and survives scrolling far away',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final controller = BlockEditorController([
+        for (var i = 0; i < 200; i++) _line('paragraph', 'line $i'),
+      ]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: BlockEditor(controller: controller)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scroll = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.down(
+        tester.getTopLeft(find.text('line 0')) + const Offset(2, 5),
+      );
+      await tester.pump();
+      await mouse.moveTo(const Offset(100, 395));
+      await mouse.moveTo(const Offset(100, 420));
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      // 화면 안으로 돌아와 조금 움직임 (자동 스크롤 멈춤)
+      await mouse.moveTo(const Offset(100, 200));
+      await tester.pump();
+      final stopped = scroll.pixels;
+      expect(stopped, greaterThan(100));
+      await mouse.moveTo(const Offset(110, 205));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(scroll.pixels, stopped); // 시작한 줄로 되돌아가지 않음
+
+      // 누른 채로 멀리 굴림 (휠) → 다시 움직임
+      scroll.jumpTo(scroll.maxScrollExtent);
+      await tester.pump();
+      final far = scroll.pixels;
+      await mouse.moveTo(const Offset(120, 210));
+      await tester.pump();
+      await mouse.moveTo(const Offset(130, 220));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull);
+      expect(scroll.pixels, far);
+      final range = controller.selectedRange;
+      expect(range!.si, 0);
+      expect(range.ei, greaterThan(100));
+      await mouse.up();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  // 들여쓴 빈 체크리스트 줄에서 Enter: 체크박스 해제 → 한 단계씩 내어쓰기 → 새 줄
+  testWidgets('enter on an empty indented line steps out one level', (
+    tester,
+  ) async {
+    EditorBlock todo(String text, int depth) => EditorBlock(
+      type: 'todo_list',
+      depth: depth,
+      data: {'checked': false},
+      delta: [
+        if (text.isNotEmpty) {'insert': text},
+      ],
+    );
+    final empty = todo('', 2);
+    final controller = BlockEditorController([
+      todo('부모', 0),
+      todo('자식', 1),
+      todo('손자', 2),
+      empty,
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: BlockEditor(controller: controller)),
+      ),
+    );
+    controller.focus(empty, 0);
+    await tester.pumpAndSettle();
+
+    Future<void> enter() async {
+      tester.testTextInput.enterText('\n');
+      await tester.pumpAndSettle();
+    }
+
+    // 1) 체크박스 해제 (들여쓰기 그대로)
+    await enter();
+    expect((empty.type, empty.depth), ('paragraph', 2));
+    // 2) 한 단계씩 내어쓰기
+    await enter();
+    expect((empty.type, empty.depth), ('paragraph', 1));
+    await enter();
+    expect((empty.type, empty.depth), ('paragraph', 0));
+    expect(controller.blocks.length, 4); // 아직 새 줄은 없음
+    expect(empty.focusNode.hasPrimaryFocus, isTrue);
+    // 3) 맨 앞에서는 새 줄
+    await enter();
+    expect(controller.blocks.length, 5);
+    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 1)); // 실행 취소 기록 타이머
+  });
 }

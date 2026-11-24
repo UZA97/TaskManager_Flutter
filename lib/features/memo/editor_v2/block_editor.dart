@@ -128,6 +128,31 @@ class _BlockEditorState extends State<BlockEditor> {
     _c.keyHandler = _onKey;
     _c.revealer = _reveal;
     _c.addListener(_onControllerChanged);
+    _scroll.addListener(_onScrolled);
+  }
+
+  /// 드래그 중 휠 등으로 굴러가도 선택을 포인터 위치로 따라가게 함
+  void _onScrolled() {
+    if (_dragBase == null || _dragPointer == null) return;
+    _autoScrolled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateDragSelection();
+    });
+  }
+
+  /// 마우스로 글을 끄는 중에는 줄 입력창이 스스로 목록을 굴리지 못하게 함.
+  /// (Windows에서는 드래그로 선택이 바뀔 때마다 입력창이 그 줄을 화면에 보이게
+  /// 굴려서, 자동 스크롤·휠로 내려가도 시작한 줄로 되돌아가고, 그 줄이 화면에서
+  /// 멀어지면 목록이 위치를 몰라 오류가 났음. 드래그 중 스크롤은 에디터가 맡음.)
+  bool _suppressReveal() => _dragBase != null;
+
+  /// 화면에서 멀리 벗어난(목록에 배치되지 않은) 줄을 보이게 할 때: 그 줄로 이동
+  void _jumpToItem(int item) {
+    scheduleMicrotask(() {
+      if (!mounted || !_scroll.hasClients || !_list.isAttached) return;
+      if (item >= _items.length) return;
+      _list.jumpToItem(index: item, scrollController: _scroll, alignment: 0.3);
+    });
   }
 
   @override
@@ -145,6 +170,7 @@ class _BlockEditorState extends State<BlockEditor> {
   @override
   void dispose() {
     _c.removeListener(_onControllerChanged);
+    _autoScrollTimer?.cancel();
     _scroll.dispose();
     _list.dispose();
     super.dispose();
@@ -864,6 +890,13 @@ class _BlockEditorState extends State<BlockEditor> {
       block.changeType('paragraph');
       controller.setContent('', const [], 0);
       _c.contentChanged();
+      return;
+    }
+    // 들여쓴 빈 줄에서 Enter → 한 단계 내어쓰기 (상위 항목 밖으로).
+    // 맨 앞까지 나온 뒤부터는 보통처럼 새 줄.
+    if (text == '\n' && block.type == 'paragraph' && block.depth > 0) {
+      controller.setContent('', const [], 0);
+      _outdent(block);
       return;
     }
 
@@ -1976,6 +2009,114 @@ class _BlockEditorState extends State<BlockEditor> {
   (Object, Offset, EditorBlock)? _linkDown;
   int _dragBaseOffset = 0;
 
+  // ── 드래그 중 화면 끝에 닿으면 자동 스크롤
+  /// 마지막 포인터 위치 (스크롤로 글이 움직이면 이 위치로 선택을 다시 맞춤)
+  Offset? _dragPointer;
+  Timer? _autoScrollTimer;
+
+  /// 한 번에 굴릴 양 (음수: 위로)
+  double _autoScrollStep = 0;
+
+  /// 이번 드래그 중 자동 스크롤을 했는지 (했으면 시작한 줄의 선택도 직접 맞춤:
+  /// 입력창은 바깥 목록이 굴러간 만큼을 모름)
+  bool _autoScrolled = false;
+
+  /// 자동 스크롤이 시작되는 화면 위·아래 끝의 폭
+  static const _autoScrollEdge = 48.0;
+
+  /// 에디터 목록이 보이는 영역 (전역 좌표)
+  Rect? _viewportRect() {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  /// 포인터 위치까지 선택. 화면 밖이면 보이는 맨 위·아래 줄까지.
+  void _updateDragSelection() {
+    final base = _dragBase;
+    final pointer = _dragPointer;
+    if (base == null || pointer == null) return;
+    final view = _viewportRect();
+    final position = view == null
+        ? pointer
+        : Offset(
+            pointer.dx,
+            pointer.dy.clamp(view.top + 2, max(view.top + 2, view.bottom - 2)),
+          );
+    final target = _textBlockAt(position);
+    if (target == null) return;
+    if (target == base) {
+      // 다시 시작한 줄로 돌아오면 그 줄 안의 선택 (평소엔 입력창이 처리)
+      _c.clearSelection();
+      if (_autoScrolled) {
+        final extent = _offsetAt(base, position);
+        scheduleMicrotask(
+          () => base.controller.selection = TextSelection(
+            baseOffset: _dragBaseOffset,
+            extentOffset: extent,
+          ),
+        );
+      }
+      return;
+    }
+    _c.setSelection(
+      BlockSelection(
+        base,
+        _dragBaseOffset,
+        target,
+        _offsetAt(target, position),
+      ),
+    );
+    // 시작한 줄의 입력창이 이번 이동에서 자기 선택을 바꾼 뒤에 다시 맞춤
+    scheduleMicrotask(_c.applySelectionHighlights);
+  }
+
+  /// 포인터가 화면 위·아래 끝 근처(또는 밖)면 그쪽으로 굴림. 멀수록 빠르게.
+  void _updateAutoScroll() {
+    final view = _viewportRect();
+    final pointer = _dragPointer;
+    if (view == null || pointer == null || _dragBase == null) {
+      return _stopAutoScroll();
+    }
+    final top = view.top + _autoScrollEdge;
+    final bottom = view.bottom - _autoScrollEdge;
+    final double distance = pointer.dy < top
+        ? pointer.dy - top
+        : pointer.dy > bottom
+        ? pointer.dy - bottom
+        : 0;
+    if (distance == 0) return _stopAutoScroll();
+    // 16ms마다 2~40px
+    _autoScrollStep = distance.sign * (distance.abs() / 3).clamp(2, 40);
+    _autoScrollTimer ??= Timer.periodic(
+      const Duration(milliseconds: 16),
+      (_) => _autoScrollTick(),
+    );
+  }
+
+  void _autoScrollTick() {
+    if (!mounted || _dragBase == null || !_scroll.hasClients) {
+      return _stopAutoScroll();
+    }
+    final position = _scroll.position;
+    final next = (position.pixels + _autoScrollStep).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (next == position.pixels) return; // 맨 위·아래
+    _scroll.jumpTo(next);
+    _autoScrolled = true;
+    // 새로 보인 줄이 그려진 뒤 선택을 넓힘
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateDragSelection();
+    });
+  }
+
+  void _stopAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+  }
+
   RenderEditable? _renderEditableOf(EditorBlock block) {
     if (!block.isOnScreen) return null;
     final context = block.focusNode.context!;
@@ -2049,6 +2190,7 @@ class _BlockEditorState extends State<BlockEditor> {
 
   void _onPointerDown(PointerDownEvent event) {
     if (event.buttons & kPrimaryMouseButton == 0) return;
+    _endDrag(); // 이전 드래그의 자동 스크롤 상태 정리
     // 그림 크기 조절 손잡이: 글 선택 드래그를 하지 않음
     if (InlineImage.resizing) {
       _dragBase = null;
@@ -2091,8 +2233,27 @@ class _BlockEditorState extends State<BlockEditor> {
         (editable.localToGlobal(Offset.zero) & editable.size)
             .inflate(4)
             .contains(event.position);
-    _dragBase = inText ? block : null;
-    _dragBaseOffset = inText ? _offsetAt(block!, event.position) : 0;
+    if (inText) {
+      _dragBase = block;
+      _dragBaseOffset = _offsetAt(block!, event.position);
+      return;
+    }
+    // 메모 맨 끝 아래 빈 곳에서 시작: 마지막 줄의 끝부터 선택
+    // (그 빈 곳을 누르면 마지막 줄 끝으로 커서가 가는 것과 같게)
+    final lastText = _blocks.indexed
+        .where((e) => e.$2.isText && !_c.isHidden(e.$1))
+        .lastOrNull
+        ?.$2;
+    final belowLast =
+        editable != null &&
+        block == lastText &&
+        // 줄 옆(손잡이 등)이 아니라 줄 아래를 눌렀을 때만
+        event.position.dy >
+            editable.localToGlobal(Offset(0, editable.size.height)).dy;
+    _dragBase = belowLast ? block : null;
+    _dragBaseOffset = belowLast ? block!.controller.text.length : 0;
+    // 복사 등 키보드 동작이 되도록 그 줄 끝에 커서
+    if (belowLast) _c.focus(block!, _dragBaseOffset);
   }
 
   void _onPointerMove(PointerMoveEvent event) {
@@ -2102,24 +2263,13 @@ class _BlockEditorState extends State<BlockEditor> {
       _linkDown = null;
     }
     final base = _dragBase;
-    if (base == null || event.buttons & kPrimaryMouseButton == 0) return;
-    final target = _textBlockAt(event.position);
-    if (target == null) return;
-    if (target == base) {
-      // 다시 시작한 줄로 돌아오면 그 줄 안의 선택 (입력창이 처리)
-      _c.clearSelection();
+    if (base == null || event.buttons & kPrimaryMouseButton == 0) {
+      _stopAutoScroll();
       return;
     }
-    _c.setSelection(
-      BlockSelection(
-        base,
-        _dragBaseOffset,
-        target,
-        _offsetAt(target, event.position),
-      ),
-    );
-    // 시작한 줄의 입력창이 이번 이동에서 자기 선택을 바꾼 뒤에 다시 맞춤
-    scheduleMicrotask(_c.applySelectionHighlights);
+    _dragPointer = event.position;
+    _updateDragSelection();
+    _updateAutoScroll();
   }
 
   void _onPointerUp(PointerUpEvent event) {
@@ -2141,8 +2291,15 @@ class _BlockEditorState extends State<BlockEditor> {
         }
       case _:
     }
-    _dragBase = null;
+    _endDrag();
     if (_c.selection != null) scheduleMicrotask(_c.applySelectionHighlights);
+  }
+
+  void _endDrag() {
+    _dragBase = null;
+    _dragPointer = null;
+    _autoScrolled = false;
+    _stopAutoScroll();
   }
 
   @override
@@ -2161,6 +2318,7 @@ class _BlockEditorState extends State<BlockEditor> {
           onPointerDown: _onPointerDown,
           onPointerMove: _onPointerMove,
           onPointerUp: _onPointerUp,
+          onPointerCancel: (_) => _endDrag(),
           // 화면 근처의 줄만 만들고 그림 (긴 메모에서 입력이 느려지지 않도록).
           // 포커스 있는 입력창은 화면 밖으로 나가도 유지됨 (EditableText의 keep-alive).
           child: SuperListView.builder(
@@ -2173,7 +2331,13 @@ class _BlockEditorState extends State<BlockEditor> {
             findChildIndexCallback: (key) =>
                 key is GlobalObjectKey ? _itemOf[key.value] : null,
             itemBuilder: (context, item) {
-              if (item < _items.length) return _buildItem(item);
+              if (item < _items.length) {
+                return _RevealGuard(
+                  suppress: _suppressReveal,
+                  onOffscreen: () => _jumpToItem(item),
+                  child: _buildItem(item),
+                );
+              }
               // 아래 빈 곳을 누르면 마지막 줄 끝으로 (마지막이 텍스트가 아니면 새 줄)
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -2191,6 +2355,73 @@ class _BlockEditorState extends State<BlockEditor> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 목록의 한 항목. 안쪽 입력창이 "화면에 보이게 굴려 달라"고 할 때
+/// [suppress]가 참이면 무시하고, 목록에 배치되지 않은 항목이면(화면에서 멀리 벗어나
+/// 위치를 알 수 없음) 오류 대신 [onOffscreen]으로 그 항목으로 이동.
+class _RevealGuard extends SingleChildRenderObjectWidget {
+  const _RevealGuard({
+    required this.suppress,
+    required this.onOffscreen,
+    super.child,
+  });
+
+  final bool Function() suppress;
+  final VoidCallback onOffscreen;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderRevealGuard(suppress, onOffscreen);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderRevealGuard renderObject,
+  ) {
+    renderObject
+      ..suppress = suppress
+      ..onOffscreen = onOffscreen;
+  }
+}
+
+class _RenderRevealGuard extends RenderProxyBox {
+  _RenderRevealGuard(this.suppress, this.onOffscreen);
+
+  bool Function() suppress;
+  VoidCallback onOffscreen;
+
+  /// 목록(슬리버)이 이번 배치에서 이 항목의 위치를 알고 있는지
+  bool get _laidOut {
+    RenderObject child = this;
+    for (var parent = child.parent; parent != null; parent = child.parent) {
+      if (parent is RenderSliver) {
+        return parent.childScrollOffset(child) != null;
+      }
+      child = parent;
+    }
+    return true;
+  }
+
+  @override
+  void showOnScreen({
+    RenderObject? descendant,
+    Rect? rect,
+    Duration duration = Duration.zero,
+    Curve curve = Curves.ease,
+  }) {
+    if (suppress()) return;
+    if (!attached || !_laidOut) {
+      onOffscreen();
+      return;
+    }
+    super.showOnScreen(
+      descendant: descendant,
+      rect: rect,
+      duration: duration,
+      curve: curve,
     );
   }
 }
