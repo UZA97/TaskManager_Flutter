@@ -123,7 +123,11 @@ void main() {
       );
       expect(
         toRRule(
-          _event(start: '2026-10-01', recurrence: 'monthly', until: '2026-12-31'),
+          _event(
+            start: '2026-10-01',
+            recurrence: 'monthly',
+            until: '2026-12-31',
+          ),
         ),
         'RRULE:FREQ=MONTHLY;UNTIL=20261231',
       );
@@ -139,6 +143,5 @@ void main() {
         'RRULE:FREQ=DAILY;UNTIL=20261231T235959Z',
       );
     });
-
   });
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/notification/notification_service.dart';
@@ -104,7 +105,7 @@ class MailCheckService {
             DateTime.fromMillisecondsSinceEpoch(received).isBefore(watermark)) {
           continue;
         }
-        final detail = _parseMessage(id, raw);
+        final detail = parseGmailMessage(id, raw);
         if (detail == null) continue;
         await NotificationService.show(
           title: '📧 새 메일 - ${detail.from}',
@@ -126,7 +127,7 @@ class MailCheckService {
     String messageId,
   ) async {
     final raw = await _fetchMessageRaw(accessToken, messageId);
-    return raw == null ? null : _parseMessage(messageId, raw);
+    return raw == null ? null : parseGmailMessage(messageId, raw);
   }
 
   // 상세 조회를 5개씩 동시에 (순서 유지)
@@ -168,36 +169,58 @@ class MailCheckService {
     }
   }
 
-  MailMessage? _parseMessage(String messageId, Map<String, dynamic> json) {
+  /// 메일 본문 (HTML이 있으면 HTML, 없으면 일반 글자). 실패하면 null.
+  Future<MailBody?> fetchBody(String messageId) async {
+    final account = await _repo.getAccount();
+    if (account == null) return null;
+    final accessToken = await _getValidAccessToken(account);
+    if (accessToken == null) return null;
+    final headers = {'Authorization': 'Bearer $accessToken'};
     try {
-      final headers = json['payload']['headers'] as List<dynamic>;
+      final response = await http
+          .get(
+            Uri.https(
+              'gmail.googleapis.com',
+              '/gmail/v1/users/me/messages/$messageId',
+              {'format': 'full'},
+            ),
+            headers: headers,
+          )
+          .timeout(_timeout);
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final payload = json['payload'] as Map<String, dynamic>?;
+      if (payload == null) return null;
+      final part =
+          findMailBodyPart(payload, 'text/html') ??
+          findMailBodyPart(payload, 'text/plain');
+      if (part == null) return null;
 
-      String subject = '(제목 없음)';
-      String from = '';
-      DateTime date = DateTime.now();
-
-      for (final header in headers) {
-        final name = header['name'] as String;
-        final value = header['value'] as String;
-        if (name == 'Subject') subject = value;
-        if (name == 'From') from = value;
-        if (name == 'Date') {
-          try {
-            date = DateTime.parse(value);
-          } catch (_) {}
-        }
+      final body = part['body'] as Map<String, dynamic>? ?? const {};
+      var data = body['data'] as String?;
+      // 큰 본문은 따로 받아야 함
+      final attachmentId = body['attachmentId'] as String?;
+      if (data == null && attachmentId != null) {
+        final attachment = await http
+            .get(
+              Uri.https(
+                'gmail.googleapis.com',
+                '/gmail/v1/users/me/messages/$messageId/attachments/$attachmentId',
+              ),
+              headers: headers,
+            )
+            .timeout(_timeout);
+        if (attachment.statusCode != 200) return null;
+        data =
+            (jsonDecode(attachment.body) as Map<String, dynamic>)['data']
+                as String?;
       }
-
-      final snippet = json['snippet'] as String? ?? '';
-      final isUnread = (json['labelIds'] as List<dynamic>).contains('UNREAD');
-
-      return MailMessage(
-        id: messageId,
-        subject: subject,
-        from: from,
-        preview: snippet,
-        date: date,
-        isRead: !isUnread,
+      return MailBody(
+        bytes: data == null
+            ? Uint8List(0)
+            : base64Url.decode(base64Url.normalize(data)),
+        charset: mailPartCharset(part),
+        isHtml: part['mimeType'] == 'text/html',
       );
     } catch (e) {
       return null;
@@ -427,6 +450,73 @@ class MailCheckService {
     if (account == null) return null;
     return _getValidAccessToken(account);
   }
+}
+
+/// Gmail API 메일(형식 metadata/full)을 목록용 메일로. 읽지 못하면 null.
+MailMessage? parseGmailMessage(String messageId, Map<String, dynamic> json) {
+  try {
+    final headers = json['payload']['headers'] as List<dynamic>;
+
+    String subject = '(제목 없음)';
+    String from = '';
+
+    for (final header in headers) {
+      final name = header['name'] as String;
+      final value = header['value'] as String;
+      if (name == 'Subject') subject = value;
+      if (name == 'From') from = value;
+    }
+
+    // 받은 시각: Gmail이 주는 internalDate(밀리초). Date 헤더는
+    // "Tue, 24 Nov 2026 10:00:00 +0900" 형식이라 DateTime.parse로 못 읽음
+    final received = int.tryParse(json['internalDate'] as String? ?? '');
+    final date = received != null
+        ? DateTime.fromMillisecondsSinceEpoch(received)
+        : DateTime.now();
+
+    final snippet = json['snippet'] as String? ?? '';
+    final isUnread = (json['labelIds'] as List<dynamic>).contains('UNREAD');
+
+    return MailMessage(
+      id: messageId,
+      threadId: json['threadId'] as String? ?? '',
+      subject: subject,
+      from: from,
+      preview: snippet,
+      date: date,
+      isRead: !isUnread,
+    );
+  } catch (e) {
+    return null;
+  }
+}
+
+/// 메일 구조(여러 부분이 겹겹이 든 트리)에서 [mimeType]인 첫 본문 부분.
+/// 첨부파일(파일 이름이 있는 부분)은 건너뜀.
+Map<String, dynamic>? findMailBodyPart(
+  Map<String, dynamic> part,
+  String mimeType,
+) {
+  final filename = part['filename'] as String? ?? '';
+  if (part['mimeType'] == mimeType && filename.isEmpty) return part;
+  for (final child in part['parts'] as List<dynamic>? ?? const []) {
+    final found = findMailBodyPart(child as Map<String, dynamic>, mimeType);
+    if (found != null) return found;
+  }
+  return null;
+}
+
+/// 본문 부분의 Content-Type 헤더에 적힌 글자 인코딩 (없으면 utf-8)
+String mailPartCharset(Map<String, dynamic> part) {
+  for (final header in part['headers'] as List<dynamic>? ?? const []) {
+    if ((header['name'] as String).toLowerCase() != 'content-type') continue;
+    final match = RegExp(
+      r'''charset\s*=\s*"?([A-Za-z0-9_.:-]+)''',
+      caseSensitive: false,
+    ).firstMatch(header['value'] as String);
+    if (match != null) return match.group(1)!;
+  }
+  return 'utf-8';
 }
 
 final mailCheckServiceProvider = Provider<MailCheckService>((ref) {

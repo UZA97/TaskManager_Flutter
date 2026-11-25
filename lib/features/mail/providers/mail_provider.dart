@@ -87,19 +87,7 @@ class MailMessagesNotifier extends AsyncNotifier<List<MailMessage>> {
     final count = await ref.read(mailCheckServiceProvider).markAllAsRead();
     if (count == null) return null;
     final current = state.value ?? [];
-    state = AsyncData([
-      for (final m in current)
-        m.isRead
-            ? m
-            : MailMessage(
-                id: m.id,
-                subject: m.subject,
-                from: m.from,
-                preview: m.preview,
-                date: m.date,
-                isRead: true,
-              ),
-    ]);
+    state = AsyncData([for (final m in current) m.isRead ? m : m.asRead()]);
     return count;
   }
 
@@ -108,22 +96,9 @@ class MailMessagesNotifier extends AsyncNotifier<List<MailMessage>> {
     await service.markAsRead(messageId);
     // 로컬 상태 업데이트
     final current = state.value ?? [];
-    state = AsyncData(
-      current
-          .map(
-            (m) => m.id == messageId
-                ? MailMessage(
-                    id: m.id,
-                    subject: m.subject,
-                    from: m.from,
-                    preview: m.preview,
-                    date: m.date,
-                    isRead: true,
-                  )
-                : m,
-          )
-          .toList(),
-    );
+    state = AsyncData([
+      for (final m in current) m.id == messageId ? m.asRead() : m,
+    ]);
   }
 }
 

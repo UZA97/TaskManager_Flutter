@@ -162,56 +162,12 @@ Future<String?> _showActionMenu(
   );
 }
 
-/// 지우고 스낵바로 되살리기
-Future<void> _deleteWithUndo(
-  BuildContext context,
-  WidgetRef ref,
-  TodoItem todo,
-) async {
-  final todos = ref.read(todoListProvider.notifier);
-  final messenger = ScaffoldMessenger.of(context);
+/// 할 일 삭제 (열려 있던 상세 패널도 닫음)
+Future<void> _deleteTodo(WidgetRef ref, TodoItem todo) async {
   if (ref.read(todoSelectedProvider) == todo.id) {
     ref.read(todoSelectedProvider.notifier).select(null);
   }
-  final removed = await todos.delete(todo.id);
-  _showUndoSnackBar(
-    messenger,
-    '"${todo.title}" 삭제',
-    () => todos.restore(removed),
-  );
-}
-
-/// 실행 취소 알림. 2초 뒤 저절로 닫힘 (할 일 화면의 다른 곳을 눌러도 닫힘).
-/// Flutter는 버튼이 있는 알림을 기본으로 계속 띄워 두므로 persist: false.
-void _showUndoSnackBar(
-  ScaffoldMessengerState messenger,
-  String message,
-  VoidCallback onUndo,
-) {
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-        persist: false,
-        action: SnackBarAction(label: '실행 취소', onPressed: onUndo),
-      ),
-    );
-}
-
-/// 할 일 화면 안을 누르면 떠 있는 알림을 닫음
-class _DismissSnackBarOnTap extends StatelessWidget {
-  final Widget child;
-  const _DismissSnackBarOnTap({required this.child});
-
-  @override
-  Widget build(BuildContext context) => Listener(
-    behavior: HitTestBehavior.translucent,
-    onPointerDown: (_) =>
-        ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar(),
-    child: child,
-  );
+  await ref.read(todoListProvider.notifier).delete(todo.id);
 }
 
 /// 오늘 진행: 오늘까지 해야 하는 남은 할 일 + 오늘 끝낸 할 일
@@ -489,7 +445,7 @@ class _NoPressEffect extends StatelessWidget {
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
       ),
-      child: _DismissSnackBarOnTap(child: child),
+      child: child,
     );
   }
 }
@@ -1617,16 +1573,9 @@ class _TodoRowState extends ConsumerState<_TodoRow> {
       await todos.setDone(todo.id, !todo.done);
       return;
     }
-    final messenger = ScaffoldMessenger.of(context);
     setState(() => _completing = true);
     await Future<void>.delayed(const Duration(milliseconds: 250));
     await todos.setDone(todo.id, true);
-    // 행은 이미 목록에서 빠졌으므로 notifier로 되돌림
-    _showUndoSnackBar(
-      messenger,
-      '"${todo.title}" 완료',
-      () => todos.setDone(todo.id, false),
-    );
   }
 
   Future<void> _pickDue(Offset position) async {
@@ -1664,7 +1613,7 @@ class _TodoRowState extends ConsumerState<_TodoRow> {
       case 'memo':
         await addTodoToMemo(context, ref, todo, widget.subtasks);
       case 'delete':
-        await _deleteWithUndo(context, ref, todo);
+        await _deleteTodo(ref, todo);
     }
   }
 
@@ -2315,7 +2264,7 @@ class _TodoDetailPanelState extends ConsumerState<_TodoDetailPanel> {
                           foregroundColor: _overdueColor,
                           visualDensity: VisualDensity.compact,
                         ),
-                        onPressed: () => _deleteWithUndo(context, ref, todo),
+                        onPressed: () => _deleteTodo(ref, todo),
                         icon: const Icon(Icons.delete_outline, size: 16),
                         label: const Text('삭제', style: TextStyle(fontSize: 12)),
                       ),
@@ -2447,7 +2396,7 @@ class _DetailSubRowState extends ConsumerState<_DetailSubRow> {
               width: 24,
               child: _hovering
                   ? GestureDetector(
-                      onTap: () => _deleteWithUndo(context, ref, sub),
+                      onTap: () => _deleteTodo(ref, sub),
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: Icon(Icons.close, size: 14, color: muted),

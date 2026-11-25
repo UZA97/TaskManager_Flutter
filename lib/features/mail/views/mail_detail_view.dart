@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/mail_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../widgets/mail_body_view.dart';
+
+/// Gmail 웹에서 이 계정의 [threadId] 대화를 여는 주소 (없으면 받은편지함)
+Uri gmailThreadUrl(String email, String threadId) => Uri.parse(
+  'https://mail.google.com/mail/'
+  '${email.isEmpty ? '' : '?authuser=${Uri.encodeQueryComponent(email)}'}'
+  '${threadId.isEmpty ? '' : '#all/$threadId'}',
+);
 
 class MailDetailView extends ConsumerWidget {
   const MailDetailView({super.key});
@@ -135,14 +143,15 @@ class MailDetailView extends ConsumerWidget {
                 },
               ),
               const SizedBox(width: 6),
-              // 답장 버튼
+              // 답장: Gmail에서 이 메일 대화를 열어 답장
               FilledButton.icon(
-                onPressed: () async {
-                  final url = Uri.parse('https://mail.google.com/');
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url, mode: LaunchMode.externalApplication);
-                  }
-                },
+                onPressed: () => launchUrl(
+                  gmailThreadUrl(
+                    accountAsync.value?.email ?? '',
+                    selectedMail.threadId,
+                  ),
+                  mode: LaunchMode.externalApplication,
+                ),
                 icon: const Icon(Icons.reply, size: 16),
                 label: const Text('답장'),
                 style: FilledButton.styleFrom(
@@ -162,15 +171,7 @@ class MailDetailView extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(36, 16, 24, 0),
           child: Divider(height: 1, color: context.lineSubtle),
         ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(36, 16, 24, 32),
-            child: Text(
-              selectedMail.preview.isEmpty ? '(내용 없음)' : selectedMail.preview,
-              style: const TextStyle(fontSize: 14, height: 1.6),
-            ),
-          ),
-        ),
+        Expanded(child: MailBodyView(mail: selectedMail)),
       ],
     );
   }
