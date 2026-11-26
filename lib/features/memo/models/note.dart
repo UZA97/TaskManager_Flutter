@@ -36,6 +36,24 @@ class Note {
     this.contentLoaded = true,
   });
 
+  /// 목록용 (본문 없이). 본문은 필요할 때 id로 다시 읽음.
+  Note withoutContent() => Note(
+    id: id,
+    title: title,
+    content: '',
+    contentLoaded: false,
+    tags: tags,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    folderId: folderId,
+    sortOrder: sortOrder,
+    deletedAt: deletedAt,
+    isPinned: isPinned,
+    isImportant: isImportant,
+    isFavorite: isFavorite,
+    favoriteSortOrder: favoriteSortOrder,
+  );
+
   Note copyWith({
     int? id,
     String? title,

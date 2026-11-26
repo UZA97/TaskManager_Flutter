@@ -222,56 +222,23 @@ final googleCalendarsProvider =
 
 // 이벤트 목록 (현재 달의 그리드 범위)
 // build()는 로컬 DB만 읽고, 구글 동기화는 syncNow()로 따로 (한 번에 하나만)
-class EventListNotifier extends AsyncNotifier<List<Event>> {
-  final _calendarService = GoogleCalendarService();
+/// 구글 캘린더 동기화·반영. 아무 provider도 watch하지 않는 provider에 두어,
+/// 동기화 도중 캘린더 목록·보는 달이 바뀌어도 ref를 계속 쓸 수 있음
+/// (일정 목록 notifier 안에서 하면 지켜보던 값이 바뀐 뒤 ref.read가 막힘).
+class CalendarSync {
+  CalendarSync(this.ref);
 
-  // 마지막으로 자동 동기화를 건 "월|계정" — 같은 키로는 다시 안 함
-  String? _autoSyncKey;
+  final Ref ref;
+  final _calendarService = GoogleCalendarService();
   Future<void>? _syncing;
   bool _resyncRequested = false;
   // 구글 푸시/동기화 직렬화 (중복 업로드 방지)
   Future<void> _googleLock = Future.value();
 
-  @override
-  Future<List<Event>> build() async {
-    final month = ref.watch(currentMonthProvider);
-    final repo = ref.watch(eventRepositoryProvider);
-    final tagFilter = ref.watch(tagFilterProvider);
-    final calendars =
-        ref.watch(googleCalendarsProvider).valueOrNull ??
-        const GoogleCalendarsState();
-    final email = ref.watch(
-      googleAccountProvider.select((a) => a.valueOrNull?.email),
-    );
+  EventRepository get repo => ref.read(eventRepositoryProvider);
 
-    // 앱 시작 / 월 변경 / 로그인 시에만 자동 동기화
-    final key = '${month.year}-${month.month}|$email';
-    if (email != null && key != _autoSyncKey) {
-      _autoSyncKey = key;
-      Future.microtask(syncNow);
-    }
-
-    final range = monthGridRange(month);
-    var events = [
-      for (final e in await repo.getEventsInRange(range.from, range.to))
-        if (!calendars.hidden.contains(e.calendarId))
-          // 태그가 없는 다른 캘린더 일정은 그 캘린더 색으로
-          e.tagColor == null && e.calendarId.isNotEmpty
-              ? e.copyWith(tagColor: calendars.byId(e.calendarId)?.color)
-              : e,
-    ];
-    if (tagFilter.isEmpty) return events;
-
-    // 태그 필터 적용 (태그는 한 번의 쿼리로)
-    final tagsById = await repo.getTagsForEvents(
-      events.map((e) => e.id).whereType<int>(),
-    );
-    events = events.where((event) {
-      final tags = tagsById[event.id] ?? const <EventTag>[];
-      return tags.any((t) => tagFilter.contains(t.id));
-    }).toList();
-    return events;
-  }
+  /// 일정 목록 다시 읽기
+  void refresh() => ref.invalidate(eventListProvider);
 
   Future<String?> _getAccessToken() =>
       ref.read(googleAccountProvider.notifier).getAccessToken();
@@ -298,24 +265,24 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
     } finally {
       _syncing = null;
     }
-    ref.invalidateSelf();
+    refresh();
   }
 
-  // 로컬 변경을 백그라운드로 구글에 반영
-  void _pushInBackground() {
+  /// 로컬 변경을 백그라운드로 구글에 반영
+  void pushInBackground() {
     _serialized(() async {
       final accessToken = await _getAccessToken();
       if (accessToken == null) return;
       await _pushPending(accessToken);
     }).then(
-      (_) => ref.invalidateSelf(),
+      (_) => refresh(),
       onError: (e) => print('구글 캘린더 반영 실패 (다음 동기화 때 재시도): $e'),
     );
   }
 
   // 삭제 대기 → 수정/신규 순으로 푸시. 네트워크 오류는 그대로 던짐
   Future<void> _pushPending(String accessToken) async {
-    final repo = ref.read(eventRepositoryProvider);
+    final repo = this.repo;
     final calendars = await ref.read(googleCalendarsProvider.future);
 
     for (final key in await repo.getPendingDeletes()) {
@@ -370,7 +337,7 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       final accessToken = await _getAccessToken();
       if (accessToken == null) return;
 
-      final repo = ref.read(eventRepositoryProvider);
+      final repo = this.repo;
 
       // 0. 캘린더 목록 (실패하면 전에 받은 목록, 그것도 없으면 기본 캘린더만)
       final fetched = await _calendarService.getCalendars(accessToken);
@@ -430,25 +397,86 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       print('구글 캘린더 동기화 오류: $e');
     }
   }
+}
 
-  // 로컬에 먼저 저장(dirty)하고 구글 반영은 백그라운드 — 오프라인에서도 저장됨
+final calendarSyncProvider = Provider<CalendarSync>(CalendarSync.new);
+
+class EventListNotifier extends AsyncNotifier<List<Event>> {
+  // 마지막으로 자동 동기화를 건 "월|계정" — 같은 키로는 다시 안 함
+  String? _autoSyncKey;
+
+  /// 동기화·저장용. build에서 한 번 받아 둠 — 지켜보던 값이 바뀐 뒤 다시 만들어지기
+  /// 전에도(동기화 도중 등) 저장·삭제가 ref 없이 동작하도록.
+  late CalendarSync _sync;
+
+  /// 구글 캘린더 동기화
+  Future<void> syncNow() => _sync.syncNow();
+
+  @override
+  Future<List<Event>> build() async {
+    final month = ref.watch(currentMonthProvider);
+    final repo = ref.watch(eventRepositoryProvider);
+    final tagFilter = ref.watch(tagFilterProvider);
+    final calendars =
+        ref.watch(googleCalendarsProvider).valueOrNull ??
+        const GoogleCalendarsState();
+    final email = ref.watch(
+      googleAccountProvider.select((a) => a.valueOrNull?.email),
+    );
+
+    // 앱 시작 / 월 변경 / 로그인 시에만 자동 동기화
+    final key = '${month.year}-${month.month}|$email';
+    _sync = ref.read(calendarSyncProvider);
+    if (email != null && key != _autoSyncKey) {
+      _autoSyncKey = key;
+      Future.microtask(_sync.syncNow);
+    }
+
+    final range = monthGridRange(month);
+    var events = [
+      for (final e in await repo.getEventsInRange(range.from, range.to))
+        if (!calendars.hidden.contains(e.calendarId))
+          // 태그가 없는 다른 캘린더 일정은 그 캘린더 색으로
+          e.tagColor == null && e.calendarId.isNotEmpty
+              ? e.copyWith(tagColor: calendars.byId(e.calendarId)?.color)
+              : e,
+    ];
+    if (tagFilter.isEmpty) return events;
+
+    // 태그 필터 적용 (태그는 한 번의 쿼리로)
+    final tagsById = await repo.getTagsForEvents(
+      events.map((e) => e.id).whereType<int>(),
+    );
+    events = events.where((event) {
+      final tags = tagsById[event.id] ?? const <EventTag>[];
+      return tags.any((t) => tagFilter.contains(t.id));
+    }).toList();
+    return events;
+  }
+
+  // 로컬에 먼저 저장(dirty)하고 구글 반영은 백그라운드 — 오프라인에서도 저장됨.
+  // ref는 맨 처음 한 번만 씀 (await 뒤에 동기화가 캘린더 목록을 바꾸면 ref를 못 씀)
   Future<int> addEvent(Event event) async {
-    final repo = ref.read(eventRepositoryProvider);
-    final id = await repo.addEvent(event, dirty: true);
-    ref.invalidateSelf();
-    _pushInBackground();
+    final sync = _sync;
+    final id = await sync.repo.addEvent(event, dirty: true);
+    sync
+      ..refresh()
+      ..pushInBackground();
     return id;
   }
 
-  Future<void> updateEvent(Event event) async {
-    final repo = ref.read(eventRepositoryProvider);
-    await repo.updateEvent(event, dirty: true);
-    ref.invalidateSelf();
-    _pushInBackground();
+  Future<void> updateEvent(Event event) => _update(_sync, event);
+
+  static Future<void> _update(CalendarSync sync, Event event) async {
+    await sync.repo.updateEvent(event, dirty: true);
+    sync
+      ..refresh()
+      ..pushInBackground();
   }
 
   Future<void> deleteEvent(int id) async {
-    final repo = ref.read(eventRepositoryProvider);
+    final sync = _sync;
+    final repo = sync.repo;
     final event = await repo.getEventById(id);
 
     // 구글 삭제는 툼스톤으로 남겨 두고 푸시 (실패해도 다음 동기화 때 재시도)
@@ -459,23 +487,30 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       );
     }
     await repo.deleteEvent(id);
-    ref.invalidateSelf();
-    if (googleEventId != null) _pushInBackground();
+    sync.refresh();
+    if (googleEventId != null) sync.pushInBackground();
   }
 
   /// 반복 일정에서 [occurrence] 회차만 삭제
   Future<void> deleteOccurrence(Event occurrence) async {
-    await ref
-        .read(eventRepositoryProvider)
-        .addRecurrenceException(occurrence.id!, occurrence.start);
-    ref.invalidateSelf();
-    _pushInBackground();
+    final sync = _sync;
+    await sync.repo.addRecurrenceException(occurrence.id!, occurrence.start);
+    sync
+      ..refresh()
+      ..pushInBackground();
   }
 
   /// 반복 일정에서 [occurrence] 회차만 [edited]로 바꿈:
   /// 그 회차를 반복에서 빼고, 반복 없는 일정으로 따로 만듦. 새 일정 id 반환.
-  Future<int> detachOccurrence(Event occurrence, Event edited) async {
-    final repo = ref.read(eventRepositoryProvider);
+  Future<int> detachOccurrence(Event occurrence, Event edited) =>
+      _detach(_sync, occurrence, edited);
+
+  static Future<int> _detach(
+    CalendarSync sync,
+    Event occurrence,
+    Event edited,
+  ) async {
+    final repo = sync.repo;
     await repo.addRecurrenceException(occurrence.id!, occurrence.start);
     final tags = await repo.getEventTags(occurrence.id!);
     final id = await repo.addEvent(
@@ -502,8 +537,9 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       dirty: true,
     );
     await repo.setEventTags(id, [for (final t in tags) t.id!]);
-    ref.invalidateSelf();
-    _pushInBackground();
+    sync
+      ..refresh()
+      ..pushInBackground();
     return id;
   }
 
@@ -554,23 +590,22 @@ class EventListNotifier extends AsyncNotifier<List<Event>> {
       );
     }
 
-    if (!event.isRecurring) return updateEvent(moved(event));
+    final sync = _sync;
+    if (!event.isRecurring) return _update(sync, moved(event));
     if (!wholeSeries) {
-      await detachOccurrence(event, moved(event));
+      await _detach(sync, event, moved(event));
       return;
     }
-    final master = await ref
-        .read(eventRepositoryProvider)
-        .getEventById(event.id!);
+    final master = await sync.repo.getEventById(event.id!);
     if (master == null) return;
-    await updateEvent(moved(master));
+    await _update(sync, moved(master));
   }
 
   // 완료 여부는 로컬 전용 — 동기화 안 함
   Future<void> updateCompletion(int id, bool isCompleted) async {
-    final repo = ref.read(eventRepositoryProvider);
-    await repo.updateCompletion(id, isCompleted);
-    ref.invalidateSelf();
+    final sync = _sync;
+    await sync.repo.updateCompletion(id, isCompleted);
+    sync.refresh();
   }
 }
 

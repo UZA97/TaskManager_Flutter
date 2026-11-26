@@ -275,3 +275,84 @@ Map<String, Object?> blocksToJson(List<EditorBlock> blocks) {
     'document': {'type': 'page', 'children': rootChildren},
   };
 }
+
+/// `jsonEncode(blocksToJson(blocks))`와 같은 문자열을 만들되,
+/// 각 줄의 글자 부분은 [StyledTextController.deltaJson]에 기억해 둔 것을 씀
+/// (긴 메모에서 한 줄만 바뀌어도 문서 전체를 다시 변환하지 않도록).
+String blocksToJsonString(List<EditorBlock> blocks) {
+  final depths = treeDepthsOf(blocks);
+  final out = StringBuffer('{"document":{"type":"page","children":[');
+  // 아직 닫지 않은 텍스트 블록들 (트리 깊이 순). 값 = 자식을 하나라도 썼는지
+  final open = <bool>[];
+  var rootHasChild = false;
+
+  void close() {
+    if (open.removeLast()) out.write(']');
+    out.write('}');
+  }
+
+  for (var i = 0; i < blocks.length; i++) {
+    final block = blocks[i];
+    final depth = depths[i];
+    final extra = block.depth - depth;
+    while (open.length > depth) {
+      close();
+    }
+    if (depth == 0) {
+      if (rootHasChild) out.write(',');
+      rootHasChild = true;
+    } else if (open[depth - 1]) {
+      out.write(',');
+    } else {
+      out.write(',"children":[');
+      open[depth - 1] = true;
+    }
+
+    final raw = block.raw;
+    if (raw != null) {
+      out.write(
+        jsonEncode(
+          extra > 0
+              ? {
+                  ...raw,
+                  'data': {...?(raw['data'] as Map?), extraIndentKey: extra},
+                }
+              : raw,
+        ),
+      );
+      continue;
+    }
+    // {"type":…,"data":{…data,"delta":[…],"extra_indent":n} 까지 쓰고 닫지 않음
+    if (block.data.containsKey('delta') ||
+        block.data.containsKey(extraIndentKey)) {
+      // 키가 겹치는 드문 경우는 원래 방식대로 (키 순서·덮어쓰기를 똑같이)
+      final node = jsonEncode({
+        'type': block.type,
+        'data': {
+          ...block.data,
+          'delta': block.controller.toDelta(),
+          if (extra > 0) extraIndentKey: extra,
+        },
+      });
+      out.write(node.substring(0, node.length - 1));
+      open.add(false);
+      continue;
+    }
+    final data = jsonEncode(block.data);
+    out
+      ..write('{"type":')
+      ..write(jsonEncode(block.type))
+      ..write(',"data":')
+      ..write(data.substring(0, data.length - 1))
+      ..write(data.length > 2 ? ',"delta":' : '"delta":')
+      ..write(block.controller.deltaJson);
+    if (extra > 0) out.write(',"$extraIndentKey":$extra');
+    out.write('}');
+    open.add(false);
+  }
+  while (open.isNotEmpty) {
+    close();
+  }
+  out.write(']}}');
+  return out.toString();
+}

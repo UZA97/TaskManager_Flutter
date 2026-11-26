@@ -130,9 +130,17 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
 
   Future<void> saveNote(Note note) async {
     final repo = ref.read(noteRepositoryProvider);
+    // 목록에는 본문 없이 둠 (자동 저장마다 긴 본문을 목록에 들고 있지 않게).
+    // 검색 결과는 본문까지 읽은 목록이므로 본문을 바꿔 넣음.
+    // (ref는 await 전에만 씀 — 그사이 검색어가 바뀌면 ref를 쓸 수 없음)
+    final listed = ref.read(searchQueryProvider).isEmpty
+        ? note.withoutContent()
+        : note;
     await repo.saveNote(note);
     final current = state.value ?? [];
-    state = AsyncData(current.map((n) => n.id == note.id ? note : n).toList());
+    state = AsyncData([
+      for (final n in current) n.id == note.id ? listed : n,
+    ]);
   }
 
   Future<void> deleteNote(int id) async {

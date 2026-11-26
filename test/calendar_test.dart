@@ -9,6 +9,7 @@ import 'package:taskmanager/features/calendar/data/event_repository.dart';
 import 'package:taskmanager/features/calendar/models/event.dart';
 import 'package:taskmanager/features/calendar/models/recurrence.dart';
 import 'package:taskmanager/features/calendar/providers/event_provider.dart';
+import 'package:taskmanager/features/calendar/services/google_calendar_service.dart';
 import 'package:taskmanager/features/calendar/views/calendar_editor_view.dart';
 
 Event _event({
@@ -179,6 +180,45 @@ void main() {
     final key = EventRepository.pendingDeleteKey('a#holiday@group', 'ev1');
     expect(EventRepository.parsePendingDeleteKey(key), ('a#holiday@group', 'ev1'));
     expect(EventRepository.parsePendingDeleteKey('ev2'), ('', 'ev2'));
+  });
+
+  // 동기화 도중 캘린더 목록이 바뀐 직후(일정 목록이 다시 만들어지기 전)에도
+  // 저장·옮기기가 Riverpod 오류 없이 동작
+  test('캘린더 목록이 바뀐 직후에도 일정 저장', () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+    container.listen(eventListProvider, (_, _) {});
+    await container.read(eventListProvider.future);
+    final notifier = container.read(eventListProvider.notifier);
+
+    await container.read(googleCalendarsProvider.notifier).replace(const [
+      GoogleCalendarInfo(
+        id: '',
+        name: '내 캘린더',
+        color: '#4A90E2',
+        primary: true,
+        writable: true,
+        selected: true,
+      ),
+      GoogleCalendarInfo(
+        id: 'ko#holiday',
+        name: '공휴일',
+        color: '#0B8043',
+        primary: false,
+        writable: false,
+        selected: true,
+      ),
+    ]);
+    // 여기서 일정 목록은 "다시 만들어야 함" 상태 — 그래도 저장·옮기기가 돼야 함
+    final id = await notifier.addEvent(_event(start: '2026-11-10', title: 'a'));
+    final added = (await EventRepository(db).getEventById(id))!;
+    await container.read(googleCalendarsProvider.notifier).toggle('ko#holiday');
+    await notifier.moveEvent(added, DateTime(2026, 11, 12));
+    expect((await EventRepository(db).getEventById(id))!.start, '2026-11-12');
   });
 
   group('calendar screen', () {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -349,6 +350,24 @@ class StyledTextController extends TextEditingController {
 
   /// appflowy delta로 변환 (같은 서식이 이어지는 글자끼리 묶음).
   /// [start]~[end]를 주면 그 부분만.
+  /// 줄 전체의 delta JSON. 글자·서식이 바뀌기 전까지 다시 만들지 않음
+  /// (긴 메모를 저장할 때 바뀐 줄만 다시 변환하도록 메모리에 기억해 둠).
+  String get deltaJson {
+    final cached = _deltaJson;
+    if (cached != null &&
+        _deltaJsonRevision == _marksRevision &&
+        identical(_deltaJsonText, text)) {
+      return cached;
+    }
+    _deltaJsonRevision = _marksRevision;
+    _deltaJsonText = text;
+    return _deltaJson = jsonEncode(toDelta());
+  }
+
+  String? _deltaJson;
+  int _deltaJsonRevision = -1;
+  String? _deltaJsonText;
+
   List<Map<String, Object?>> toDelta([int start = 0, int? end]) {
     final stop = end ?? text.length;
     final ops = <Map<String, Object?>>[];

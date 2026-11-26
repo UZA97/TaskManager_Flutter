@@ -178,7 +178,7 @@ class BlockEditorController extends ChangeNotifier {
     _recordHistory();
   }
 
-  String toJsonString() => jsonEncode(blocksToJson(blocks));
+  String toJsonString() => blocksToJsonString(blocks);
 
   @override
   void dispose() {

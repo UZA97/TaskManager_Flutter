@@ -371,7 +371,8 @@ class AppDatabase extends _$AppDatabase {
     return LazyDatabase(() async {
       final dir = await getApplicationSupportDirectory();
       final file = File(p.join(dir.path, 'taskmanager.sqlite'));
-      return NativeDatabase(file);
+      // SQLite는 별도 isolate에서 실행 (긴 메모 저장 등으로 화면이 멈추지 않도록)
+      return NativeDatabase.createInBackground(file);
     });
   }
 }
