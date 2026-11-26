@@ -29,6 +29,7 @@ class GoogleDriveSyncService {
     'mail_account',
     'sync_device_id',
     'quick_memo_hotkey', // 다른 프로그램과 겹치는지는 PC마다 다름
+    'sticker_bounds', // 스티커 모드 창 위치 (모니터 구성이 PC마다 다름)
   ];
 
   final String accessToken;

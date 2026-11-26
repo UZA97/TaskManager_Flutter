@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'sticker_mode.dart';
 import 'todo_memo.dart';
 import 'todo_provider.dart';
 
@@ -63,10 +64,18 @@ Future<({DateTime? due})?> showTodoDueMenu(
       children: [
         Icon(icon, size: 16, color: muted),
         const SizedBox(width: 10),
-        Text(label, style: const TextStyle(fontSize: 13)),
+        // 좁은 창(스티커 모드)에서는 이름을 줄여 날짜가 보이게
+        Flexible(
+          fit: date == null ? FlexFit.loose : FlexFit.tight,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
         if (date != null) ...[
-          const SizedBox(width: 24),
-          const Spacer(),
+          const SizedBox(width: 16),
           Text(
             '${date.month}/${date.day} (${_weekdays[date.weekday - 1]})',
             style: TextStyle(fontSize: 12, color: muted),
@@ -597,6 +606,12 @@ class _TodoViewState extends ConsumerState<TodoView> {
                     letterSpacing: -0.2,
                   ),
                 ),
+              ),
+              _ToolButton(
+                key: const ValueKey('todo-sticker'),
+                icon: Icons.sticky_note_2_outlined,
+                label: '스티커',
+                onTap: (_) => ref.read(stickerModeProvider.notifier).enter(),
               ),
               _ToolButton(
                 key: const ValueKey('todo-search'),
@@ -1618,7 +1633,7 @@ class _TodoRowState extends ConsumerState<_TodoRow> {
   }
 
   void _startEdit() {
-    if (widget.todo.done) return;
+    if (widget.todo.done && !_isSub) return;
     _editController.text = widget.todo.title;
     _editController.selection = TextSelection.collapsed(
       offset: widget.todo.title.length,
@@ -1708,12 +1723,19 @@ class _TodoRowState extends ConsumerState<_TodoRow> {
 
     // 더보기 버튼은 이름을 고치는 중에도 눌리도록 입력창 영역으로 묶음
     // (입력창 밖을 누르면 포커스가 풀리며 버튼이 사라져 클릭이 먹히지 않던 문제)
+    // 하위 할 일은 메뉴 대신 바로 삭제 (이름은 줄을 눌러 바꿈)
     final more = TextFieldTapRegion(
-      child: _RowAction(
-        key: ValueKey(_isSub ? 'todo-sub-more' : 'todo-more'),
-        icon: Icons.more_horiz,
-        onTapDown: _showMore,
-      ),
+      child: _isSub
+          ? _RowAction(
+              key: const ValueKey('todo-sub-delete'),
+              icon: Icons.delete_outline,
+              onTapDown: (_) => _deleteTodo(ref, todo),
+            )
+          : _RowAction(
+              key: const ValueKey('todo-more'),
+              icon: Icons.more_horiz,
+              onTapDown: _showMore,
+            ),
     );
     final actions = <Widget>[
       if (!_isSub && !todo.done) ...[
@@ -1822,11 +1844,13 @@ class _TodoRowState extends ConsumerState<_TodoRow> {
                   ? scheme.surfaceContainerHigh
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
-              // 줄을 누르면 상세 패널 (하위 할 일은 상위 할 일의 상세).
+              // 줄을 누르면 상세 패널 (하위 할 일은 그 자리에서 이름 바꾸기).
               // 물결 효과 없이 선택 배경색으로만 표시 (가볍게)
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: widget.onSelect,
+                onTap: _isSub
+                    ? (_editing ? null : _startEdit)
+                    : widget.onSelect,
                 child: row,
               ),
             ),
@@ -2359,11 +2383,54 @@ class _DetailSubRow extends ConsumerStatefulWidget {
 
 class _DetailSubRowState extends ConsumerState<_DetailSubRow> {
   bool _hovering = false;
+  bool _editing = false;
+  final _editController = TextEditingController();
+  final _editFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _editFocus.addListener(() {
+      if (!_editFocus.hasFocus) _finishEdit(save: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _editController.dispose();
+    _editFocus.dispose();
+    super.dispose();
+  }
+
+  void _startEdit() {
+    _editController.text = widget.sub.title;
+    _editController.selection = TextSelection.collapsed(
+      offset: widget.sub.title.length,
+    );
+    setState(() => _editing = true);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _editFocus.requestFocus(),
+    );
+  }
+
+  void _finishEdit({required bool save}) {
+    if (!_editing) return;
+    setState(() => _editing = false);
+    final text = _editController.text.trim();
+    if (save && text.isNotEmpty && text != widget.sub.title) {
+      ref.read(todoListProvider.notifier).rename(widget.sub.id, text);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final sub = widget.sub;
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final style = TextStyle(
+      fontSize: 14,
+      decoration: sub.done && !_editing ? TextDecoration.lineThrough : null,
+      color: sub.done ? muted : null,
+    );
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
@@ -2382,24 +2449,47 @@ class _DetailSubRowState extends ConsumerState<_DetailSubRow> {
               ),
             ),
             const SizedBox(width: 10),
+            // 누르면 그 자리에서 이름 바꾸기 (Enter·밖을 누르면 저장, Esc는 취소)
             Expanded(
-              child: Text(
-                sub.title,
-                style: TextStyle(
-                  fontSize: 14,
-                  decoration: sub.done ? TextDecoration.lineThrough : null,
-                  color: sub.done ? muted : null,
-                ),
-              ),
+              child: _editing
+                  ? CallbackShortcuts(
+                      bindings: {
+                        const SingleActivator(LogicalKeyboardKey.escape): () =>
+                            _finishEdit(save: false),
+                      },
+                      child: TextField(
+                        key: const ValueKey('todo-detail-sub-rename'),
+                        controller: _editController,
+                        focusNode: _editFocus,
+                        onSubmitted: (_) => _finishEdit(save: true),
+                        style: style,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    )
+                  : GestureDetector(
+                      key: ValueKey('todo-detail-sub-${sub.id}'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _startEdit,
+                      child: Text(sub.title, style: style),
+                    ),
             ),
             SizedBox(
               width: 24,
               child: _hovering
                   ? GestureDetector(
+                      key: ValueKey('todo-detail-sub-delete-${sub.id}'),
                       onTap: () => _deleteTodo(ref, sub),
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
-                        child: Icon(Icons.close, size: 14, color: muted),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 15,
+                          color: muted,
+                        ),
                       ),
                     )
                   : null,

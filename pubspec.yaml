@@ -21,6 +21,8 @@ dependencies:
   sqlite3: ^2.9.4
 
   window_manager: ^0.5.1
+  # 스티커 모드 창이 화면 밖에 열리지 않도록 모니터 영역 확인
+  screen_retriever: ^0.2.0
   pdf: ^3.11.0
   printing: ^5.12.0
   # 시스템 트레이

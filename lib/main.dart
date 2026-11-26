@@ -40,6 +40,7 @@ import 'core/database/database_provider.dart';
 import 'core/update/update_service.dart';
 import 'features/briefing/briefing_dialog.dart';
 import 'features/briefing/briefing_provider.dart';
+import 'features/todo/sticker_mode.dart';
 import 'features/todo/todo_provider.dart';
 import 'features/todo/todo_views.dart';
 
@@ -221,6 +222,8 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   void _lock() {
     if (!mounted || _isLocked) return;
     Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+    // 잠금 화면은 스티커 창보다 넓으므로 원래 창으로
+    ref.read(stickerModeProvider.notifier).exit();
     setState(() => _isLocked = true);
   }
 
@@ -236,6 +239,9 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   Future<void> _openQuickMemo() async {
     if (_quickMemoOpen || !mounted) return;
     final wasVisible = await windowManager.isVisible();
+    // 빠른 메모 창은 스티커 창에 들어가지 않으므로 원래 창으로
+    await ref.read(stickerModeProvider.notifier).exit();
+    if (!mounted) return;
     await _showWindow();
     // 잠금 화면이 떠 있으면 빠른 메모는 열지 않음
     if (_isLocked || !mounted) return;
@@ -251,6 +257,8 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
   // 알람 알림 클릭: 트레이/최소화 상태에서도 창을 띄우고 해당 날짜의 캘린더로 이동
   // (잠금 중이면 잠금 해제 후 그 화면이 보임)
   Future<void> _openCalendarAt(DateTime date) async {
+    if (!mounted) return;
+    await ref.read(stickerModeProvider.notifier).exit();
     if (!mounted) return;
     ref.read(currentMonthProvider.notifier)
       ..setYear(date.year)
@@ -489,6 +497,11 @@ class _MainShellState extends ConsumerState<MainShell> with WindowListener {
           );
         },
       );
+    }
+
+    // 스티커 모드: 작은 창에 할 일만
+    if (ref.watch(stickerModeProvider.select((s) => s.on))) {
+      return const StickerTodoView();
     }
 
     // 사이드 패널 폭: 창이 좁으면 메인 패널이 남도록 최대치를 줄임
