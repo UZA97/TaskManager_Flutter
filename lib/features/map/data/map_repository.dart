@@ -47,6 +47,16 @@ class MapRepository {
     return MapTag(id: id, name: name, color: color);
   }
 
+  Future<void> updateTag(
+    int id, {
+    required String name,
+    required String color,
+  }) async {
+    await (_db.update(_db.mapTagTable)..where((t) => t.id.equals(id))).write(
+      MapTagTableCompanion(name: Value(name), color: Value(color)),
+    );
+  }
+
   Future<void> deleteTag(int id) async {
     await (_db.delete(
       _db.mapPlaceTable,
@@ -103,6 +113,17 @@ class MapRepository {
             createdAt: place.createdAt,
           ),
         );
+  }
+
+  /// 장소 이름 바꾸기·다른 태그로 옮기기
+  Future<void> updatePlace(
+    int id, {
+    required String name,
+    required int tagId,
+  }) async {
+    await (_db.update(_db.mapPlaceTable)..where((t) => t.id.equals(id))).write(
+      MapPlaceTableCompanion(name: Value(name), tagId: Value(tagId)),
+    );
   }
 
   Future<void> deletePlace(int id) async {

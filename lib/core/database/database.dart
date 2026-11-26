@@ -152,6 +152,15 @@ class EventTable extends Table {
   TextColumn get recurrence => text().withDefault(const Constant(''))();
   // 반복 종료일 (yyyy-MM-dd, 포함). null이면 무기한
   TextColumn get recurrenceUntil => text().nullable()();
+  // 반복 간격 (2면 격주·격월 등)
+  IntColumn get recurrenceInterval => integer().withDefault(const Constant(1))();
+  // 매주 반복의 요일 (DateTime.weekday, 쉼표로: "1,3,5"). 비면 시작일의 요일
+  TextColumn get recurrenceDays => text().withDefault(const Constant(''))();
+  // 반복에서 뺀 날짜 (yyyy-MM-dd, 쉼표로) — "이 일정만" 삭제·수정한 회차
+  TextColumn get recurrenceExceptions =>
+      text().withDefault(const Constant(''))();
+  // 구글 캘린더 ID ('' = 기본 캘린더)
+  TextColumn get calendarId => text().withDefault(const Constant(''))();
 
   // 로컬 변경이 아직 구글에 반영되지 않음 (동기화 때 먼저 푸시, 풀이 덮어쓰지 않음)
   BoolColumn get dirty => boolean().withDefault(const Constant(false))();
@@ -211,7 +220,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   /// 신규 설치와 기존 데이터베이스 업그레이드 모두에서 공통으로 쓰이는
   /// 기본 폴더를 생성하고, 폴더가 비어 있는 메모에 자동으로 연결합니다.
@@ -330,6 +339,16 @@ class AppDatabase extends _$AppDatabase {
           todoTable,
           todoTable.noteId as GeneratedColumn,
         );
+      }
+      if (from < 15) {
+        for (final column in [
+          eventTable.recurrenceInterval,
+          eventTable.recurrenceDays,
+          eventTable.recurrenceExceptions,
+          eventTable.calendarId,
+        ]) {
+          await _addColumnIfMissing(m, eventTable, column);
+        }
       }
     },
   );

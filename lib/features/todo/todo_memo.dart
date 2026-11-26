@@ -170,10 +170,11 @@ Future<void> openTodoMemo(WidgetRef ref, int noteId) async {
 /// 메모 id → 제목 (할 일의 연결된 메모 표시용). 메모가 바뀌면 다시 읽음.
 final todoNoteTitlesProvider = FutureProvider<Map<int, String>>((ref) async {
   ref.watch(noteListProvider);
-  final notes = await ref.read(noteRepositoryProvider).getAllNotes();
+  // 제목만 읽음 (자동 저장마다 다시 읽으므로 본문까지 읽지 않게)
+  final titles = await ref.read(noteRepositoryProvider).getNoteTitles();
   return {
-    for (final n in notes)
-      if (n.id != null) n.id!: n.title.trim().isEmpty ? '제목 없음' : n.title,
+    for (final e in titles.entries)
+      e.key: e.value.trim().isEmpty ? '제목 없음' : e.value,
   };
 });
 

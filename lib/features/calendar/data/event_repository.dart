@@ -111,6 +111,10 @@ class EventRepository {
             content: Value(event.content),
             recurrence: Value(event.recurrence),
             recurrenceUntil: Value(event.recurrenceUntil),
+            recurrenceInterval: Value(event.recurrenceInterval),
+            recurrenceDays: Value(event.recurrenceDays.join(',')),
+            recurrenceExceptions: Value(event.recurrenceExceptions.join(',')),
+            calendarId: Value(event.calendarId),
             dirty: Value(dirty),
           ),
         );
@@ -128,15 +132,20 @@ class EventRepository {
     if (googleEventId == null || googleEventId.isEmpty) return;
 
     // 로컬에서 삭제 대기 중인 일정은 다시 가져오지 않음
+    final pendingKey = pendingDeleteKey(event.calendarId, googleEventId);
     final pendingDelete = await (_db.select(
       _db.pendingEventDeleteTable,
-    )..where((t) => t.googleEventId.equals(googleEventId))).getSingleOrNull();
+    )..where((t) => t.googleEventId.equals(pendingKey))).getSingleOrNull();
     if (pendingDelete != null) return;
 
-    // googleEventId로 기존 이벤트 확인 (중복 행이 있으면 첫 행만 남김)
-    final rows = await (_db.select(
-      _db.eventTable,
-    )..where((t) => t.googleEventId.equals(googleEventId))).get();
+    // 같은 캘린더의 googleEventId로 기존 이벤트 확인 (중복 행이 있으면 첫 행만 남김)
+    final rows =
+        await (_db.select(_db.eventTable)..where(
+              (t) =>
+                  t.googleEventId.equals(googleEventId) &
+                  t.calendarId.equals(event.calendarId),
+            ))
+            .get();
 
     if (rows.isEmpty) {
       await addEvent(event);
@@ -164,6 +173,7 @@ class EventRepository {
         isAllDay: Value(event.isAllDay),
         content: Value(event.content),
         locationName: Value(event.locationName),
+        calendarId: Value(event.calendarId),
       ),
     );
   }
@@ -226,7 +236,31 @@ class EventRepository {
     });
   }
 
-  // 삭제 툼스톤
+  /// 삭제 툼스톤 키. 기본 캘린더가 아니면 "캘린더ID::일정ID"
+  static String pendingDeleteKey(String calendarId, String googleEventId) =>
+      calendarId.isEmpty ? googleEventId : '$calendarId::$googleEventId';
+
+  /// [pendingDeleteKey]를 (캘린더ID, 일정ID)로
+  static (String, String) parsePendingDeleteKey(String key) {
+    final i = key.lastIndexOf('::');
+    return i < 0 ? ('', key) : (key.substring(0, i), key.substring(i + 2));
+  }
+
+  /// 설정 값 (캘린더 목록 등을 저장)
+  Future<String?> getSetting(String key) async {
+    final row = await (_db.select(
+      _db.settingTable,
+    )..where((t) => t.key.equals(key))).getSingleOrNull();
+    return row?.value;
+  }
+
+  Future<void> setSetting(String key, String value) => _db
+      .into(_db.settingTable)
+      .insertOnConflictUpdate(
+        SettingTableCompanion.insert(key: key, value: value),
+      );
+
+  // 삭제 툼스톤 (키는 [pendingDeleteKey])
   Future<void> addPendingDelete(String googleEventId) async {
     await _db
         .into(_db.pendingEventDeleteTable)
@@ -244,6 +278,41 @@ class EventRepository {
     await (_db.delete(
       _db.pendingEventDeleteTable,
     )..where((t) => t.googleEventId.equals(googleEventId))).go();
+  }
+
+  /// 제목·내용·장소에 [query]가 든 일정 (반복 일정은 원본 한 개). 최근 날짜부터.
+  Future<List<Event>> searchEvents(String query, {int limit = 100}) async {
+    final q = query.trim();
+    if (q.isEmpty) return const [];
+    final pattern =
+        '%${q.replaceAll(r'\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_')}%';
+    final rows = await _db
+        .customSelect(
+          'SELECT * FROM events WHERE '
+          r"title LIKE ?1 ESCAPE '\' OR content LIKE ?1 ESCAPE '\' "
+          r"OR location_name LIKE ?1 ESCAPE '\' "
+          'ORDER BY event_date DESC LIMIT ?2',
+          variables: [Variable.withString(pattern), Variable.withInt(limit)],
+          readsFrom: {_db.eventTable},
+        )
+        .get();
+    return [for (final row in rows) _rowToEvent(_db.eventTable.map(row.data))];
+  }
+
+  /// 반복 일정에서 [date] 회차만 뺌 ("이 일정만" 삭제·수정). 구글에도 반영되도록 dirty.
+  Future<void> addRecurrenceException(int masterId, String date) async {
+    final master = await getEventById(masterId);
+    if (master == null || master.recurrenceExceptions.contains(date)) return;
+    await (_db.update(
+      _db.eventTable,
+    )..where((t) => t.id.equals(masterId))).write(
+      EventTableCompanion(
+        recurrenceExceptions: Value(
+          [...master.recurrenceExceptions, date].join(','),
+        ),
+        dirty: const Value(true),
+      ),
+    );
   }
 
   Future<void> deleteEvent(int id) async {
@@ -284,6 +353,9 @@ class EventRepository {
         locationLng: Value(event.locationLng),
         recurrence: Value(event.recurrence),
         recurrenceUntil: Value(event.recurrenceUntil),
+        recurrenceInterval: Value(event.recurrenceInterval),
+        recurrenceDays: Value(event.recurrenceDays.join(',')),
+        recurrenceExceptions: Value(event.recurrenceExceptions.join(',')),
         dirty: dirty ? const Value(true) : const Value.absent(),
       ),
     );
@@ -394,6 +466,16 @@ class EventRepository {
       content: row.content,
       recurrence: row.recurrence,
       recurrenceUntil: row.recurrenceUntil,
+      recurrenceInterval: row.recurrenceInterval,
+      recurrenceDays: [
+        for (final d in row.recurrenceDays.split(','))
+          if (int.tryParse(d) case final n?) n,
+      ],
+      recurrenceExceptions: [
+        for (final d in row.recurrenceExceptions.split(','))
+          if (d.isNotEmpty) d,
+      ],
+      calendarId: row.calendarId,
     );
   }
 }

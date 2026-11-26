@@ -158,7 +158,7 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
   }
 
   Future<void> _loadAllNotes() async {
-    final notes = await ref.read(noteRepositoryProvider).getAllNotes();
+    final notes = await ref.read(noteRepositoryProvider).getNoteSummaries();
     if (mounted) _allNotesCache = notes;
   }
 
@@ -1432,9 +1432,12 @@ class _MemoEditorV2ViewState extends ConsumerState<MemoEditorV2View> {
         // 이전 메모의 저장 대기분을 바로 저장 (500ms 안에 전환해도 잃지 않게)
         _flushSave();
         _currentNote = freshNote;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
           ref.read(tabProvider.notifier).addTab(freshNote.id!);
-          _initEditor(freshNote);
+          // 목록의 메모는 본문 없이 읽은 것이라 열 때 본문을 읽음
+          final full = await _noteList.loadContent(freshNote);
+          if (!mounted || _currentNote?.id != full.id) return;
+          _initEditor(full);
         });
       } else {
         _currentNote = freshNote;

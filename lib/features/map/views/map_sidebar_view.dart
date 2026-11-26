@@ -290,37 +290,43 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                           children: tags.map((tag) {
                             final isActive = activeTags.contains(tag.id);
                             final color = _hexToColor(tag.color);
-                            return InputChip(
-                              label: Text(
-                                tag.name,
-                                style: TextStyle(
-                                  fontSize: 11,
+                            // 오른쪽 클릭: 수정·삭제
+                            return GestureDetector(
+                              key: Key('map-tag-${tag.id}'),
+                              onSecondaryTapDown: (d) =>
+                                  _showTagMenu(tag, d.globalPosition),
+                              child: InputChip(
+                                label: Text(
+                                  tag.name,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isActive ? Colors.white : color,
+                                  ),
+                                ),
+                                labelPadding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 0,
+                                ),
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                backgroundColor: isActive
+                                    ? color
+                                    : color.withValues(alpha: 0.12),
+                                side: BorderSide.none,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                onPressed: () => ref
+                                    .read(activeMapTagsProvider.notifier)
+                                    .toggle(tag.id!),
+                                onDeleted: () => _showDeleteTagDialog(tag),
+                                deleteIcon: Icon(
+                                  Icons.close,
+                                  size: 14,
                                   color: isActive ? Colors.white : color,
                                 ),
+                                deleteButtonTooltipMessage: '삭제',
                               ),
-                              labelPadding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 0,
-                              ),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              backgroundColor: isActive
-                                  ? color
-                                  : color.withValues(alpha: 0.12),
-                              side: BorderSide.none,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              onPressed: () => ref
-                                  .read(activeMapTagsProvider.notifier)
-                                  .toggle(tag.id!),
-                              onDeleted: () => _showDeleteTagDialog(tag),
-                              deleteIcon: Icon(
-                                Icons.close,
-                                size: 14,
-                                color: isActive ? Colors.white : color,
-                              ),
-                              deleteButtonTooltipMessage: '삭제',
                             );
                           }).toList(),
                         ),
@@ -366,17 +372,29 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
                       name: place.name,
                       address: place.address,
                       iconColor: color,
-                      trailing: IconButton(
-                        icon: Icon(Icons.close, size: 14, color: muted),
-                        tooltip: '삭제',
+                      trailing: PopupMenuButton<String>(
+                        key: Key('map-place-more-${place.id}'),
+                        icon: Icon(Icons.more_horiz, size: 16, color: muted),
+                        tooltip: '더보기',
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 28,
-                          height: 28,
+                        constraints: const BoxConstraints(),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(28, 28),
+                          fixedSize: const Size(28, 28),
                         ),
-                        onPressed: () => ref
-                            .read(mapPlaceProvider.notifier)
-                            .deletePlace(place.id!),
+                        onSelected: (action) {
+                          if (action == 'edit') {
+                            _showEditPlaceDialog(place, tagsData);
+                          } else {
+                            ref
+                                .read(mapPlaceProvider.notifier)
+                                .deletePlace(place.id!);
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 'edit', child: Text('수정')),
+                          PopupMenuItem(value: 'delete', child: Text('삭제')),
+                        ],
                       ),
                       onTap: () {
                         ref
@@ -399,23 +417,21 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
     );
   }
 
-  void _showCreateTagDialog() {
-    final nameController = TextEditingController();
-    String selectedColor = '#4A90E2';
+  /// 태그 추가 ([tag]가 있으면 그 태그의 이름·색 수정)
+  void _showCreateTagDialog({MapTag? tag}) {
+    final nameController = TextEditingController(text: tag?.name ?? '');
+    String selectedColor = tag?.color ?? '#4A90E2';
+    // 예전에 고른 색이 목록에 없어도 그대로 고를 수 있게
     final colors = [
-      '#E53935',
-      '#FF9800',
-      '#4CAF50',
-      '#4A90E2',
-      '#9C27B0',
-      '#FF5722',
+      ..._tagColors,
+      if (!_tagColors.contains(selectedColor)) selectedColor,
     ];
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('태그 추가'),
+          title: Text(tag == null ? '태그 추가' : '태그 수정'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -456,18 +472,54 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
               child: const Text('취소'),
             ),
             TextButton(
+              key: const Key('map-tag-save'),
               onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  ref
-                      .read(mapTagProvider.notifier)
-                      .createTag(nameController.text, selectedColor);
-                  Navigator.pop(ctx);
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                final tags = ref.read(mapTagProvider.notifier);
+                if (tag == null) {
+                  tags.createTag(name, selectedColor);
+                } else {
+                  tags.updateTag(tag.id!, name, selectedColor);
                 }
+                Navigator.pop(ctx);
               },
-              child: const Text('추가'),
+              child: Text(tag == null ? '추가' : '저장'),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 태그 칩 오른쪽 클릭 메뉴
+  Future<void> _showTagMenu(MapTag tag, Offset position) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        position & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: const [
+        PopupMenuItem(value: 'edit', child: Text('수정')),
+        PopupMenuItem(value: 'delete', child: Text('삭제')),
+      ],
+    );
+    if (!mounted) return;
+    if (action == 'edit') _showCreateTagDialog(tag: tag);
+    if (action == 'delete') _showDeleteTagDialog(tag);
+  }
+
+  void _showEditPlaceDialog(MapPlace place, List<MapTag> tags) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _PlaceEditDialog(
+        place: place,
+        tags: tags,
+        onSave: (name, tagId) => ref
+            .read(mapPlaceProvider.notifier)
+            .updatePlace(place.id!, name, tagId),
       ),
     );
   }
@@ -505,6 +557,139 @@ class _MapSidebarViewState extends ConsumerState<MapSidebarView> {
   }
 }
 
+/// 태그 색 선택지
+const _tagColors = [
+  '#E53935',
+  '#FF9800',
+  '#4CAF50',
+  '#4A90E2',
+  '#9C27B0',
+  '#FF5722',
+];
+
+Color _tagColor(String hex) {
+  try {
+    return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+  } catch (_) {
+    return const Color(0xFF4A90E2);
+  }
+}
+
+/// 저장한 장소 수정: 이름, 태그 옮기기
+class _PlaceEditDialog extends StatefulWidget {
+  final MapPlace place;
+  final List<MapTag> tags;
+  final Future<void> Function(String name, int tagId) onSave;
+
+  const _PlaceEditDialog({
+    required this.place,
+    required this.tags,
+    required this.onSave,
+  });
+
+  @override
+  State<_PlaceEditDialog> createState() => _PlaceEditDialogState();
+}
+
+class _PlaceEditDialogState extends State<_PlaceEditDialog> {
+  late final _name = TextEditingController(text: widget.place.name);
+  late int _tagId = widget.place.tagId;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    await widget.onSave(name, _tagId);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: const Text('장소 수정'),
+      content: SizedBox(
+        width: 300,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              key: const Key('map-place-name'),
+              controller: _name,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: '장소 이름'),
+              onSubmitted: (_) => _save(),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '태그',
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final tag in widget.tags)
+                  GestureDetector(
+                    key: Key('map-place-tag-${tag.id}'),
+                    onTap: () => setState(() => _tagId = tag.id!),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _tagId == tag.id
+                            ? _tagColor(tag.color)
+                            : _tagColor(tag.color).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        tag.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _tagId == tag.id
+                              ? Colors.white
+                              : _tagColor(tag.color),
+                          fontWeight: _tagId == tag.id ? FontWeight.w600 : null,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        FilledButton(
+          key: const Key('map-place-save'),
+          onPressed: _save,
+          style: FilledButton.styleFrom(
+            backgroundColor: context.accent,
+            foregroundColor: scheme.onPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text('저장'),
+        ),
+      ],
+    );
+  }
+}
+
 // 태그 선택 다이얼로그
 class _TagSelectDialog extends StatefulWidget {
   final LocationSearchResult result;
@@ -530,14 +715,7 @@ class _TagSelectDialogState extends State<_TagSelectDialog> {
   String _newTagColor = '#4A90E2';
   bool _isCreating = false;
 
-  final _colors = [
-    '#E53935',
-    '#FF9800',
-    '#4CAF50',
-    '#4A90E2',
-    '#9C27B0',
-    '#FF5722',
-  ];
+  final _colors = _tagColors;
 
   @override
   void initState() {

@@ -59,9 +59,7 @@ class MemoListView extends ConsumerWidget {
         IconButton.styleFrom(
           backgroundColor: background,
           foregroundColor: foreground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         );
     return Row(
       children: [
@@ -857,7 +855,11 @@ class _NoteNode extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.description_outlined, size: 15, color: Colors.grey),
+            const Icon(
+              Icons.description_outlined,
+              size: 15,
+              color: Colors.grey,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -984,9 +986,16 @@ class _NoteNode extends ConsumerWidget {
         break;
       case 'duplicate':
         final repo = ref.read(noteRepositoryProvider);
+        // 목록의 메모는 본문 없이 읽은 것이라 본문을 다시 읽음
+        final source = await ref
+            .read(noteListProvider.notifier)
+            .loadContent(note);
         final newNote = await repo.createNote(folderId: note.folderId);
         await repo.saveNote(
-          newNote.copyWith(title: '${note.title} (복사)', content: note.content),
+          newNote.copyWith(
+            title: '${note.title} (복사)',
+            content: source.content,
+          ),
         );
         ref.read(noteListProvider.notifier).refresh();
         break;

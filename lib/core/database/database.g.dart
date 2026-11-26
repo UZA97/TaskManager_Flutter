@@ -2928,6 +2928,53 @@ class $EventTableTable extends EventTable
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _recurrenceIntervalMeta =
+      const VerificationMeta('recurrenceInterval');
+  @override
+  late final GeneratedColumn<int> recurrenceInterval = GeneratedColumn<int>(
+    'recurrence_interval',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _recurrenceDaysMeta = const VerificationMeta(
+    'recurrenceDays',
+  );
+  @override
+  late final GeneratedColumn<String> recurrenceDays = GeneratedColumn<String>(
+    'recurrence_days',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _recurrenceExceptionsMeta =
+      const VerificationMeta('recurrenceExceptions');
+  @override
+  late final GeneratedColumn<String> recurrenceExceptions =
+      GeneratedColumn<String>(
+        'recurrence_exceptions',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _calendarIdMeta = const VerificationMeta(
+    'calendarId',
+  );
+  @override
+  late final GeneratedColumn<String> calendarId = GeneratedColumn<String>(
+    'calendar_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
   @override
   late final GeneratedColumn<bool> dirty = GeneratedColumn<bool>(
@@ -2964,6 +3011,10 @@ class $EventTableTable extends EventTable
     content,
     recurrence,
     recurrenceUntil,
+    recurrenceInterval,
+    recurrenceDays,
+    recurrenceExceptions,
+    calendarId,
     dirty,
   ];
   @override
@@ -3129,6 +3180,39 @@ class $EventTableTable extends EventTable
         ),
       );
     }
+    if (data.containsKey('recurrence_interval')) {
+      context.handle(
+        _recurrenceIntervalMeta,
+        recurrenceInterval.isAcceptableOrUnknown(
+          data['recurrence_interval']!,
+          _recurrenceIntervalMeta,
+        ),
+      );
+    }
+    if (data.containsKey('recurrence_days')) {
+      context.handle(
+        _recurrenceDaysMeta,
+        recurrenceDays.isAcceptableOrUnknown(
+          data['recurrence_days']!,
+          _recurrenceDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('recurrence_exceptions')) {
+      context.handle(
+        _recurrenceExceptionsMeta,
+        recurrenceExceptions.isAcceptableOrUnknown(
+          data['recurrence_exceptions']!,
+          _recurrenceExceptionsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('calendar_id')) {
+      context.handle(
+        _calendarIdMeta,
+        calendarId.isAcceptableOrUnknown(data['calendar_id']!, _calendarIdMeta),
+      );
+    }
     if (data.containsKey('dirty')) {
       context.handle(
         _dirtyMeta,
@@ -3228,6 +3312,22 @@ class $EventTableTable extends EventTable
         DriftSqlType.string,
         data['${effectivePrefix}recurrence_until'],
       ),
+      recurrenceInterval: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}recurrence_interval'],
+      )!,
+      recurrenceDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence_days'],
+      )!,
+      recurrenceExceptions: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence_exceptions'],
+      )!,
+      calendarId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}calendar_id'],
+      )!,
       dirty: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}dirty'],
@@ -3263,6 +3363,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
   final String? content;
   final String recurrence;
   final String? recurrenceUntil;
+  final int recurrenceInterval;
+  final String recurrenceDays;
+  final String recurrenceExceptions;
+  final String calendarId;
   final bool dirty;
   const EventTableData({
     required this.id,
@@ -3286,6 +3390,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     this.content,
     required this.recurrence,
     this.recurrenceUntil,
+    required this.recurrenceInterval,
+    required this.recurrenceDays,
+    required this.recurrenceExceptions,
+    required this.calendarId,
     required this.dirty,
   });
   @override
@@ -3330,6 +3438,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     if (!nullToAbsent || recurrenceUntil != null) {
       map['recurrence_until'] = Variable<String>(recurrenceUntil);
     }
+    map['recurrence_interval'] = Variable<int>(recurrenceInterval);
+    map['recurrence_days'] = Variable<String>(recurrenceDays);
+    map['recurrence_exceptions'] = Variable<String>(recurrenceExceptions);
+    map['calendar_id'] = Variable<String>(calendarId);
     map['dirty'] = Variable<bool>(dirty);
     return map;
   }
@@ -3375,6 +3487,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       recurrenceUntil: recurrenceUntil == null && nullToAbsent
           ? const Value.absent()
           : Value(recurrenceUntil),
+      recurrenceInterval: Value(recurrenceInterval),
+      recurrenceDays: Value(recurrenceDays),
+      recurrenceExceptions: Value(recurrenceExceptions),
+      calendarId: Value(calendarId),
       dirty: Value(dirty),
     );
   }
@@ -3406,6 +3522,12 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       content: serializer.fromJson<String?>(json['content']),
       recurrence: serializer.fromJson<String>(json['recurrence']),
       recurrenceUntil: serializer.fromJson<String?>(json['recurrenceUntil']),
+      recurrenceInterval: serializer.fromJson<int>(json['recurrenceInterval']),
+      recurrenceDays: serializer.fromJson<String>(json['recurrenceDays']),
+      recurrenceExceptions: serializer.fromJson<String>(
+        json['recurrenceExceptions'],
+      ),
+      calendarId: serializer.fromJson<String>(json['calendarId']),
       dirty: serializer.fromJson<bool>(json['dirty']),
     );
   }
@@ -3434,6 +3556,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       'content': serializer.toJson<String?>(content),
       'recurrence': serializer.toJson<String>(recurrence),
       'recurrenceUntil': serializer.toJson<String?>(recurrenceUntil),
+      'recurrenceInterval': serializer.toJson<int>(recurrenceInterval),
+      'recurrenceDays': serializer.toJson<String>(recurrenceDays),
+      'recurrenceExceptions': serializer.toJson<String>(recurrenceExceptions),
+      'calendarId': serializer.toJson<String>(calendarId),
       'dirty': serializer.toJson<bool>(dirty),
     };
   }
@@ -3460,6 +3586,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     Value<String?> content = const Value.absent(),
     String? recurrence,
     Value<String?> recurrenceUntil = const Value.absent(),
+    int? recurrenceInterval,
+    String? recurrenceDays,
+    String? recurrenceExceptions,
+    String? calendarId,
     bool? dirty,
   }) => EventTableData(
     id: id ?? this.id,
@@ -3485,6 +3615,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     recurrenceUntil: recurrenceUntil.present
         ? recurrenceUntil.value
         : this.recurrenceUntil,
+    recurrenceInterval: recurrenceInterval ?? this.recurrenceInterval,
+    recurrenceDays: recurrenceDays ?? this.recurrenceDays,
+    recurrenceExceptions: recurrenceExceptions ?? this.recurrenceExceptions,
+    calendarId: calendarId ?? this.calendarId,
     dirty: dirty ?? this.dirty,
   );
   EventTableData copyWithCompanion(EventTableCompanion data) {
@@ -3528,6 +3662,18 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
       recurrenceUntil: data.recurrenceUntil.present
           ? data.recurrenceUntil.value
           : this.recurrenceUntil,
+      recurrenceInterval: data.recurrenceInterval.present
+          ? data.recurrenceInterval.value
+          : this.recurrenceInterval,
+      recurrenceDays: data.recurrenceDays.present
+          ? data.recurrenceDays.value
+          : this.recurrenceDays,
+      recurrenceExceptions: data.recurrenceExceptions.present
+          ? data.recurrenceExceptions.value
+          : this.recurrenceExceptions,
+      calendarId: data.calendarId.present
+          ? data.calendarId.value
+          : this.calendarId,
       dirty: data.dirty.present ? data.dirty.value : this.dirty,
     );
   }
@@ -3556,6 +3702,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           ..write('content: $content, ')
           ..write('recurrence: $recurrence, ')
           ..write('recurrenceUntil: $recurrenceUntil, ')
+          ..write('recurrenceInterval: $recurrenceInterval, ')
+          ..write('recurrenceDays: $recurrenceDays, ')
+          ..write('recurrenceExceptions: $recurrenceExceptions, ')
+          ..write('calendarId: $calendarId, ')
           ..write('dirty: $dirty')
           ..write(')'))
         .toString();
@@ -3584,6 +3734,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
     content,
     recurrence,
     recurrenceUntil,
+    recurrenceInterval,
+    recurrenceDays,
+    recurrenceExceptions,
+    calendarId,
     dirty,
   ]);
   @override
@@ -3611,6 +3765,10 @@ class EventTableData extends DataClass implements Insertable<EventTableData> {
           other.content == this.content &&
           other.recurrence == this.recurrence &&
           other.recurrenceUntil == this.recurrenceUntil &&
+          other.recurrenceInterval == this.recurrenceInterval &&
+          other.recurrenceDays == this.recurrenceDays &&
+          other.recurrenceExceptions == this.recurrenceExceptions &&
+          other.calendarId == this.calendarId &&
           other.dirty == this.dirty);
 }
 
@@ -3636,6 +3794,10 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
   final Value<String?> content;
   final Value<String> recurrence;
   final Value<String?> recurrenceUntil;
+  final Value<int> recurrenceInterval;
+  final Value<String> recurrenceDays;
+  final Value<String> recurrenceExceptions;
+  final Value<String> calendarId;
   final Value<bool> dirty;
   const EventTableCompanion({
     this.id = const Value.absent(),
@@ -3659,6 +3821,10 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.content = const Value.absent(),
     this.recurrence = const Value.absent(),
     this.recurrenceUntil = const Value.absent(),
+    this.recurrenceInterval = const Value.absent(),
+    this.recurrenceDays = const Value.absent(),
+    this.recurrenceExceptions = const Value.absent(),
+    this.calendarId = const Value.absent(),
     this.dirty = const Value.absent(),
   });
   EventTableCompanion.insert({
@@ -3683,6 +3849,10 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     this.content = const Value.absent(),
     this.recurrence = const Value.absent(),
     this.recurrenceUntil = const Value.absent(),
+    this.recurrenceInterval = const Value.absent(),
+    this.recurrenceDays = const Value.absent(),
+    this.recurrenceExceptions = const Value.absent(),
+    this.calendarId = const Value.absent(),
     this.dirty = const Value.absent(),
   }) : eventDate = Value(eventDate),
        createdAt = Value(createdAt);
@@ -3708,6 +3878,10 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Expression<String>? content,
     Expression<String>? recurrence,
     Expression<String>? recurrenceUntil,
+    Expression<int>? recurrenceInterval,
+    Expression<String>? recurrenceDays,
+    Expression<String>? recurrenceExceptions,
+    Expression<String>? calendarId,
     Expression<bool>? dirty,
   }) {
     return RawValuesInsertable({
@@ -3732,6 +3906,11 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       if (content != null) 'content': content,
       if (recurrence != null) 'recurrence': recurrence,
       if (recurrenceUntil != null) 'recurrence_until': recurrenceUntil,
+      if (recurrenceInterval != null) 'recurrence_interval': recurrenceInterval,
+      if (recurrenceDays != null) 'recurrence_days': recurrenceDays,
+      if (recurrenceExceptions != null)
+        'recurrence_exceptions': recurrenceExceptions,
+      if (calendarId != null) 'calendar_id': calendarId,
       if (dirty != null) 'dirty': dirty,
     });
   }
@@ -3758,6 +3937,10 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     Value<String?>? content,
     Value<String>? recurrence,
     Value<String?>? recurrenceUntil,
+    Value<int>? recurrenceInterval,
+    Value<String>? recurrenceDays,
+    Value<String>? recurrenceExceptions,
+    Value<String>? calendarId,
     Value<bool>? dirty,
   }) {
     return EventTableCompanion(
@@ -3782,6 +3965,10 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
       content: content ?? this.content,
       recurrence: recurrence ?? this.recurrence,
       recurrenceUntil: recurrenceUntil ?? this.recurrenceUntil,
+      recurrenceInterval: recurrenceInterval ?? this.recurrenceInterval,
+      recurrenceDays: recurrenceDays ?? this.recurrenceDays,
+      recurrenceExceptions: recurrenceExceptions ?? this.recurrenceExceptions,
+      calendarId: calendarId ?? this.calendarId,
       dirty: dirty ?? this.dirty,
     );
   }
@@ -3852,6 +4039,20 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
     if (recurrenceUntil.present) {
       map['recurrence_until'] = Variable<String>(recurrenceUntil.value);
     }
+    if (recurrenceInterval.present) {
+      map['recurrence_interval'] = Variable<int>(recurrenceInterval.value);
+    }
+    if (recurrenceDays.present) {
+      map['recurrence_days'] = Variable<String>(recurrenceDays.value);
+    }
+    if (recurrenceExceptions.present) {
+      map['recurrence_exceptions'] = Variable<String>(
+        recurrenceExceptions.value,
+      );
+    }
+    if (calendarId.present) {
+      map['calendar_id'] = Variable<String>(calendarId.value);
+    }
     if (dirty.present) {
       map['dirty'] = Variable<bool>(dirty.value);
     }
@@ -3882,6 +4083,10 @@ class EventTableCompanion extends UpdateCompanion<EventTableData> {
           ..write('content: $content, ')
           ..write('recurrence: $recurrence, ')
           ..write('recurrenceUntil: $recurrenceUntil, ')
+          ..write('recurrenceInterval: $recurrenceInterval, ')
+          ..write('recurrenceDays: $recurrenceDays, ')
+          ..write('recurrenceExceptions: $recurrenceExceptions, ')
+          ..write('calendarId: $calendarId, ')
           ..write('dirty: $dirty')
           ..write(')'))
         .toString();
@@ -7692,6 +7897,10 @@ typedef $$EventTableTableCreateCompanionBuilder =
       Value<String?> content,
       Value<String> recurrence,
       Value<String?> recurrenceUntil,
+      Value<int> recurrenceInterval,
+      Value<String> recurrenceDays,
+      Value<String> recurrenceExceptions,
+      Value<String> calendarId,
       Value<bool> dirty,
     });
 typedef $$EventTableTableUpdateCompanionBuilder =
@@ -7717,6 +7926,10 @@ typedef $$EventTableTableUpdateCompanionBuilder =
       Value<String?> content,
       Value<String> recurrence,
       Value<String?> recurrenceUntil,
+      Value<int> recurrenceInterval,
+      Value<String> recurrenceDays,
+      Value<String> recurrenceExceptions,
+      Value<String> calendarId,
       Value<bool> dirty,
     });
 
@@ -7867,6 +8080,26 @@ class $$EventTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get recurrenceInterval => $composableBuilder(
+    column: $table.recurrenceInterval,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recurrenceDays => $composableBuilder(
+    column: $table.recurrenceDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recurrenceExceptions => $composableBuilder(
+    column: $table.recurrenceExceptions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get calendarId => $composableBuilder(
+    column: $table.calendarId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<bool> get dirty => $composableBuilder(
     column: $table.dirty,
     builder: (column) => ColumnFilters(column),
@@ -8013,6 +8246,26 @@ class $$EventTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get recurrenceInterval => $composableBuilder(
+    column: $table.recurrenceInterval,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recurrenceDays => $composableBuilder(
+    column: $table.recurrenceDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recurrenceExceptions => $composableBuilder(
+    column: $table.recurrenceExceptions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get calendarId => $composableBuilder(
+    column: $table.calendarId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get dirty => $composableBuilder(
     column: $table.dirty,
     builder: (column) => ColumnOrderings(column),
@@ -8109,6 +8362,26 @@ class $$EventTableTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get recurrenceInterval => $composableBuilder(
+    column: $table.recurrenceInterval,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get recurrenceDays => $composableBuilder(
+    column: $table.recurrenceDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get recurrenceExceptions => $composableBuilder(
+    column: $table.recurrenceExceptions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get calendarId => $composableBuilder(
+    column: $table.calendarId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get dirty =>
       $composableBuilder(column: $table.dirty, builder: (column) => column);
 
@@ -8188,6 +8461,10 @@ class $$EventTableTableTableManager
                 Value<String?> content = const Value.absent(),
                 Value<String> recurrence = const Value.absent(),
                 Value<String?> recurrenceUntil = const Value.absent(),
+                Value<int> recurrenceInterval = const Value.absent(),
+                Value<String> recurrenceDays = const Value.absent(),
+                Value<String> recurrenceExceptions = const Value.absent(),
+                Value<String> calendarId = const Value.absent(),
                 Value<bool> dirty = const Value.absent(),
               }) => EventTableCompanion(
                 id: id,
@@ -8211,6 +8488,10 @@ class $$EventTableTableTableManager
                 content: content,
                 recurrence: recurrence,
                 recurrenceUntil: recurrenceUntil,
+                recurrenceInterval: recurrenceInterval,
+                recurrenceDays: recurrenceDays,
+                recurrenceExceptions: recurrenceExceptions,
+                calendarId: calendarId,
                 dirty: dirty,
               ),
           createCompanionCallback:
@@ -8236,6 +8517,10 @@ class $$EventTableTableTableManager
                 Value<String?> content = const Value.absent(),
                 Value<String> recurrence = const Value.absent(),
                 Value<String?> recurrenceUntil = const Value.absent(),
+                Value<int> recurrenceInterval = const Value.absent(),
+                Value<String> recurrenceDays = const Value.absent(),
+                Value<String> recurrenceExceptions = const Value.absent(),
+                Value<String> calendarId = const Value.absent(),
                 Value<bool> dirty = const Value.absent(),
               }) => EventTableCompanion.insert(
                 id: id,
@@ -8259,6 +8544,10 @@ class $$EventTableTableTableManager
                 content: content,
                 recurrence: recurrence,
                 recurrenceUntil: recurrenceUntil,
+                recurrenceInterval: recurrenceInterval,
+                recurrenceDays: recurrenceDays,
+                recurrenceExceptions: recurrenceExceptions,
+                calendarId: calendarId,
                 dirty: dirty,
               ),
           withReferenceMapper: (p0) => p0

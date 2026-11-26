@@ -68,6 +68,13 @@ class MapTagNotifier extends AsyncNotifier<List<MapTag>> {
     ref.invalidateSelf();
   }
 
+  Future<void> updateTag(int id, String name, String color) async {
+    await ref
+        .read(mapRepositoryProvider)
+        .updateTag(id, name: name, color: color);
+    ref.invalidateSelf();
+  }
+
   Future<void> deleteTag(int id) async {
     final repo = ref.read(mapRepositoryProvider);
     await repo.deleteTag(id);
@@ -91,6 +98,13 @@ class MapPlaceNotifier extends AsyncNotifier<List<MapPlace>> {
   Future<void> addPlace(MapPlace place) async {
     final repo = ref.read(mapRepositoryProvider);
     await repo.addPlace(place);
+    ref.invalidateSelf();
+  }
+
+  Future<void> updatePlace(int id, String name, int tagId) async {
+    await ref
+        .read(mapRepositoryProvider)
+        .updatePlace(id, name: name, tagId: tagId);
     ref.invalidateSelf();
   }
 

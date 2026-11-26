@@ -33,7 +33,40 @@ class GoogleDriveSyncService {
 
   final String accessToken;
 
-  GoogleDriveSyncService({required this.accessToken});
+  GoogleDriveSyncService({required this.accessToken, http.Client? client})
+    : _clientInstance = client;
+
+  /// 한 번의 업로드·다운로드 동안 연결을 재사용 (요청마다 새로 연결하면 느림)
+  http.Client? _clientInstance;
+  http.Client get _client => _clientInstance ??= http.Client();
+
+  /// 이름 → Drive 파일 id (한 번의 작업 안에서 같은 파일을 다시 찾지 않게)
+  final _fileIds = <String, String>{};
+
+  /// 연결을 닫음. 업로드·다운로드가 끝나면 자동으로 불림.
+  void close() {
+    _clientInstance?.close();
+    _clientInstance = null;
+    _fileIds.clear();
+  }
+
+  /// [items]를 최대 [limit]개씩 동시에 처리 (하나라도 실패하면 모두 끝난 뒤 예외)
+  static Future<void> _runLimited<T>(
+    List<T> items,
+    int limit,
+    Future<void> Function(T item) task,
+  ) async {
+    var next = 0;
+    Future<void> worker() async {
+      while (next < items.length) {
+        await task(items[next++]);
+      }
+    }
+
+    await Future.wait([
+      for (var i = 0; i < limit && i < items.length; i++) worker(),
+    ]);
+  }
 
   Map<String, String> get _headers => {
     'Authorization': 'Bearer $accessToken',
@@ -54,18 +87,20 @@ class GoogleDriveSyncService {
   }
 
   Future<String?> _getFileId(String name) async {
+    final cached = _fileIds[name];
+    if (cached != null) return cached;
     final uri = Uri.parse(
       '$_driveApiBase/files'
       '?spaces=appDataFolder'
       '&q=name%3D%22$name%22'
       '&fields=files(id,name)',
     );
-    final res = await http.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers);
     _check(res, '파일 조회');
     final data = jsonDecode(res.body);
     final files = data['files'] as List<dynamic>;
     if (files.isEmpty) return null;
-    return files.first['id'] as String;
+    return _fileIds[name] = files.first['id'] as String;
   }
 
   Future<SyncMeta?> fetchRemoteMeta() async {
@@ -73,7 +108,7 @@ class GoogleDriveSyncService {
     if (fileId == null) return null;
 
     final uri = Uri.parse('$_driveApiBase/files/$fileId?alt=media');
-    final res = await http.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers);
     _check(res, '메타데이터 다운로드');
 
     try {
@@ -91,7 +126,7 @@ class GoogleDriveSyncService {
       final uri = Uri.parse(
         '$_driveUploadBase/files/$existingId?uploadType=media',
       );
-      final res = await http.patch(
+      final res = await _client.patch(
         uri,
         headers: {
           'Authorization': 'Bearer $accessToken',
@@ -138,7 +173,7 @@ class GoogleDriveSyncService {
     final uri = Uri.parse(
       '$_driveUploadBase/files?uploadType=multipart&fields=id',
     );
-    final res = await http.post(
+    final res = await _client.post(
       uri,
       headers: {
         'Authorization': 'Bearer $accessToken',
@@ -151,7 +186,9 @@ class GoogleDriveSyncService {
     _check(res, '$name 업로드');
 
     final data = jsonDecode(res.body);
-    return data['id'] as String? ?? ''; // null 안전하게
+    final id = data['id'] as String? ?? ''; // null 안전하게
+    if (id.isNotEmpty) _fileIds[name] = id;
+    return id;
   }
 
   Future<void> _updateFile(
@@ -160,7 +197,7 @@ class GoogleDriveSyncService {
     String mimeType,
   ) async {
     final uri = Uri.parse('$_driveUploadBase/files/$fileId?uploadType=media');
-    final res = await http.patch(
+    final res = await _client.patch(
       uri,
       headers: {
         'Authorization': 'Bearer $accessToken',
@@ -173,14 +210,14 @@ class GoogleDriveSyncService {
 
   Future<Uint8List?> _downloadFile(String fileId) async {
     final uri = Uri.parse('$_driveApiBase/files/$fileId?alt=media');
-    final res = await http.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers);
     _check(res, '파일 다운로드');
     return res.bodyBytes;
   }
 
   Future<void> _deleteFile(String fileId) async {
     final uri = Uri.parse('$_driveApiBase/files/$fileId');
-    final res = await http.delete(uri, headers: _headers);
+    final res = await _client.delete(uri, headers: _headers);
     if (res.statusCode != 404) _check(res, '파일 삭제');
   }
 
@@ -197,7 +234,7 @@ class GoogleDriveSyncService {
           '&pageSize=100';
       if (pageToken != null) url += '&pageToken=$pageToken';
 
-      final res = await http.get(Uri.parse(url), headers: _headers);
+      final res = await _client.get(Uri.parse(url), headers: _headers);
       _check(res, '첨부파일 목록 조회');
 
       final data = jsonDecode(res.body);
@@ -333,10 +370,14 @@ class GoogleDriveSyncService {
     final attDir = await _attachmentsDir();
     if (!await attDir.exists()) return [];
 
-    final notes = await (db.select(
-      db.noteTable,
-    )..where((t) => t.deletedAt.isNull())).get();
-    final validNoteIds = notes.map((n) => n.id.toString()).toSet();
+    // 메모 id만 읽음 (본문까지 읽으면 메모가 많을 때 느림)
+    final t = db.noteTable;
+    final rows =
+        await (db.selectOnly(t)
+              ..addColumns([t.id])
+              ..where(t.deletedAt.isNull()))
+            .get();
+    final validNoteIds = {for (final r in rows) '${r.read(t.id)}'};
 
     final files = <File>[];
     await for (final entity in attDir.list(recursive: true)) {
@@ -371,6 +412,14 @@ class GoogleDriveSyncService {
   }
 
   Future<void> upload(AppDatabase db, {void Function(String)? onStatus}) async {
+    try {
+      await _upload(db, onStatus);
+    } finally {
+      close();
+    }
+  }
+
+  Future<void> _upload(AppDatabase db, void Function(String)? onStatus) async {
     onStatus?.call('DB 준비 중...');
     await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
 
@@ -381,9 +430,17 @@ class GoogleDriveSyncService {
 
     onStatus?.call('첨부파일 확인 중...');
     final validFiles = await _collectValidAttachments(db);
-    final localMetas = await _attachmentChecksums(validFiles);
-    final driveAttachments = await _listDriveAttachments();
-    final remoteMeta = await fetchRemoteMeta();
+    // Drive 조회(첨부 목록·메타·DB 파일 id)는 서로 상관없어 해시 계산과 함께 동시에
+    final results = await Future.wait<Object?>([
+      _attachmentChecksums(validFiles),
+      _listDriveAttachments(),
+      fetchRemoteMeta(),
+      _getFileId(_dbFileName),
+    ]);
+    final localMetas = results[0] as List<AttachmentMeta>;
+    final driveAttachments = results[1] as Map<String, String>;
+    final remoteMeta = results[2] as SyncMeta?;
+    final existingDbId = results[3] as String?;
     final remoteChecksums = {
       for (final m in remoteMeta?.attachments ?? <AttachmentMeta>[])
         m.relativePath: m.checksum,
@@ -401,7 +458,6 @@ class GoogleDriveSyncService {
     }
 
     onStatus?.call('DB 업로드 중...');
-    final existingDbId = await _getFileId(_dbFileName);
     if (existingDbId != null) {
       await _updateFile(existingDbId, dbBytes, 'application/octet-stream');
     } else {
@@ -425,10 +481,13 @@ class GoogleDriveSyncService {
             : localMetas[i],
     ]);
 
-    for (var n = 0; n < pending.length; n++) {
-      final i = pending[n];
+    // 첨부는 3개씩 동시에
+    var uploaded = 0;
+    if (pending.isNotEmpty) {
+      onStatus?.call('첨부파일 업로드 중... (0/${pending.length})');
+    }
+    await _runLimited(pending, 3, (i) async {
       final driveKey = _attachmentDriveKey(localMetas[i].relativePath);
-      onStatus?.call('첨부파일 업로드 중... (${n + 1}/${pending.length})');
       final fileBytes = await validFiles[i].readAsBytes();
       final existingId = driveAttachments[driveKey];
       if (existingId != null) {
@@ -440,17 +499,21 @@ class GoogleDriveSyncService {
           bytes: fileBytes,
         );
       }
-    }
+      onStatus?.call('첨부파일 업로드 중... (${++uploaded}/${pending.length})');
+    });
 
     // 고아 파일 삭제
     final validKeys = localMetas
         .map((m) => _attachmentDriveKey(m.relativePath))
         .toSet();
-    for (final entry in driveAttachments.entries) {
-      if (!validKeys.contains(entry.key)) {
-        await _deleteFile(entry.value);
-      }
-    }
+    await _runLimited(
+      [
+        for (final entry in driveAttachments.entries)
+          if (!validKeys.contains(entry.key)) entry.value,
+      ],
+      4,
+      _deleteFile,
+    );
 
     onStatus?.call('메타데이터 저장 중...');
     await _uploadMeta(deviceId, dbChecksum, localMetas);
@@ -475,6 +538,17 @@ class GoogleDriveSyncService {
     AppDatabase db, {
     void Function(String)? onStatus,
   }) async {
+    try {
+      await _download(db, onStatus);
+    } finally {
+      close(); // 성공하면 앱이 재시작되므로 실패했을 때만 여기까지 옴
+    }
+  }
+
+  Future<void> _download(
+    AppDatabase db,
+    void Function(String)? onStatus,
+  ) async {
     onStatus?.call('Drive 메타데이터 확인 중...');
     final remoteMeta = await fetchRemoteMeta();
     if (remoteMeta == null) throw Exception('Drive에 백업이 없습니다');
@@ -597,20 +671,19 @@ class GoogleDriveSyncService {
     final appDir = await _appSupportDir();
     final driveAttachments = await _listDriveAttachments();
 
-    for (final meta in remoteMeta.attachments) {
+    // 이 PC에 없는 첨부만 3개씩 동시에 받음
+    await _runLimited(remoteMeta.attachments, 3, (meta) async {
       final localFile = File(p.join(appDir.path, meta.relativePath));
-      if (!await localFile.exists()) {
-        final driveKey = _attachmentDriveKey(meta.relativePath);
-        final fileId = driveAttachments[driveKey];
-        if (fileId == null) continue;
+      if (await localFile.exists()) return;
+      final fileId = driveAttachments[_attachmentDriveKey(meta.relativePath)];
+      if (fileId == null) return;
 
-        final bytes = await _downloadFile(fileId);
-        if (bytes == null) continue;
+      final bytes = await _downloadFile(fileId);
+      if (bytes == null) return;
 
-        await localFile.parent.create(recursive: true);
-        await localFile.writeAsBytes(bytes);
-      }
-    }
+      await localFile.parent.create(recursive: true);
+      await localFile.writeAsBytes(bytes);
+    });
 
     // 고아 파일 삭제
     final validPaths = remoteMeta.attachments

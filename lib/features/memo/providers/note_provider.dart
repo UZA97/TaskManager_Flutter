@@ -91,10 +91,17 @@ class NoteListNotifier extends AsyncNotifier<List<Note>> {
   Future<List<Note>> _fetchNotes() async {
     final query = ref.watch(searchQueryProvider);
     final repo = ref.watch(noteRepositoryProvider);
+    // 목록에는 본문이 필요 없으므로 본문 없이 (검색은 본문 글자로 거르므로 본문까지)
     if (query.isEmpty) {
-      return repo.getAllNotes();
+      return repo.getNoteSummaries();
     }
     return repo.searchNotes(query);
+  }
+
+  /// 본문 없이 읽은 목록용 메모면 본문까지 다시 읽음
+  Future<Note> loadContent(Note note) async {
+    if (note.contentLoaded || note.id == null) return note;
+    return await ref.read(noteRepositoryProvider).getNoteById(note.id!) ?? note;
   }
 
   Future<void> createNote({int? folderId}) async {

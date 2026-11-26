@@ -15,6 +15,10 @@ class Note {
   final bool isFavorite;
   final double favoriteSortOrder;
 
+  /// false면 목록용으로 본문 없이 읽은 메모 ([content]가 비어 있음).
+  /// 본문이 필요하면 id로 다시 읽어야 하고, 저장해도 본문은 건드리지 않음.
+  final bool contentLoaded;
+
   const Note({
     this.id,
     required this.title,
@@ -29,6 +33,7 @@ class Note {
     this.isImportant = false,
     this.isFavorite = false,
     this.favoriteSortOrder = 0.0,
+    this.contentLoaded = true,
   });
 
   Note copyWith({
@@ -60,6 +65,7 @@ class Note {
       isImportant: isImportant ?? this.isImportant,
       isFavorite: isFavorite ?? this.isFavorite,
       favoriteSortOrder: favoriteSortOrder ?? this.favoriteSortOrder,
+      contentLoaded: content != null || contentLoaded,
     );
   }
 }

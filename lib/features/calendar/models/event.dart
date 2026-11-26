@@ -26,11 +26,24 @@ class Event {
   final String recurrence;
   // 반복 종료일 (yyyy-MM-dd, 포함). null이면 무기한
   final String? recurrenceUntil;
+  // 반복 간격 (2면 격주·격월 등)
+  final int recurrenceInterval;
+  // 매주 반복의 요일 (DateTime.weekday 1=월 ~ 7=일). 비면 시작일의 요일
+  final List<int> recurrenceDays;
+  // 반복에서 뺀 회차 날짜 (yyyy-MM-dd)
+  final List<String> recurrenceExceptions;
+
+  // 구글 캘린더 ID ('' = 기본 캘린더)
+  final String calendarId;
 
   // 구글에서 가져온 반복 일정의 회차일 때, 원본 일정의 구글 ID (DB에 저장 안 함)
   final String? googleRecurringEventId;
 
   bool get isRecurring => recurrence.isNotEmpty;
+
+  /// 화면에 보이는 회차의 시작일 (반복 일정이면 펼친 회차의 날짜)
+  String get start => startDate ?? eventDate;
+  String get end => endDate ?? startDate ?? eventDate;
 
   const Event({
     this.id,
@@ -55,6 +68,10 @@ class Event {
     this.tagColor,
     this.recurrence = '',
     this.recurrenceUntil,
+    this.recurrenceInterval = 1,
+    this.recurrenceDays = const [],
+    this.recurrenceExceptions = const [],
+    this.calendarId = '',
     this.googleRecurringEventId,
   });
 
@@ -77,6 +94,10 @@ class Event {
     bool? isAllDay,
     String? content,
     String? recurrence,
+    int? recurrenceInterval,
+    List<int>? recurrenceDays,
+    List<String>? recurrenceExceptions,
+    String? calendarId,
     // 위치·반복 종료일은 null로 지울 수 있도록 Value<T> 패턴
     Value<String?> recurrenceUntil = const Value.absent(),
     Value<String?> locationName = const Value.absent(),
@@ -110,6 +131,10 @@ class Event {
       recurrenceUntil: recurrenceUntil.present
           ? recurrenceUntil.value
           : this.recurrenceUntil,
+      recurrenceInterval: recurrenceInterval ?? this.recurrenceInterval,
+      recurrenceDays: recurrenceDays ?? this.recurrenceDays,
+      recurrenceExceptions: recurrenceExceptions ?? this.recurrenceExceptions,
+      calendarId: calendarId ?? this.calendarId,
       googleRecurringEventId: googleRecurringEventId,
     );
   }

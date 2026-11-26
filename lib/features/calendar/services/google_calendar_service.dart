@@ -6,11 +6,118 @@ import '../models/recurrence.dart';
 // 일정 수정 결과 — notFound면 구글에서 지워진 일정
 enum GoogleUpdateResult { ok, failed, notFound }
 
+/// 구글 계정의 캘린더 하나 (기본·공유·구독·공휴일 등)
+class GoogleCalendarInfo {
+  const GoogleCalendarInfo({
+    required this.id,
+    required this.name,
+    required this.color,
+    required this.primary,
+    required this.writable,
+    required this.selected,
+  });
+
+  /// 기본 캘린더는 '' (DB의 calendarId와 같게)
+  final String id;
+  final String name;
+
+  /// '#RRGGBB'
+  final String color;
+  final bool primary;
+
+  /// 일정을 고칠 수 있는지 (공휴일·구독 캘린더는 읽기 전용)
+  final bool writable;
+
+  /// 구글 캘린더 화면에서 보이게 해 둔 캘린더인지
+  final bool selected;
+
+  Map<String, Object> toJson() => {
+    'id': id,
+    'name': name,
+    'color': color,
+    'primary': primary,
+    'writable': writable,
+    'selected': selected,
+  };
+
+  factory GoogleCalendarInfo.fromJson(Map<String, dynamic> json) =>
+      GoogleCalendarInfo(
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        color: json['color'] as String? ?? '#4A90E2',
+        primary: json['primary'] as bool? ?? false,
+        writable: json['writable'] as bool? ?? true,
+        selected: json['selected'] as bool? ?? true,
+      );
+}
+
 class GoogleCalendarService {
   static const _host = 'www.googleapis.com';
   // 오프라인 등에서 무한 대기 방지
   static const _timeout = Duration(seconds: 15);
-  static const _eventsPath = '/calendar/v3/calendars/primary/events';
+
+  /// 캘린더의 일정 주소 ('' = 기본 캘린더). ID의 @ 등은 경로에 맞게 인코딩됨
+  static Uri _eventsUri(
+    String calendarId, [
+    String? eventId,
+    Map<String, String>? query,
+  ]) => Uri(
+    scheme: 'https',
+    host: _host,
+    pathSegments: [
+      'calendar',
+      'v3',
+      'calendars',
+      calendarId.isEmpty ? 'primary' : calendarId,
+      'events',
+      ?eventId,
+    ],
+    queryParameters: query,
+  );
+
+  /// 계정의 캘린더 목록 (숨긴 캘린더 제외). 실패하면 null.
+  Future<List<GoogleCalendarInfo>?> getCalendars(String accessToken) async {
+    final calendars = <GoogleCalendarInfo>[];
+    String? pageToken;
+    do {
+      final response = await http
+          .get(
+            Uri.https(_host, '/calendar/v3/users/me/calendarList', {
+              'minAccessRole': 'reader',
+              'pageToken': ?pageToken,
+            }),
+            headers: {'Authorization': 'Bearer $accessToken'},
+          )
+          .timeout(_timeout);
+      if (response.statusCode != 200) {
+        print('구글 캘린더 목록 조회 실패: ${response.statusCode} ${response.body}');
+        return null;
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      for (final item in data['items'] as List<dynamic>? ?? const []) {
+        if (item['hidden'] == true || item['deleted'] == true) continue;
+        final primary = item['primary'] == true;
+        final role = item['accessRole'] as String? ?? 'reader';
+        calendars.add(
+          GoogleCalendarInfo(
+            id: primary ? '' : item['id'] as String,
+            name:
+                item['summaryOverride'] as String? ??
+                item['summary'] as String? ??
+                '',
+            color: item['backgroundColor'] as String? ?? '#4A90E2',
+            primary: primary,
+            writable: role == 'owner' || role == 'writer',
+            selected: primary || item['selected'] == true,
+          ),
+        );
+      }
+      pageToken = data['nextPageToken'] as String?;
+    } while (pageToken != null);
+    // 기본 캘린더를 맨 앞에
+    calendars.sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0));
+    return calendars;
+  }
 
   // 사용자 기본 캘린더의 시간대 (예: Asia/Seoul) — 반복 시간 일정에 필요
   static String? _calendarTimeZone;
@@ -42,27 +149,36 @@ class GoogleCalendarService {
     return _eventToGoogle(event, timeZone: timeZone);
   }
 
-  // 이번 달 일정 가져오기. 요청 실패 시 null (빈 목록과 구분)
+  /// [from]~[to] (날짜, 양끝 포함) 일정 가져오기. 요청 실패 시 null (빈 목록과 구분)
   Future<List<Event>?> getEvents(
     String accessToken,
-    int year,
-    int month,
-  ) async {
-    final timeMin = DateTime(year, month, 1).toUtc().toIso8601String();
-    final timeMax = DateTime(year, month + 1, 1).toUtc().toIso8601String();
+    DateTime from,
+    DateTime to, {
+    String calendarId = '',
+  }) async {
+    final timeMin = DateTime(
+      from.year,
+      from.month,
+      from.day,
+    ).toUtc().toIso8601String();
+    final timeMax = DateTime(
+      to.year,
+      to.month,
+      to.day + 1,
+    ).toUtc().toIso8601String();
 
     final events = <Event>[];
     String? pageToken;
     do {
       final response = await http
           .get(
-            Uri.https(_host, _eventsPath, {
+            _eventsUri(calendarId, null, {
               'timeMin': timeMin,
               'timeMax': timeMax,
               'singleEvents': 'true',
               'orderBy': 'startTime',
               'maxResults': '250',
-              if (pageToken != null) 'pageToken': pageToken,
+              'pageToken': ?pageToken,
             }),
             headers: {'Authorization': 'Bearer $accessToken'},
           )
@@ -77,7 +193,11 @@ class GoogleCalendarService {
       final items = data['items'] as List<dynamic>? ?? [];
       for (final item in items) {
         if (item['status'] == 'cancelled') continue;
-        events.add(_googleEventToEvent(item as Map<String, dynamic>));
+        events.add(
+          _googleEventToEvent(
+            item as Map<String, dynamic>,
+          ).copyWith(calendarId: calendarId),
+        );
       }
       pageToken = data['nextPageToken'] as String?;
     } while (pageToken != null);
@@ -89,7 +209,7 @@ class GoogleCalendarService {
   Future<String?> addEvent(String accessToken, Event event) async {
     final response = await http
         .post(
-          Uri.https(_host, _eventsPath),
+          _eventsUri(event.calendarId),
           headers: {
             'Authorization': 'Bearer $accessToken',
             'Content-Type': 'application/json',
@@ -115,7 +235,7 @@ class GoogleCalendarService {
 
     final response = await http
         .patch(
-          Uri.https(_host, '$_eventsPath/${event.googleEventId}'),
+          _eventsUri(event.calendarId, event.googleEventId),
           headers: {
             'Authorization': 'Bearer $accessToken',
             'Content-Type': 'application/json',
@@ -135,10 +255,14 @@ class GoogleCalendarService {
   }
 
   // 일정 삭제 — 이미 지워진 일정(404/410)도 성공으로 처리
-  Future<bool> deleteEvent(String accessToken, String googleEventId) async {
+  Future<bool> deleteEvent(
+    String accessToken,
+    String googleEventId, {
+    String calendarId = '',
+  }) async {
     final response = await http
         .delete(
-          Uri.https(_host, '$_eventsPath/$googleEventId'),
+          _eventsUri(calendarId, googleEventId),
           headers: {'Authorization': 'Bearer $accessToken'},
         )
         .timeout(_timeout);
@@ -189,6 +313,7 @@ class GoogleCalendarService {
     }
 
     final rrule = toRRule(event);
+    final exdate = toExDate(event, timeZone: timeZone);
     return {
       'summary': event.title,
       'description': event.content,
@@ -196,7 +321,7 @@ class GoogleCalendarService {
       'start': start,
       'end': end,
       // 수정 시 null을 보내면 반복이 해제됨
-      'recurrence': rrule == null ? null : [rrule],
+      'recurrence': rrule == null ? null : [rrule, ?exdate],
     };
   }
 

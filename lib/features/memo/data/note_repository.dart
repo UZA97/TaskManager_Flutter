@@ -65,6 +65,60 @@ class NoteRepository {
     return _withTags(rows);
   }
 
+  /// 목록용: 본문(content) 없이 읽음. 메모가 많고 길어도 빠름.
+  /// 본문이 필요하면 [getNoteById]로 다시 읽음.
+  Future<List<Note>> getNoteSummaries() async {
+    final t = _db.noteTable;
+    final rows =
+        await (_db.selectOnly(t)
+              ..addColumns([
+                t.id,
+                t.title,
+                t.createdAt,
+                t.updatedAt,
+                t.folderId,
+                t.sortOrder,
+                t.isPinned,
+                t.isImportant,
+                t.isFavorite,
+                t.favoriteSortOrder,
+              ])
+              ..where(t.deletedAt.isNull()))
+            .get();
+    if (rows.isEmpty) return const [];
+    final ids = [for (final r in rows) r.read(t.id)!];
+    final tagsByNote = await _tagsByNote(ids);
+    return [
+      for (final r in rows)
+        Note(
+          id: r.read(t.id),
+          title: r.read(t.title)!,
+          content: '',
+          contentLoaded: false,
+          tags: tagsByNote[r.read(t.id)] ?? const [],
+          createdAt: r.read(t.createdAt)!,
+          updatedAt: r.read(t.updatedAt)!,
+          folderId: r.read(t.folderId),
+          sortOrder: r.read(t.sortOrder),
+          isPinned: r.read(t.isPinned)!,
+          isImportant: r.read(t.isImportant)!,
+          isFavorite: r.read(t.isFavorite)!,
+          favoriteSortOrder: r.read(t.favoriteSortOrder)!,
+        ),
+    ];
+  }
+
+  /// 메모 id → 제목 (휴지통 제외). 제목만 읽음.
+  Future<Map<int, String>> getNoteTitles() async {
+    final t = _db.noteTable;
+    final rows =
+        await (_db.selectOnly(t)
+              ..addColumns([t.id, t.title])
+              ..where(t.deletedAt.isNull()))
+            .get();
+    return {for (final r in rows) r.read(t.id)!: r.read(t.title)!};
+  }
+
   /// 본문에 이 메모 링크(href "note://id")가 있는 메모들 (휴지통·자기 자신 제외, 최근 수정 순)
   Future<List<Note>> getBacklinks(int id) async {
     final rows =
@@ -195,7 +249,10 @@ class NoteRepository {
     )..where((t) => t.id.equals(note.id!))).write(
       NoteTableCompanion(
         title: Value(note.title),
-        content: Value(note.content),
+        // 본문 없이 읽은 목록용 메모면 본문을 빈 글자로 덮어쓰지 않음
+        content: note.contentLoaded
+            ? Value(note.content)
+            : const Value.absent(),
         updatedAt: Value(DateTime.now().toIso8601String()),
       ),
     );

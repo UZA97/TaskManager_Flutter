@@ -2,9 +2,9 @@ import 'package:taskmanager/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/event_provider.dart';
-import '../providers/google_calendar_provider.dart';
 import '../../../core/auth/google_account_provider.dart';
 import '../models/event_tag.dart';
+import 'calendar_actions.dart';
 import 'calendar_editor_view.dart';
 import '../../map/widgets/directions_button.dart';
 
@@ -59,6 +59,7 @@ class CalendarView extends ConsumerWidget {
         Divider(height: 1, color: context.lineSubtle),
         _TagFilterSection(),
         Divider(height: 1, color: context.lineSubtle),
+        const _GoogleCalendarsSection(),
         Expanded(child: _SelectedDateEventList()),
       ],
     );
@@ -113,11 +114,7 @@ class _MiniCalendar extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              navButton(
-                Icons.chevron_left,
-                '이전 달',
-                () => ref.read(currentMonthProvider.notifier).prevMonth(),
-              ),
+              navButton(Icons.chevron_left, '이전 달', () => _stepMonth(ref, -1)),
               // 연도 클릭 시 팝업
               InkWell(
                 borderRadius: BorderRadius.circular(6),
@@ -136,11 +133,7 @@ class _MiniCalendar extends ConsumerWidget {
                   ),
                 ),
               ),
-              navButton(
-                Icons.chevron_right,
-                '다음 달',
-                () => ref.read(currentMonthProvider.notifier).nextMonth(),
-              ),
+              navButton(Icons.chevron_right, '다음 달', () => _stepMonth(ref, 1)),
             ],
           ),
           const SizedBox(height: 4),
@@ -320,6 +313,104 @@ class _MiniCalendar extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// 미니 달력의 이전/다음 달. 주·일 보기면 선택 날짜도 같이 옮겨 큰 화면이 따라가게.
+void _stepMonth(WidgetRef ref, int direction) {
+  final notifier = ref.read(currentMonthProvider.notifier);
+  direction < 0 ? notifier.prevMonth() : notifier.nextMonth();
+  if (ref.read(calendarViewModeProvider) == CalendarViewMode.month) return;
+  final month = ref.read(currentMonthProvider);
+  final selected = ref.read(selectedDateProvider);
+  final lastDay = DateTime(month.year, month.month + 1, 0).day;
+  ref
+      .read(selectedDateProvider.notifier)
+      .select(
+        DateTime(
+          month.year,
+          month.month,
+          selected.day > lastDay ? lastDay : selected.day,
+        ),
+      );
+}
+
+// ── 구글 캘린더 (보이기/숨기기) ───────────────────────────
+class _GoogleCalendarsSection extends ConsumerWidget {
+  const _GoogleCalendarsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(googleCalendarsProvider).valueOrNull;
+    // 기본 캘린더 하나뿐이면 보이지 않음
+    if (state == null || state.calendars.length < 2) {
+      return const SizedBox.shrink();
+    }
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 12, 4),
+          child: Text('캘린더', style: TextStyle(fontSize: 11, color: muted)),
+        ),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 150),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 6),
+            children: [
+              for (final c in state.calendars)
+                InkWell(
+                  key: ValueKey('calendar-toggle-${c.id}'),
+                  onTap: () =>
+                      ref.read(googleCalendarsProvider.notifier).toggle(c.id),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 3,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          state.hidden.contains(c.id)
+                              ? Icons.check_box_outline_blank
+                              : Icons.check_box,
+                          size: 16,
+                          color: _hexToColor(c.color),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            c.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        if (!c.writable)
+                          Tooltip(
+                            message: '읽기 전용',
+                            child: Icon(
+                              Icons.lock_outline,
+                              size: 12,
+                              color: muted,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: context.lineSubtle),
+      ],
+    );
+  }
+
+  static Color _hexToColor(String hex) {
+    final value = int.tryParse(hex.replaceFirst('#', ''), radix: 16);
+    return value == null ? Colors.grey : Color(0xFF000000 | value);
   }
 }
 
@@ -676,13 +767,32 @@ class _SelectedDateEventList extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                            // 삭제
-                            GestureDetector(
-                              onTap: () => ref
-                                  .read(eventListProvider.notifier)
-                                  .deleteEvent(event.id!),
-                              child: Icon(Icons.close, size: 14, color: muted),
-                            ),
+                            // 삭제 (반복 일정은 이 일정만/전체를 물음)
+                            if (isEventWritable(ref, event))
+                              GestureDetector(
+                                onTap: () async {
+                                  final notifier = ref.read(
+                                    eventListProvider.notifier,
+                                  );
+                                  if (!event.isRecurring) {
+                                    return notifier.deleteEvent(event.id!);
+                                  }
+                                  final scope = await askRecurringScope(
+                                    context,
+                                    title: '반복 일정 삭제',
+                                  );
+                                  if (scope == RecurringScope.thisOnly) {
+                                    await notifier.deleteOccurrence(event);
+                                  } else if (scope == RecurringScope.all) {
+                                    await notifier.deleteEvent(event.id!);
+                                  }
+                                },
+                                child: Icon(
+                                  Icons.close,
+                                  size: 14,
+                                  color: muted,
+                                ),
+                              ),
                           ],
                         ),
                       ),
